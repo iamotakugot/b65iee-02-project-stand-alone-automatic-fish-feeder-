@@ -1,0 +1,31 @@
+Fish Feeder Arduino - Include Directory
+=====================================
+
+This directory contains header files for the Fish Feeder Arduino system.
+
+Structure:
+- sensor_data.h: Core data structures and global variables
+- sensor_service.h: High-performance sensor management class
+- dht_sensor.h: DHT22 temperature/humidity sensor wrapper
+- soil_sensor.h: Soil moisture sensor interface
+- weight_sensor.h: HX711 load cell sensor wrapper
+- voltage_sensor.h: Voltage monitoring with ACS712 current sensor
+- blower.h: Blower motor control interface
+- water_temp_sensor.h: DS18B20 water temperature (deprecated)
+- acs712_sensor.h: ACS712 current sensor interface
+
+Design Philosophy:
+- Each sensor has its own dedicated header file
+- Global instances are declared in headers and defined in .cpp files
+- High-performance optimized for 1000Hz main loop
+- Zero-delay operations with smart scheduling
+- Memory-efficient with pre-allocated buffers
+
+Usage:
+Include only the headers you need in your main.cpp file.
+
+Dependencies:
+- DHT sensor library
+- OneWire library  
+- DallasTemperature library
+- HX711 library 

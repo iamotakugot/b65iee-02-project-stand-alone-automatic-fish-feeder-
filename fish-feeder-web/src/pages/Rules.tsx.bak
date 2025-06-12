@@ -1,0 +1,646 @@
+import { useState } from "react";
+import { IoMdAdd, IoMdPlay, IoMdTrash } from "react-icons/io";
+import { Switch } from "@heroui/switch";
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+
+interface FeedingRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  schedule: {
+    time: string; // HH:MM format
+    days: number[]; // 0=Sunday, 1=Monday, etc.
+  };
+  conditions: {
+    minTemperature?: number;
+    maxTemperature?: number;
+    minWeight?: number;
+    maxWeight?: number;
+  };
+  feeding: {
+    auger_speed: number;
+    duration: number;
+    feed_amount: number;
+    direction: "forward" | "reverse";
+  };
+}
+
+interface TemperatureRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  condition: {
+    temperature: number;
+    operator: "above" | "below";
+  };
+  action: {
+    device: "fan" | "led";
+    state: boolean;
+  };
+}
+
+const Rules = () => {
+  // Remove unused variables
+  // const { controlDevice, isLoading } = useFishFeederApi();
+
+  const [feedingRules, setFeedingRules] = useState<FeedingRule[]>([
+    {
+      id: "1",
+      name: "Morning Feed",
+      enabled: true,
+      schedule: {
+        time: "07:00",
+        days: [1, 2, 3, 4, 5, 6, 0], // Every day
+      },
+      conditions: {
+        minWeight: 0.5, // Only feed if food weight > 0.5kg
+        maxTemperature: 35, // Don't feed if too hot
+      },
+      feeding: {
+        auger_speed: 60,
+        duration: 3000,
+        feed_amount: 50,
+        direction: "forward",
+      },
+    },
+    {
+      id: "2",
+      name: "Evening Feed",
+      enabled: true,
+      schedule: {
+        time: "18:00",
+        days: [1, 2, 3, 4, 5, 6, 0],
+      },
+      conditions: {
+        minWeight: 0.5,
+        maxTemperature: 35,
+      },
+      feeding: {
+        auger_speed: 70,
+        duration: 4000,
+        feed_amount: 75,
+        direction: "forward",
+      },
+    },
+  ]);
+
+  const [temperatureRules, setTemperatureRules] = useState<TemperatureRule[]>([
+    {
+      id: "1",
+      name: "Auto Fan (Hot)",
+      enabled: true,
+      condition: {
+        temperature: 30,
+        operator: "above",
+      },
+      action: {
+        device: "fan",
+        state: true,
+      },
+    },
+    {
+      id: "2",
+      name: "Auto Fan (Cool)",
+      enabled: true,
+      condition: {
+        temperature: 25,
+        operator: "below",
+      },
+      action: {
+        device: "fan",
+        state: false,
+      },
+    },
+  ]);
+
+  const [newFeedingRule, setNewFeedingRule] = useState<Partial<FeedingRule>>({
+    name: "",
+    enabled: true,
+    schedule: { time: "12:00", days: [1, 2, 3, 4, 5, 6, 0] },
+    conditions: {},
+    feeding: {
+      auger_speed: 50,
+      duration: 3000,
+      feed_amount: 50,
+      direction: "forward",
+    },
+  });
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const cardStyle = {
+    backgroundColor: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    padding: "20px",
+    margin: "10px 0",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+  };
+
+  const buttonStyle = {
+    padding: "8px 16px",
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "bold",
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "8px 12px",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    fontSize: "14px",
+    marginBottom: "10px",
+  };
+
+  const addFeedingRule = () => {
+    if (newFeedingRule.name) {
+      const rule: FeedingRule = {
+        id: Date.now().toString(),
+        name: newFeedingRule.name,
+        enabled: newFeedingRule.enabled || true,
+        schedule: newFeedingRule.schedule || {
+          time: "12:00",
+          days: [1, 2, 3, 4, 5, 6, 0],
+        },
+        conditions: newFeedingRule.conditions || {},
+        feeding: newFeedingRule.feeding || {
+          auger_speed: 50,
+          duration: 3000,
+          feed_amount: 50,
+          direction: "forward",
+        },
+      };
+
+      setFeedingRules([...feedingRules, rule]);
+      setNewFeedingRule({
+        name: "",
+        enabled: true,
+        schedule: { time: "12:00", days: [1, 2, 3, 4, 5, 6, 0] },
+        conditions: {},
+        feeding: {
+          auger_speed: 50,
+          duration: 3000,
+          feed_amount: 50,
+          direction: "forward",
+        },
+      });
+    }
+  };
+
+  const toggleFeedingRule = (id: string) => {
+    setFeedingRules(
+      feedingRules.map((rule) =>
+        rule.id === id ? { ...rule, enabled: !rule.enabled } : rule,
+      ),
+    );
+  };
+
+  const deleteFeedingRule = (id: string) => {
+    setFeedingRules(feedingRules.filter((rule) => rule.id !== id));
+  };
+
+  const toggleTemperatureRule = (id: string) => {
+    setTemperatureRules(
+      temperatureRules.map((rule) =>
+        rule.id === id ? { ...rule, enabled: !rule.enabled } : rule,
+      ),
+    );
+  };
+
+  const toggleDay = (day: number) => {
+    const currentDays = newFeedingRule.schedule?.days || [];
+    const newDays = currentDays.includes(day)
+      ? currentDays.filter((d) => d !== day)
+      : [...currentDays, day];
+
+    setNewFeedingRule({
+      ...newFeedingRule,
+      schedule: { ...newFeedingRule.schedule!, days: newDays },
+    });
+  };
+
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [simulationData, setSimulationData] = useState({
+    temperature: 25,
+    weight: 50,
+  });
+  const [simulationResults, setSimulationResults] = useState<string[]>([]);
+
+  const runSimulation = () => {
+    // Implement simulation logic here
+    setSimulationResults(["Simulation result 1", "Simulation result 2"]);
+    setShowSimulator(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 space-y-6">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              📋 Automation Rules
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Create intelligent automation rules for your fish feeder
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-sm">
+              <div className="text-gray-900 dark:text-gray-100 font-medium">
+                {feedingRules.length} Active Rules
+              </div>
+              <div className="text-gray-500 dark:text-gray-400">
+                Last updated: {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Create New Rule */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center text-blue-500 dark:text-blue-400 mb-6">
+            <IoMdAdd className="mr-3 text-xl" />
+            <h2 className="text-xl font-semibold">Create New Rule</h2>
+          </div>
+
+          <div className="space-y-4">
+            {/* Rule Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Rule Name
+              </label>
+              <Input
+                placeholder="e.g., Hot Weather Feeding"
+                value={newFeedingRule.name}
+                onChange={(e) => setNewFeedingRule({ ...newFeedingRule, name: e.target.value })}
+              />
+            </div>
+
+            {/* Rule Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Rule Type
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {["temperature", "schedule", "weight", "weather"].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setNewFeedingRule({ ...newFeedingRule, type: type as any })}
+                    className={`p-3 rounded-lg text-left transition-colors ${
+                      newFeedingRule.type === type
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    <div className="font-medium">
+                      {type === "temperature" && "🌡️ Temperature"}
+                      {type === "schedule" && "⏰ Schedule"}
+                      {type === "weight" && "⚖️ Weight"}
+                      {type === "weather" && "🌤️ Weather"}
+                    </div>
+                    <div className="text-xs opacity-80">
+                      {type === "temperature" && "Based on temperature conditions"}
+                      {type === "schedule" && "Time-based automation"}
+                      {type === "weight" && "Food weight monitoring"}
+                      {type === "weather" && "Weather-based feeding"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Condition Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Condition
+              </label>
+              <Input
+                placeholder={getConditionPlaceholder(newFeedingRule.type)}
+                value={newFeedingRule.condition}
+                onChange={(e) => setNewFeedingRule({ ...newFeedingRule, condition: e.target.value })}
+              />
+            </div>
+
+            {/* Action Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Action
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Feed amount (g)"
+                  type="number"
+                  value={newFeedingRule.feeding?.feed_amount || 50}
+                  onChange={(e) =>
+                    setNewFeedingRule({
+                      ...newFeedingRule,
+                      feeding: {
+                        ...newFeedingRule.feeding!,
+                        feed_amount: parseInt(e.target.value),
+                      },
+                    })
+                  }
+                />
+                <select
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  value={newFeedingRule.feeding?.direction || "forward"}
+                  onChange={(e) =>
+                    setNewFeedingRule({
+                      ...newFeedingRule,
+                      feeding: {
+                        ...newFeedingRule.feeding!,
+                        direction: e.target.value as "forward" | "reverse",
+                      },
+                    })
+                  }
+                >
+                  <option value="forward">Forward</option>
+                  <option value="reverse">Reverse</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Create Button */}
+            <Button
+              color="primary"
+              size="lg"
+              onPress={addFeedingRule}
+              isDisabled={!newFeedingRule.name || !newFeedingRule.condition}
+              className="w-full"
+              startContent={<IoMdAdd />}
+            >
+              Create Rule
+            </Button>
+          </div>
+        </div>
+
+        {/* Active Rules List */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                📜 Active Rules
+              </h2>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="bordered"
+                  onPress={() => setFeedingRules([])}
+                  color="danger"
+                >
+                  Clear All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="bordered"
+                  onPress={() => setShowSimulator(true)}
+                >
+                  🧪 Test Rules
+                </Button>
+              </div>
+            </div>
+
+            {feedingRules.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🤖</div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  No Automation Rules
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Create your first automation rule to get started with intelligent feeding
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
+                    <div className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                      💡 Suggestion
+                    </div>
+                    <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      "Feed extra when temperature {'>'} 30°C"
+                    </div>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-700">
+                    <div className="text-green-600 dark:text-green-400 text-sm font-medium">
+                      ⏰ Schedule
+                    </div>
+                    <div className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      "Auto feed at 8:00, 12:00, 18:00"
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {feedingRules.map((rule, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {rule.name}
+                          </h3>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            rule.enabled
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                              : "bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-300"
+                          }`}>
+                            {rule.enabled ? "Active" : "Disabled"}
+                          </span>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                            {rule.type}
+                          </span>
+                        </div>
+                        
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          <strong>When:</strong> {rule.condition}
+                        </div>
+                        
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                          <strong>Then:</strong> {rule.feeding.feed_amount}g, {rule.feeding.direction}
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <div>Created: {new Date(rule.created).toLocaleDateString()}</div>
+                          <div>Triggered: {rule.triggered} times</div>
+                          <div>Last run: {rule.lastRun || "Never"}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 ml-4">
+                        <Switch
+                          size="sm"
+                          isSelected={rule.enabled}
+                          onValueChange={(enabled) => toggleFeedingRule(rule.id)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="primary"
+                          onPress={() => console.log("Test rule")}
+                          isIconOnly
+                        >
+                          <IoMdPlay />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="danger"
+                          onPress={() => deleteFeedingRule(rule.id)}
+                          isIconOnly
+                        >
+                          <IoMdTrash />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Rule Templates */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              🎯 Quick Templates
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {ruleTemplates.map((template, index) => (
+                <div
+                  key={index}
+                  className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-700 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => applyTemplate(template)}
+                >
+                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    {template.name}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {template.description}
+                  </div>
+                  <div className="text-xs text-purple-600 dark:text-purple-400">
+                    Click to apply template
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rule Statistics */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          📊 Automation Statistics
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {feedingRules.length}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Total Rules</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {feedingRules.filter(r => r.enabled).length}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Active Rules</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              {feedingRules.reduce((sum, r) => sum + r.triggered, 0)}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Total Triggers</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+              {feedingRules.filter(r => r.lastRun).length}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Recently Used</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rule Simulator Modal */}
+      {showSimulator && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                🧪 Rule Simulator
+              </h3>
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setShowSimulator(false)}
+                isIconOnly
+              >
+                ✕
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Test Temperature (°C)
+                </label>
+                <Input
+                  type="number"
+                  value={simulationData.temperature.toString()}
+                  onChange={(e) => setSimulationData({
+                    ...simulationData,
+                    temperature: Number(e.target.value)
+                  })}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Test Weight (g)
+                </label>
+                <Input
+                  type="number"
+                  value={simulationData.weight.toString()}
+                  onChange={(e) => setSimulationData({
+                    ...simulationData,
+                    weight: Number(e.target.value)
+                  })}
+                />
+              </div>
+              
+              <Button
+                color="primary"
+                onPress={runSimulation}
+                className="w-full"
+              >
+                Run Simulation
+              </Button>
+              
+              {simulationResults.length > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Simulation Results:
+                  </div>
+                  {simulationResults.map((result, index) => (
+                    <div key={index} className="text-xs text-gray-600 dark:text-gray-400">
+                      • {result}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Rules;

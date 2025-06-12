@@ -1,0 +1,15 @@
+# Test Directory
+
+This directory contains test files for the Fish Feeder Arduino System.
+
+## Contents
+
+### test_sensors.ino
+Complete sensor testing script that reads all sensors every 2 seconds and displays their values and status.
+
+Use this script to verify that all sensors are connected correctly and providing valid readings.
+
+Use PlatformIO testing framework for automated testing.
+
+Example test command:
+pio test 
