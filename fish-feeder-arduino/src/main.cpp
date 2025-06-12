@@ -1719,10 +1719,10 @@ void saveCalibrationToEEPROM() {
   Serial.println(F("[EEPROM] Saving calibration data..."));
   
   // Save calibration factor to EEPROM
-  EEPROM.put(0, scale.get_scale());
+  EEPROM.put(0, weightSensor.getScale()->get_scale());
   
   // Save tare offset
-  EEPROM.put(4, scale.get_offset());
+  EEPROM.put(4, weightSensor.getScale()->get_offset());
   
   // Save calibration timestamp
   uint32_t timestamp = millis();
@@ -1761,8 +1761,8 @@ void loadCalibrationFromEEPROM() {
   
   // Apply calibration if valid
   if (calibration_factor != 0 && !isnan(calibration_factor)) {
-    scale.set_scale(calibration_factor);
-    scale.set_offset(tare_offset);
+    weightSensor.getScale()->set_scale(calibration_factor);
+    weightSensor.getScale()->set_offset(tare_offset);
     
     Serial.print(F("[EEPROM] Calibration loaded - Factor: "));
     Serial.print(calibration_factor);
@@ -1815,17 +1815,17 @@ void performStartupSequence() {
   
   // Initialize scale
   Serial.println(F("[STARTUP] Initializing HX711 scale..."));
-  scale.begin(HX711_DOUT_PIN, HX711_SCK_PIN);
+  weightSensor.begin();
   
   // Check if scale is ready
-  if (scale.is_ready()) {
+  if (weightSensor.getScale()->is_ready()) {
     Serial.println(F("[STARTUP] HX711 ready"));
     
     // Auto-tare on startup if weight seems off
-    float current_weight = scale.get_units(3);
+    float current_weight = weightSensor.getScale()->get_units(3);
     if (abs(current_weight) > 50) {  // If weight > 50g, probably needs tare
       Serial.println(F("[STARTUP] Auto-taring scale..."));
-      scale.tare(5);
+      weightSensor.getScale()->tare(5);
       Serial.println(F("[STARTUP] Scale tared"));
     }
   } else {

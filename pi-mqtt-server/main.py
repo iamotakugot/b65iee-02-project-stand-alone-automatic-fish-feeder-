@@ -32,6 +32,9 @@ import threading
 # Sensor History Manager
 from sensor_history_manager import SensorHistoryManager
 
+# Arduino USB Auto-Detector
+from arduino_usb_detector import ArduinoUSBDetector
+
 # ==============================================================================
 # SYSTEM CONFIGURATION
 # ==============================================================================
@@ -41,10 +44,18 @@ class Config:
     # Arduino - OPTIMIZED for faster detection
     ARDUINO_BAUDRATE = 115200
     ARDUINO_TIMEOUT = 0.5  # Reduced from 1
-    # Prioritize COM3 first (known Arduino port), then scan others
-    ARDUINO_SCAN_PORTS = ["COM3", "COM4"]  # Reduced ports for faster scanning
-    # ARDUINO_SCAN_PORTS = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyUSB1"]  # Linux
+    
+    # Auto-detect platform and set appropriate ports
+    import platform
+    if platform.system() == "Linux":
+        # Raspberry Pi 4 USB ports (prioritize ACM for Arduino Mega)
+        ARDUINO_SCAN_PORTS = ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2", "/dev/ttyAMA0"]
+    else:
+        # Windows ports
+        ARDUINO_SCAN_PORTS = ["COM3", "COM4", "COM5", "COM6"]  # Reduced ports for faster scanning
+    
     ARDUINO_RECONNECT_INTERVAL = 10  # Reduced from 5
+    USE_AUTO_DETECTOR = True  # Enable advanced Arduino detection
 
     # Web Server
     WEB_HOST = "0.0.0.0"
@@ -265,7 +276,7 @@ class FeedHistoryManager:
 # ==============================================================================
 
 class ArduinoManager:
-    """Arduino serial communication manager"""
+    """Arduino serial communication manager with advanced USB detection"""
 
     def __init__(self, logger):
         self.logger = logger
@@ -275,10 +286,28 @@ class ArduinoManager:
         self.connection_attempts = 0
         self.last_connection_attempt = 0
         self.lock = threading.Lock()
+        
+        # Initialize USB detector
+        self.usb_detector = ArduinoUSBDetector(logger) if Config.USE_AUTO_DETECTOR else None
+        self.current_port = None
 
     def find_arduino(self):
-        """Find Arduino port by detecting continuous JSON output - OPTIMIZED FAST VERSION"""
-        # Ultra-fast Windows port scanning - COM3 first (known working port)
+        """Find Arduino port using advanced USB detection"""
+        if self.usb_detector and Config.USE_AUTO_DETECTOR:
+            # ใช้ advanced detector สำหรับ Raspberry Pi
+            self.logger.info("🔍 Using advanced Arduino USB detection...")
+            best_port = self.usb_detector.get_best_arduino_port()
+            
+            if best_port:
+                self.current_port = best_port
+                self.logger.info(f"⚡ Arduino Mega 2560 detected at {best_port}")
+                return best_port
+            else:
+                self.logger.warning("❌ Advanced detector found no Arduino devices")
+                # Fallback to basic scanning
+                self.logger.info("🔄 Falling back to basic port scanning...")
+        
+        # Fallback: Basic port scanning (original method)
         for port in Config.ARDUINO_SCAN_PORTS:
             try:
                 self.logger.info(f"🔍 Checking {port}...")
@@ -295,6 +324,7 @@ class ArduinoManager:
                                 "Temperature", "Humidity", "Weight"
                             ]):
                                 self.logger.info(f"⚡ Arduino found at {port}")
+                                self.current_port = port
                                 return port
                         time.sleep(0.05)  # Faster polling
                         
@@ -486,6 +516,66 @@ class ArduinoManager:
             self.logger.error(f"Failed to read sensors: {e}")
             self.is_connected = False
             return self.last_data
+
+    def get_usb_status(self):
+        """รับสถานะ USB และข้อมูล Arduino detection"""
+        status = {
+            'current_port': self.current_port,
+            'is_connected': self.is_connected,
+            'connection_attempts': self.connection_attempts,
+            'detector_enabled': Config.USE_AUTO_DETECTOR,
+            'platform': 'unknown',
+            'available_ports': [],
+            'detected_devices': []
+        }
+        
+        if self.usb_detector:
+            try:
+                system_info = self.usb_detector.get_system_info()
+                status['platform'] = system_info.get('platform', 'unknown')
+                status['available_ports'] = system_info.get('usb_ports', [])
+                status['detected_devices'] = system_info.get('detected_devices', [])
+            except Exception as e:
+                self.logger.debug(f"Failed to get USB status: {e}")
+        
+        return status
+
+    def monitor_usb_hotplug(self, callback=None):
+        """เริ่ม USB hotplug monitoring ใน background thread"""
+        if not self.usb_detector:
+            self.logger.warning("USB detector not available for hotplug monitoring")
+            return
+        
+        def usb_callback(event, port):
+            """Callback สำหรับ USB events"""
+            self.logger.info(f"🔌 USB {event}: {port}")
+            
+            if event == 'connected':
+                # ลองเชื่อมต่อ Arduino ใหม่ถ้าไม่ได้เชื่อมต่ออยู่
+                if not self.is_connected:
+                    self.logger.info("🔄 Attempting to connect to newly detected Arduino...")
+                    if self.connect():
+                        self.logger.info("✅ Successfully connected to Arduino!")
+                        
+            elif event == 'disconnected' and port == self.current_port:
+                # Arduino ถูกถอดออก
+                self.logger.warning(f"⚠️ Arduino disconnected from {port}")
+                self.disconnect()
+                
+            if callback:
+                callback(event, port)
+        
+        # เริ่ม monitoring ใน background thread
+        def monitor_thread():
+            self.logger.info("🔄 Starting USB hotplug monitoring...")
+            try:
+                self.usb_detector.monitor_usb_changes(callback=usb_callback, interval=3.0)
+            except Exception as e:
+                self.logger.error(f"USB monitoring error: {e}")
+        
+        thread = threading.Thread(target=monitor_thread, daemon=True)
+        thread.start()
+        return thread
 
     def _enhance_battery_data(self, measurements):
         """Enhance battery data with Li-ion 12V 12AH calculations"""
@@ -2412,6 +2502,86 @@ class WebAPI:
             except Exception as e:
                 return jsonify({'status': 'error', 'message': str(e)}), 500
 
+        @self.app.route('/api/usb/status', methods=['GET'])
+        def get_usb_status():
+            """รับสถานะ USB และ Arduino detection"""
+            try:
+                usb_status = self.arduino_mgr.get_usb_status()
+                return jsonify({
+                    "success": True,
+                    "usb_status": usb_status,
+                    "timestamp": datetime.now().isoformat()
+                })
+            except Exception as e:
+                self.logger.error(f"Failed to get USB status: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": str(e)
+                }), 500
+
+        @self.app.route('/api/usb/rescan', methods=['POST'])
+        def rescan_arduino():
+            """สแกนหา Arduino ใหม่"""
+            try:
+                self.logger.info("🔄 Manual Arduino rescan requested")
+                
+                # Disconnect current connection
+                self.arduino_mgr.disconnect()
+                
+                # Try to reconnect
+                if self.arduino_mgr.connect():
+                    usb_status = self.arduino_mgr.get_usb_status()
+                    return jsonify({
+                        "success": True,
+                        "message": "Arduino reconnected successfully",
+                        "usb_status": usb_status
+                    })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "message": "No Arduino found during rescan",
+                        "usb_status": self.arduino_mgr.get_usb_status()
+                    }), 404
+                    
+            except Exception as e:
+                self.logger.error(f"Arduino rescan failed: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": str(e)
+                }), 500
+
+        @self.app.route('/api/usb/ports', methods=['GET'])
+        def get_available_ports():
+            """รับรายการ USB ports ที่มีอยู่ทั้งหมด"""
+            try:
+                import serial.tools.list_ports
+                
+                ports_info = []
+                for port in serial.tools.list_ports.comports():
+                    port_info = {
+                        'device': port.device,
+                        'description': getattr(port, 'description', 'N/A'),
+                        'manufacturer': getattr(port, 'manufacturer', 'N/A'),
+                        'vid': getattr(port, 'vid', None),
+                        'pid': getattr(port, 'pid', None),
+                        'serial_number': getattr(port, 'serial_number', 'N/A')
+                    }
+                    ports_info.append(port_info)
+                
+                return jsonify({
+                    "success": True,
+                    "ports": ports_info,
+                    "total_ports": len(ports_info),
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+            except Exception as e:
+                self.logger.error(f"Failed to get port list: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": str(e)
+                }), 500
+
         @self.app.route('/api/energy/status', methods=['GET'])
         def get_energy_status():
             """Get energy system status including solar and battery data for Web App"""
@@ -2685,6 +2855,14 @@ class FishFeederController:
 
     def _start_background_tasks(self):
         """Start background tasks with proper thread management"""
+        
+        # Start USB hotplug monitoring for automatic Arduino detection
+        self.logger.info("🔄 Starting USB hotplug monitoring...")
+        try:
+            self.arduino_mgr.monitor_usb_hotplug()
+            self.logger.info("✅ USB hotplug monitoring started")
+        except Exception as e:
+            self.logger.warning(f"⚠️ USB hotplug monitoring failed to start: {e}")
         
         # Sensor reading task with error recovery
         def sensor_loop():
