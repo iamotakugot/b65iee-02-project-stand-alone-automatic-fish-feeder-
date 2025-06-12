@@ -805,26 +805,44 @@ break;
 // ===== OPTIMIZED RELAY CONTROL =====
 void handleRelayCommand(char cmd) {
   switch (cmd) {
-    case '1': // LED On
-      digitalWrite(RELAY_LED, LOW);  // Active LOW relay
-      status.relay_led = true;
-      Serial.println(F("[RELAY] LED ON"));
+    case '1': // LED Toggle (สำหรับ API compatibility)
+      status.relay_led = !status.relay_led;  // Toggle state
+      digitalWrite(RELAY_LED, status.relay_led ? LOW : HIGH);  // Active LOW relay
+      Serial.print(F("[RELAY] LED "));
+      Serial.println(status.relay_led ? "ON" : "OFF");
       break;
-    case '2': // Fan On  
-      digitalWrite(RELAY_FAN, LOW);  // Active LOW relay
-      status.relay_fan = true;
-      Serial.println(F("[RELAY] FAN ON"));
+      
+    case '2': // Fan Toggle (สำหรับ API compatibility)
+      status.relay_fan = !status.relay_fan;  // Toggle state
+      digitalWrite(RELAY_FAN, status.relay_fan ? LOW : HIGH);  // Active LOW relay
+      Serial.print(F("[RELAY] FAN "));
+      Serial.println(status.relay_fan ? "ON" : "OFF");
       break;
-    case '3': // LED Off
+      
+    case '3': // LED OFF (explicit)
       digitalWrite(RELAY_LED, HIGH); // Active LOW relay
       status.relay_led = false;
       Serial.println(F("[RELAY] LED OFF"));
       break;
-    case '4': // Fan Off
+      
+    case '4': // Fan OFF (explicit)
       digitalWrite(RELAY_FAN, HIGH); // Active LOW relay  
       status.relay_fan = false;
       Serial.println(F("[RELAY] FAN OFF"));
       break;
+      
+    case '5': // LED ON (explicit)
+      digitalWrite(RELAY_LED, LOW);  // Active LOW relay
+      status.relay_led = true;
+      Serial.println(F("[RELAY] LED ON"));
+      break;
+      
+    case '6': // Fan ON (explicit)
+      digitalWrite(RELAY_FAN, LOW);  // Active LOW relay
+      status.relay_fan = true;
+      Serial.println(F("[RELAY] FAN ON"));
+      break;
+      
     case '0': // All Off
       digitalWrite(RELAY_LED, HIGH);
       digitalWrite(RELAY_FAN, HIGH);
@@ -832,9 +850,12 @@ void handleRelayCommand(char cmd) {
       status.relay_fan = false;
       Serial.println(F("[RELAY] ALL OFF"));
       break;
+      
     default:
-      Serial.print(F("[ERROR] Invalid relay command: "));
+      Serial.print(F("[ERROR] Invalid relay command: R:"));
       Serial.println(cmd);
+      Serial.println(F("[HELP] Valid: R:1(LED toggle), R:2(FAN toggle), R:0(ALL OFF), R:5(LED ON), R:6(FAN ON), R:3(LED OFF), R:4(FAN OFF)"));
+      break;
   }
 }
 
