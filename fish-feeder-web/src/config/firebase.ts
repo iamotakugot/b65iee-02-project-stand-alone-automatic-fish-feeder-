@@ -5,6 +5,7 @@ import {
   Database,
   ref,
   set,
+  get,
   onValue,
   off,
 } from "firebase/database";
@@ -216,7 +217,7 @@ class FirebaseClient {
   async controlLED(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
       console.log(`🔵 Sending LED command: ${action}`);
-      const controlRef = ref(this.database, "controls/relay1");
+      const controlRef = ref(this.database, "fish_feeder/control/led");
 
       await set(controlRef, action === "on");
       console.log(`✅ LED command sent successfully: ${action}`);
@@ -233,7 +234,7 @@ class FirebaseClient {
   async controlFan(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
       console.log(`🌀 Sending Fan command: ${action}`);
-      const controlRef = ref(this.database, "controls/relay2");
+      const controlRef = ref(this.database, "fish_feeder/control/fan");
 
       await set(controlRef, action === "on");
       console.log(`✅ Fan command sent successfully: ${action}`);
@@ -269,7 +270,7 @@ class FirebaseClient {
       console.log(`💨 Sending Blower command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/blower");
 
-      await set(controlRef, action === "on");
+      await set(controlRef, action === "on" || action === "toggle");
       console.log(`✅ Blower command sent successfully: ${action}`);
 
       return true;
@@ -292,6 +293,27 @@ class FirebaseClient {
       return true;
     } catch (error) {
       console.error("❌ Actuator control error:", error);
+
+      return false;
+    }
+  }
+
+  // Control Auger
+  async controlAuger(action: "on" | "off" | "forward" | "reverse" | "stop"): Promise<boolean> {
+    try {
+      console.log(`🌀 Sending Auger command: ${action}`);
+      const controlRef = ref(this.database, "fish_feeder/control/auger");
+
+      let augerAction = action;
+      if (action === "on") augerAction = "forward";
+      if (action === "off") augerAction = "stop";
+
+      await set(controlRef, augerAction);
+      console.log(`✅ Auger command sent successfully: ${augerAction}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Auger control error:", error);
 
       return false;
     }
@@ -417,6 +439,156 @@ class FirebaseClient {
     } catch (error) {
       console.error("Arduino command error:", error);
 
+      return false;
+    }
+  }
+
+  // Send Ultra Fast Relay Command
+  async sendRelayCommand(command: string): Promise<boolean> {
+    try {
+      console.log(`⚡ Sending Relay command: ${command}`);
+      const controlRef = ref(this.database, "fish_feeder/commands/relay");
+
+      await set(controlRef, command);
+      console.log(`✅ Relay command sent successfully: ${command}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Relay command error:", error);
+
+      return false;
+    }
+  }
+
+  // Send Motor Command
+  async sendMotorCommand(command: string): Promise<boolean> {
+    try {
+      console.log(`🌀 Sending Motor command: ${command}`);
+      const controlRef = ref(this.database, "fish_feeder/commands/motor");
+
+      await set(controlRef, command);
+      console.log(`✅ Motor command sent successfully: ${command}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Motor command error:", error);
+
+      return false;
+    }
+  }
+
+  // Send Blower PWM Command
+  async sendBlowerCommand(command: string): Promise<boolean> {
+    try {
+      console.log(`💨 Sending Blower command: ${command}`);
+      const controlRef = ref(this.database, "fish_feeder/commands/blower");
+
+      await set(controlRef, command);
+      console.log(`✅ Blower command sent successfully: ${command}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Blower command error:", error);
+
+      return false;
+    }
+  }
+
+  // Send Actuator Direct Command
+  async sendActuatorCommand(command: string): Promise<boolean> {
+    try {
+      console.log(`🔧 Sending Actuator command: ${command}`);
+      const controlRef = ref(this.database, "fish_feeder/commands/actuator");
+
+      await set(controlRef, command);
+      console.log(`✅ Actuator command sent successfully: ${command}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Actuator command error:", error);
+
+      return false;
+    }
+  }
+
+  // Send Feed Command
+  async sendFeedCommand(command: string): Promise<boolean> {
+    try {
+      console.log(`🐟 Sending Feed command: ${command}`);
+      const controlRef = ref(this.database, "fish_feeder/commands/feed");
+
+      await set(controlRef, command);
+      console.log(`✅ Feed command sent successfully: ${command}`);
+
+      return true;
+    } catch (error) {
+      console.error("❌ Feed command error:", error);
+
+      return false;
+    }
+  }
+
+  // Fan control settings methods
+  async saveFanSettings(settings: any): Promise<boolean> {
+    try {
+      const settingsRef = ref(this.database, 'fish_feeder/fan_control/settings');
+      await set(settingsRef, settings);
+      return true;
+    } catch (error) {
+      console.error("Failed to save fan settings:", error);
+      return false;
+    }
+  }
+
+  async loadFanSettings(): Promise<any | null> {
+    try {
+      const settingsRef = ref(this.database, 'fish_feeder/fan_control/settings');
+      const snapshot = await get(settingsRef);
+      return snapshot.exists() ? snapshot.val() : null;
+    } catch (error) {
+      console.error("Failed to load fan settings:", error);
+      return null;
+    }
+  }
+
+  subscribeFanSettings(callback: (settings: any) => void): () => void {
+    const settingsRef = ref(this.database, 'fish_feeder/fan_control/settings');
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.val());
+      }
+    });
+    return () => off(settingsRef, 'value', unsubscribe);
+  }
+
+  async updateCurrentTemperature(systemTemp: number, feederTemp: number): Promise<boolean> {
+    try {
+      const tempRef = ref(this.database, 'fish_feeder/fan_control/current_temperature');
+      await set(tempRef, {
+        systemTemp,
+        feederTemp,
+        timestamp: new Date().toISOString(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to update temperature in Firebase:", error);
+      return false;
+    }
+  }
+
+  async updateFanStatus(fanStatus: boolean, command: string, temperature: number, threshold: number): Promise<boolean> {
+    try {
+      const statusRef = ref(this.database, 'fish_feeder/fan_control/status');
+      await set(statusRef, {
+        fanStatus,
+        command,
+        timestamp: new Date().toISOString(),
+        temperature,
+        threshold,
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to update fan status in Firebase:", error);
       return false;
     }
   }

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Fish Feeder IoT System - ระบบให้อาหารปลาอัตโนมัติ" />
+    
+    <!-- 🔤 Thai Font Support -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <title>🐟 Fish Feeder IoT System</title>
+    
+    <style>
+      /* 🎨 Thai Font CSS Variables */
+      :root {
+        --font-thai-primary: 'Sarabun', 'Noto Sans Thai', 'Helvetica Neue', Arial, sans-serif;
+        --font-thai-mono: 'Fira Code', 'SF Mono', 'Monaco', 'Roboto Mono', monospace;
+      }
+      
+      /* 🌏 Global Thai Font Application */
+      * {
+        font-family: var(--font-thai-primary) !important;
+      }
+      
+      /* 📟 Monospace for code and numbers */
+      code, pre, .font-mono, input[type="number"], .text-mono {
+        font-family: var(--font-thai-mono) !important;
+      }
+      
+      /* 🔤 Ensure proper text rendering */
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        font-feature-settings: "liga" 1, "calt" 1;
+      }
+      
+      /* 📱 Mobile optimization for Thai text */
+      @media (max-width: 768px) {
+        body {
+          font-size: 16px !important; /* Prevent zoom on iOS */
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>กรุณาเปิดใช้งาน JavaScript เพื่อใช้ระบบ Fish Feeder</noscript>
+    <div id="root"></div>
+  </body>
+</html> 

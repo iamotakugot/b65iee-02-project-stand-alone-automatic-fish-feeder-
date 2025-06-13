@@ -51,11 +51,19 @@ const DeviceTimingControl: React.FC<DeviceTimingControlProps> = ({ className = "
   const loadDeviceTiming = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.getDeviceTiming();
-      if (response?.timing) {
-        setTiming(response.timing);
-        setOriginalTiming(response.timing);
-      }
+      // Use Firebase to load device timing
+      const { firebaseClient } = await import('../config/firebase');
+      
+      // For now, use default timing since Firebase doesn't have getDeviceTiming
+      const defaultTiming: DeviceTiming = {
+        actuatorUp: 2.0,
+        actuatorDown: 1.0,
+        augerDuration: 10.0,
+        blowerDuration: 5.0
+      };
+      
+      setTiming(defaultTiming);
+      setOriginalTiming(defaultTiming);
     } catch (error) {
       console.error('Failed to load device timing:', error);
     } finally {
@@ -66,8 +74,11 @@ const DeviceTimingControl: React.FC<DeviceTimingControlProps> = ({ className = "
   const saveDeviceTiming = async () => {
     setIsSaving(true);
     try {
-      const response = await apiClient.updateDeviceTiming(timing);
-      if (response?.status === 'success') {
+      // Use Firebase to save device timing
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.setDeviceTiming(timing);
+      
+      if (success) {
         setOriginalTiming(timing);
         setLastSaved(new Date());
         setHasChanges(false);

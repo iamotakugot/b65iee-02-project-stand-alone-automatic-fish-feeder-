@@ -10,11 +10,32 @@ const AppRouter = ({ children }: AppRouterProps) => {
   const location = useLocation();
 
   useEffect(() => {
-    // ตรวจสอบใน localStorage ว่าเคยดู splash แล้วหรือไม่
-    const splashSeen = localStorage.getItem("splash-seen");
+    // Check for splash settings
+    const splashDisabled = localStorage.getItem("splash-disabled") === "true";
+    const splashSeen = localStorage.getItem("splash-seen") === "true";
+    const urlParams = new URLSearchParams(window.location.search);
+    const showSplash = urlParams.get('splash') === 'true';
+    const noSplash = urlParams.get('nosplash') === 'true';
     
-    if (splashSeen) {
+    if (noSplash) {
+      // Force skip splash via URL
       setHasSeenSplash(true);
+      localStorage.setItem("splash-seen", "true");
+      localStorage.setItem("splash-disabled", "true");
+    } else if (showSplash) {
+      // Force show splash via URL
+      setHasSeenSplash(false);
+      localStorage.removeItem("splash-seen");
+      localStorage.removeItem("splash-disabled");
+    } else if (splashDisabled) {
+      // Skip splash if user has disabled it in settings
+      setHasSeenSplash(true);
+    } else if (splashSeen) {
+      // Skip splash if user has already seen it in this session
+      setHasSeenSplash(true);
+    } else {
+      // Default: Show splash screen for new users
+      setHasSeenSplash(false);
     }
   }, []);
 

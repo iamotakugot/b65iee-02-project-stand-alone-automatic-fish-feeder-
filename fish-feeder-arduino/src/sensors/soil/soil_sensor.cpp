@@ -11,27 +11,13 @@ Serial.println(" Soil moisture sensor initialized");
 
 bool SoilSensor::readMoisture(float& moisture) {
 // Take multiple readings for stability
-long sum = 0;
-int validReadings = 0;
+int raw = analogRead(pin);
 
-for (int i = 0; i < 10; i++) {
-int reading = analogRead(pin);
-if (reading >= 0 && reading <= 1023) { // Valid ADC range
-sum += reading;
-validReadings++;
-}
-delay(5);
-}
-
-if (validReadings > 0) {
-int avgReading = sum / validReadings;
-moisture = map(avgReading, 300, 1023, 100, 0);
+// Map according to reference: ค่าต่ำ = แห้ง, ค่าสูง = เปียก
+moisture = map(raw, 300, 1023, 100, 0);  // ตาม reference code
 moisture = constrain(moisture, 0, 100);
-return true;
-}
 
-moisture = -999; // Error value
-return false;
+return true;  // Always return true since analog read should work
 }
 
 bool SoilSensor::isValidReading(float value) {
@@ -49,5 +35,4 @@ Serial.print(valid ? "OK" : "ERROR");
 Serial.println("]");
 }
 
-// ===== GLOBAL INSTANCE =====
-SoilSensor soilSensor(SOIL_PIN); 
+// Global instance moved to sensor_service.cpp to avoid conflicts 

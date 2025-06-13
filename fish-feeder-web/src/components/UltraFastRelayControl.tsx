@@ -30,15 +30,21 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch relay status - reduced frequency for performance
+  // Fetch relay status from Firebase - reduced frequency for performance
   const fetchRelayStatus = useCallback(async () => {
     try {
       const startTime = performance.now();
-      const response = await apiClient.getRelayStatus();
+      
+      // Get status from Firebase
+      const { firebaseClient } = await import('../config/firebase');
+      const unsubscribe = firebaseClient.getSensorData((data) => {
+        if (data?.status) {
       const endTime = performance.now();
 
-      if (response?.status === "success" && response.relay_status) {
-        const newStatus = response.relay_status;
+          const newStatus = {
+            led: data.control?.led === "on" || false,
+            fan: data.control?.fan === "on" || false
+          };
 
         // Only update if status actually changed
         if (JSON.stringify(newStatus) !== JSON.stringify(relayStatus)) {
@@ -47,7 +53,10 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
           setResponseTime(endTime - startTime);
         }
       }
+      });
 
+      // Clean up listener after getting initial data
+      setTimeout(() => unsubscribe(), 1000);
       setError(null);
     } catch (err) {
       console.error("❌ Relay status fetch failed:", err);
@@ -55,11 +64,12 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
     }
   }, [relayStatus]);
 
-  // ⚡ ULTRA FAST Control using Direct Serial
+  // ⚡ ULTRA FAST Control using Firebase Commands
   const ultraFastControl = useCallback(
-    async (type: "led" | "fan", relay_id: number) => {
-      // Prevent double-submit
-      if (isSubmittingRef.current[type]) {
+    async (type: "led" | "fan" | "both" | "all", relay_id: number) => {
+      // Prevent double-submit for basic types only
+      const basicType = type === "led" || type === "fan" ? type : "led";
+      if (isSubmittingRef.current[basicType]) {
         console.log(
           `⚠️ ${type.toUpperCase()} control already in progress, ignoring`,
         );
@@ -68,8 +78,8 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
       }
 
       try {
-        isSubmittingRef.current[type] = true;
-        setLoading((prev) => ({ ...prev, [type]: true }));
+        isSubmittingRef.current[basicType] = true;
+        setLoading((prev) => ({ ...prev, [basicType]: true }));
         setError(null);
 
         console.log(
@@ -77,38 +87,51 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
         );
 
         const startTime = performance.now();
-        const response = await apiClient.ultraFastRelay(relay_id);
+        
+        // Use Firebase direct command instead of API
+        const command = `R:${relay_id}`;
+        const { firebaseClient } = await import('../config/firebase');
+        const success = await firebaseClient.sendRelayCommand(command);
+        
         const endTime = performance.now();
-
         const clientResponseTime = endTime - startTime;
-        const serverResponseTime = response.elapsed_ms || 0;
 
         setResponseTime(clientResponseTime);
 
-        if (response?.status === "success") {
-          // Optimistic update for instant UI response
+        if (success) {
+          // Enhanced optimistic update for IN1/IN2 control
           const newStatus = { ...relayStatus };
 
           if (relay_id === 1) {
-            newStatus.led = true;
-            newStatus.fan = false;
-          } else if (relay_id === 2) {
-            newStatus.led = false;
+            // R:1 = IN1 (FAN) ON
             newStatus.fan = true;
-          } else {
-            newStatus.led = false;
+          } else if (relay_id === 2) {
+            // R:2 = IN1 (FAN) OFF
             newStatus.fan = false;
+          } else if (relay_id === 3) {
+            // R:3 = IN2 (LED) ON
+            newStatus.led = true;
+          } else if (relay_id === 4) {
+            // R:4 = IN2 (LED) OFF
+            newStatus.led = false;
+          } else if (relay_id === 5) {
+            // R:5 = BOTH ON
+            newStatus.fan = true;
+            newStatus.led = true;
+          } else if (relay_id === 0) {
+            // R:0 = ALL OFF
+            newStatus.fan = false;
+            newStatus.led = false;
           }
 
           setRelayStatus(newStatus);
           setLastUpdate(Date.now());
 
           console.log(`✅ ULTRA FAST ${type.toUpperCase()} completed!`);
-          console.log(`   Client: ${clientResponseTime.toFixed(1)}ms`);
-          console.log(`   Server: ${serverResponseTime.toFixed(1)}ms`);
+          console.log(`   Firebase: ${clientResponseTime.toFixed(1)}ms`);
+          console.log(`   Command: ${command}`);
 
-          // Fetch fresh status after a short delay (verify)
-          setTimeout(fetchRelayStatus, 500);
+          // ⚡ IMMEDIATE RESPONSE - No setTimeout verification delays!
         } else {
           throw new Error(`Ultra fast ${type} control failed`);
         }
@@ -120,34 +143,18 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
             : `Ultra fast ${type} control failed`,
         );
       } finally {
-        setLoading((prev) => ({ ...prev, [type]: false }));
-        isSubmittingRef.current[type] = false;
+        setLoading((prev) => ({ ...prev, [basicType]: false }));
+        isSubmittingRef.current[basicType] = false;
       }
     },
-    [relayStatus, fetchRelayStatus],
+    [relayStatus],
   );
 
-  // ⚡ ULTRA FAST Control Handlers
-  const handleLEDOn = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      ultraFastControl("led", 1); // R:1 = LED ON
-    },
-    [ultraFastControl],
-  );
-
-  const handleLEDOff = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      ultraFastControl("led", 0); // R:0 = ALL OFF
-    },
-    [ultraFastControl],
-  );
-
+  // ⚡ ENHANCED RELAY CONTROL: IN1/IN2 SEPARATE ON/OFF
   const handleFanOn = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 2); // R:2 = FAN ON
+      ultraFastControl("fan", 1); // R:1 = IN1 (FAN) ON
     },
     [ultraFastControl],
   );
@@ -155,7 +162,31 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleFanOff = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 0); // R:0 = ALL OFF
+      ultraFastControl("fan", 2); // R:2 = IN1 (FAN) OFF
+    },
+    [ultraFastControl],
+  );
+
+  const handleLEDOn = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("led", 3); // R:3 = IN2 (LED) ON
+    },
+    [ultraFastControl],
+  );
+
+  const handleLEDOff = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("led", 4); // R:4 = IN2 (LED) OFF
+    },
+    [ultraFastControl],
+  );
+
+  const handleBothOn = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("both", 5); // R:5 = BOTH ON
     },
     [ultraFastControl],
   );
@@ -163,18 +194,19 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleAllOff = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("led", 0); // R:0 = ALL OFF (will turn off both)
+      ultraFastControl("all", 0); // R:0 = ALL OFF
     },
     [ultraFastControl],
   );
 
-  // Initialize and cleanup - REDUCED polling frequency for performance
+  // Initialize and cleanup - NO POLLING for performance!
   useEffect(() => {
-    fetchRelayStatus(); // Initial fetch
-
-    // Reduced polling frequency for better performance
-    intervalRef.current = setInterval(fetchRelayStatus, 1000); // 1 second
-
+    fetchRelayStatus(); // Initial fetch once on mount
+    console.log('🎯 UltraFastRelayControl: ON-DEMAND MODE - No background polling');
+    
+    // No setInterval polling for better performance!
+    // Status will be updated after each control action
+    
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

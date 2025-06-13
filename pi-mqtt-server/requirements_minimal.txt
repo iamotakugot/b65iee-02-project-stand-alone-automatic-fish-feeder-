@@ -1,0 +1,19 @@
+# Fish Feeder IoT System - Minimal Dependencies
+# ปรับปรุงแล้ว เฉพาะที่จำเป็น
+
+# Web Framework
+flask==2.3.3
+flask-socketio==5.3.5
+flask-cors==4.0.0
+
+# Serial Communication
+pyserial==3.5
+
+# Firebase
+firebase-admin==6.2.0
+
+# Data Processing
+requests==2.31.0
+
+# System
+psutil==5.9.5 

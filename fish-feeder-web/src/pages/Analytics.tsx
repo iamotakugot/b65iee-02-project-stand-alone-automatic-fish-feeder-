@@ -23,69 +23,50 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [apiClient] = useState(new FishFeederApiClient());
 
-  // Generate mock historical data based on current sensor values
-  const generateMockData = (sensorsData: AllSensorsResponse) => {
-    const data = [];
-    const currentTime = new Date();
-    const hours =
-      timeRange === "24h" ? 24 : timeRange === "7d" ? 24 * 7 : 24 * 30;
-    const interval = timeRange === "24h" ? 1 : timeRange === "7d" ? 6 : 24; // hours
-
-    // **UPDATED: Use enhanced sensor utils to extract current values**
-    const currentValues = getCurrentSensorValues(sensorsData);
-    
-    const baseData = {
-      temperature: currentValues?.feederTemp || 25.5,
-      humidity: currentValues?.feederHumidity || 65.0,
-      waterTemperature: currentValues?.waterTemp || 24.0,
-      weight: currentValues?.weight || 2.5,
-      moisture: currentValues?.soilMoisture || 45.0,
-      batteryVoltage: currentValues?.loadVoltage || 12.5,
-      solarCurrent: currentValues?.solarCurrent || 0.5,
-      // **NEW: Additional solar data**
-      solarVoltage: currentValues?.solarVoltage || 13.2,
-      systemTemp: currentValues?.systemTemp || 28.0,
-    };
-
-    for (let i = hours; i >= 0; i -= interval) {
-      const time = new Date(currentTime.getTime() - i * 60 * 60 * 1000);
-      const variation = 0.9 + Math.random() * 0.2; // ±10% variation
-
-      data.push({
-        time: time.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        timestamp: time.toISOString(),
-        temperature: Math.round(baseData.temperature * variation * 10) / 10,
-        humidity: Math.round(baseData.humidity * variation * 10) / 10,
-        waterTemperature:
-          Math.round(baseData.waterTemperature * variation * 10) / 10,
-        weight: Math.round(baseData.weight * variation * 100) / 100,
-        moisture: Math.round(baseData.moisture * variation * 10) / 10,
-        batteryVoltage:
-          Math.round(baseData.batteryVoltage * variation * 10) / 10,
-        solarCurrent: Math.round(baseData.solarCurrent * variation * 100) / 100,
-        // **NEW: Enhanced data with solar voltage and system temperature**
-        solarVoltage: Math.round(baseData.solarVoltage * variation * 10) / 10,
-        systemTemp: Math.round(baseData.systemTemp * variation * 10) / 10,
-      });
+  // Generate historical data based on current sensor values
+  const generateDataFromSensors = (sensorsData: any) => {
+    if (!sensorsData || !sensorsData.sensors) {
+      return Array.from({ length: 24 }, (_, i) => ({
+        time: `${String(i).padStart(2, '0')}:00`,
+        temperature: 0,
+        humidity: 0,
+        weight: 0,
+        voltage: 0
+      }));
     }
 
-    return data;
+    // Use real sensor data if available
+    const currentTemp = sensorsData.sensors.DHT22_SYSTEM?.temperature?.value || 0;
+    const currentHumidity = sensorsData.sensors.DHT22_SYSTEM?.humidity?.value || 0;
+    const currentWeight = sensorsData.sensors.HX711_FEEDER?.weight?.value || 0;
+    const currentVoltage = sensorsData.sensors.BATTERY_STATUS?.voltage?.value || 12;
+
+    return Array.from({ length: 24 }, (_, i) => ({
+      time: `${String(i).padStart(2, '0')}:00`,
+      temperature: currentTemp,
+      humidity: currentHumidity,
+      weight: currentWeight,
+      voltage: currentVoltage
+    }));
   };
 
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
 
-      // Get current sensor data from Pi server
-      const sensorsData = await apiClient.getAllSensors();
+      // Get current sensor data from Firebase
+      const { firebaseClient } = await import('../config/firebase');
 
-      // Generate mock historical data based on current values
-      const mockData = generateMockData(sensorsData);
+      // Get sensor data from Firebase
+      const unsubscribe = firebaseClient.getSensorData((data) => {
+        if (data?.sensors) {
+          const mockData = generateDataFromSensors(data);
+          setChartData(mockData);
+        }
+      });
 
-      setChartData(mockData);
+      // Clean up listener after getting initial data
+      setTimeout(() => unsubscribe(), 1000);
     } catch (error) {
       console.error("Failed to fetch analytics data:", error);
 

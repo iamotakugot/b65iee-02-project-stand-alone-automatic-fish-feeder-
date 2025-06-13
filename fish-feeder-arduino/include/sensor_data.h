@@ -127,9 +127,13 @@ struct SystemStatus {
   uint8_t auger_speed = 200;        // Current auger PWM speed
   uint8_t blower_speed = 255;       // Current blower speed
   
-  // Actuator timing
-  bool actuator_auto_stop = false;  // Auto-stop enabled
-  unsigned long actuator_stop_time = 0; // Auto-stop timestamp
+  // Motor auto-stop timing (for Web App PWM/MOTOR commands)
+  bool actuator_auto_stop = false;  // Actuator auto-stop enabled
+  unsigned long actuator_stop_time = 0; // Actuator auto-stop timestamp
+  bool auger_auto_stop = false;     // Auger auto-stop enabled
+  unsigned long auger_stop_time = 0; // Auger auto-stop timestamp
+  bool blower_auto_stop = false;    // Blower auto-stop enabled
+  unsigned long blower_stop_time = 0; // Blower auto-stop timestamp
   
   // Pi Server Support
   float pi_actuator_up = 0;         // Pi actuator up time

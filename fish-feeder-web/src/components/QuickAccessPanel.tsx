@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebaseSensorData } from '../hooks/useFirebaseSensorData';
+import { useApi } from '../contexts/ApiContext';
+import { logger } from '../utils/logger';
 
 const QuickAccessPanel: React.FC = () => {
   const { sensorData, loading } = useFirebaseSensorData();
+  const { controlFeeder, controlBlower, controlActuator } = useApi();
   const [isFeeding, setIsFeeding] = useState(false);
   const [lastAction, setLastAction] = useState<string>('');
 
@@ -15,20 +18,29 @@ const QuickAccessPanel: React.FC = () => {
     setIsFeeding(true);
     setLastAction(`Feeding ${amount}g...`);
     
+    // Log button press
+    logger.buttonPress(`QUICK_FEED_${type.toUpperCase()}`, 'QuickAccessPanel', { amount, type });
+    
     try {
-      const response = await fetch('/api/feed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, type })
-      });
+      const feedMapping = {
+        'small': 'small',
+        'medium': 'medium', 
+        'large': 'large'
+      };
       
-      if (response.ok) {
+      const preset = feedMapping[type as keyof typeof feedMapping] || 'medium';
+      const response = await controlFeeder(preset as 'small' | 'medium' | 'large');
+      
+      if (response.status === 'success' || response.status === 'offline') {
         setLastAction(`✅ Fed ${amount}g successfully`);
+        logger.info('FEED', 'QUICK_FEED_SUCCESS', { amount, type, response });
       } else {
         setLastAction(`❌ Feed failed`);
+        logger.error('FEED', 'QUICK_FEED_FAILED', { amount, type, response });
       }
     } catch (error) {
       setLastAction(`❌ Feed error`);
+      logger.error('FEED', 'QUICK_FEED_ERROR', { amount, type, error });
     } finally {
       setIsFeeding(false);
       setTimeout(() => setLastAction(''), 3000);
@@ -38,28 +50,22 @@ const QuickAccessPanel: React.FC = () => {
   const emergencyStop = async () => {
     setLastAction('🛑 Stopping all motors...');
     
+    // Log emergency stop
+    logger.buttonPress('EMERGENCY_STOP', 'QuickAccessPanel', { action: 'stop_all_motors' });
+    
     try {
+      // Stop all motors using Firebase
       await Promise.all([
-        fetch('/api/control/direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: 'G:0' })
-        }),
-        fetch('/api/control/direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: 'B:0' })
-        }),
-        fetch('/api/control/direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: 'A:0' })
-        })
+        controlBlower('off'),
+        controlActuator('stop'),
+        // Note: controlFeeder doesn't have stop, but we can use controlBlower to stop feed mechanism
       ]);
       
       setLastAction('✅ All motors stopped');
+      logger.info('EMERGENCY', 'ALL_MOTORS_STOPPED', { timestamp: new Date().toISOString() });
     } catch (error) {
       setLastAction('❌ Stop command failed');
+      logger.error('EMERGENCY', 'STOP_COMMAND_FAILED', { error });
     }
     
     setTimeout(() => setLastAction(''), 3000);

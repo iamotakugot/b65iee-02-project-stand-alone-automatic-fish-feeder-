@@ -1,20 +1,491 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import {
-  getDatabase,
-  ref,
-  onValue,
-  off,
-  get,
-  DataSnapshot,
-} from "firebase/database";
-interface UseFirebaseOptions {
-  debounceMs?: number;
-  cacheTimeMs?: number;
-  maxCacheSize?: number;
-  enableLogging?: boolean;
-}
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  path: string;
-} // Global cache to share data across components const firebaseCache = new Map<string, CacheEntry<any>>(); export const useOptimizedFirebase = <T = any>( path: string, options: UseFirebaseOptions = {} ) => { const { debounceMs = 500, cacheTimeMs = 30000, // 30 seconds cache maxCacheSize = 100, enableLogging = false } = options; const [data, setData] = useState<T | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const debounceTimer = useRef<NodeJS.Timeout>(); const unsubscribeRef = useRef<(() => void) | null>(null); const lastFetchTime = useRef<number>(0); // Check cache first const getCachedData = useCallback((path: string): T | null => { const cached = firebaseCache.get(path); if (cached && Date.now() - cached.timestamp < cacheTimeMs) { if (enableLogging) { console.log(`[PACKAGE] Cache hit for ${path}`); } return cached.data; } return null; }, [cacheTimeMs, enableLogging]); // Set cache data const setCacheData = useCallback((path: string, data: T) => { // Clean cache if it's getting too large if (firebaseCache.size >= maxCacheSize) { const oldestKey = Array.from(firebaseCache.keys())[0]; firebaseCache.delete(oldestKey); } firebaseCache.set(path, { data, timestamp: Date.now(), path }); if (enableLogging) { console.log(` Cached data for ${path}`); } }, [maxCacheSize, enableLogging]); // Debounced data update const debouncedSetData = useCallback((newData: T) => { if (debounceTimer.current) { clearTimeout(debounceTimer.current); } debounceTimer.current = setTimeout(() => { setData(newData); setCacheData(path, newData); setLoading(false); lastFetchTime.current = Date.now(); }, debounceMs); }, [debounceMs, setCacheData, path]); // Firebase subscription with optimizations const setupFirebaseListener = useCallback(async () => { if (!path) return; // Check cache first const cached = getCachedData(path); if (cached) { setData(cached); setLoading(false); return; } // Rate limiting - don't fetch too frequently const now = Date.now(); if (now - lastFetchTime.current < 1000) { // 1 second minimum if (enableLogging) { console.log(`⏰ Rate limiting Firebase call for ${path}`); } return; } try { const database = getDatabase(); const dataRef = ref(database, path); // Clean up previous listener if (unsubscribeRef.current) { unsubscribeRef.current(); } // Set up new listener with error handling const unsubscribe = onValue( dataRef, (snapshot: DataSnapshot) => { const value = snapshot.val(); if (value !== null) { debouncedSetData(value); setError(null); } else { setData(null); setLoading(false); } }, (error) => { console.error(`[FIRE] Firebase error for ${path}:`, error); setError(error.message); setLoading(false); } ); unsubscribeRef.current = () => off(dataRef); if (enableLogging) { console.log(`[FIRE] Firebase listener setup for ${path}`); } } catch (err) { console.error(`[FIRE] Firebase setup error for ${path}:`, err); setError(err instanceof Error ? err.message : 'Unknown error'); setLoading(false); } }, [path, getCachedData, debouncedSetData, enableLogging]); // One-time fetch (for non-real-time data) const fetchOnce = useCallback(async (): Promise<T | null> => { if (!path) return null; const cached = getCachedData(path); if (cached) return cached; try { const database = getDatabase(); const dataRef = ref(database, path); const snapshot = await get(dataRef); const value = snapshot.val(); if (value !== null) { setCacheData(path, value); } return value; } catch (err) { console.error(`[FIRE] Firebase fetch error for ${path}:`, err); throw err; } }, [path, getCachedData, setCacheData]); // Setup effect useEffect(() => { setupFirebaseListener(); return () => { // Cleanup if (unsubscribeRef.current) { unsubscribeRef.current(); } if (debounceTimer.current) { clearTimeout(debounceTimer.current); } }; }, [setupFirebaseListener]); // Memoized return value to prevent unnecessary re-renders const returnValue = useMemo(() => ({ data, loading, error, fetchOnce, refresh: setupFirebaseListener }), [data, loading, error, fetchOnce, setupFirebaseListener]); return returnValue; }; // Hook for batch Firebase operations export const useFirebaseBatch = () => { const [operations, setOperations] = useState<Array<() => Promise<any>>>([]); const [executing, setExecuting] = useState(false); const addOperation = useCallback((operation: () => Promise<any>) => { setOperations(prev => [...prev, operation]); }, []); const executeBatch = useCallback(async () => { if (operations.length === 0 || executing) return; setExecuting(true); const results = []; try { // Execute all operations in parallel for better performance const promises = operations.map(op => op()); const batchResults = await Promise.allSettled(promises); results.push(...batchResults); setOperations([]); // Clear operations after execution } finally { setExecuting(false); } return results; }, [operations, executing]); return { addOperation, executeBatch, operationCount: operations.length, executing }; };
+import { useState, useEffect, useCallback } from 'react';
+
+// API Configuration with ngrok support
+const getApiBaseUrl = () => {
+  // 1. Environment variable (สำหรับ production)
+  if (import.meta.env.VITE_NGROK_URL) {
+    return import.meta.env.VITE_NGROK_URL;
+  }
+  
+  // 2. Check for ngrok URL in localStorage (สำหรับ development)
+  const savedNgrokUrl = localStorage.getItem('ngrok_url');
+  if (savedNgrokUrl) {
+    return savedNgrokUrl;
+  }
+  
+  // 3. Default to localhost for development
+  return 'http://localhost:5000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('🔗 API Base URL:', API_BASE_URL);
+
+export const useOptimizedFirebase = (path?: string) => {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentApiUrl, setCurrentApiUrl] = useState(API_BASE_URL);
+
+  // Function to update ngrok URL
+  const updateNgrokUrl = useCallback((newUrl: string) => {
+    console.log('🔄 Updating ngrok URL:', newUrl);
+    localStorage.setItem('ngrok_url', newUrl);
+    setCurrentApiUrl(newUrl);
+    // Reload the page to use new URL
+    window.location.reload();
+  }, []);
+
+  // API Request Function with dynamic URL
+  const apiRequest = useCallback(async (endpoint: string, options: RequestInit = {}) => {
+    const apiUrl = currentApiUrl;
+    
+    try {
+      const response = await fetch(`${apiUrl}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.error(`API request failed for ${endpoint}:`, err);
+      console.error(`Current API URL: ${apiUrl}`);
+      
+      // If using localhost and it fails, suggest ngrok
+      if (apiUrl.includes('localhost')) {
+        console.warn('💡 Suggestion: Use ngrok tunnel for HTTPS access');
+        console.warn('   Run: ngrok http 5000');
+        console.warn('   Then set URL: localStorage.setItem("ngrok_url", "https://abc123.ngrok.io")');
+      }
+      
+      throw err;
+    }
+  }, [currentApiUrl]);
+
+  // Fetch Data (ON-DEMAND ONLY)
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await apiRequest('/api/sensors');
+      
+      // Transform API data to Firebase format
+      const firebaseFormat = {
+        sensors: {},
+        status: result.status || { online: true, arduino_connected: false },
+        timestamp: result.timestamp || new Date().toISOString(),
+        control: {
+          relay1: false,
+          relay2: false
+        }
+      };
+
+      // Transform sensor data to match web app expectations
+      if (result.data) {
+        Object.entries(result.data).forEach(([sensorName, sensorData]: [string, any]) => {
+          (firebaseFormat.sensors as any)[sensorName] = {};
+          if (sensorData.values) {
+            sensorData.values.forEach((item: any) => {
+              (firebaseFormat.sensors as any)[sensorName][item.type] = item.value;
+            });
+          }
+        });
+      }
+      
+      setData(firebaseFormat);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch data');
+      console.error('Data fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiRequest]);
+
+  // ⚡ ON-DEMAND LOADING - No auto-refresh intervals!
+  useEffect(() => {
+    fetchData(); // Load data once on mount
+    console.log('🎯 ON-DEMAND MODE: No auto-refresh. Call refresh() manually to update data.');
+  }, [fetchData]);
+
+  // ============================================================================
+  // CONTROL FUNCTIONS (Firebase-compatible)
+  // ============================================================================
+
+  const controlLED = useCallback(async (action: "on" | "off" | "toggle"): Promise<boolean> => {
+    try {
+      await apiRequest(`/api/control/led/${action}`, {
+        method: 'POST',
+      });
+      console.log(`✅ LED ${action} สำเร็จ`);
+      // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
+      return true;
+    } catch (error) {
+      console.error('❌ LED control failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const controlFan = useCallback(async (action: "on" | "off" | "toggle"): Promise<boolean> => {
+    try {
+      await apiRequest(`/api/control/fan/${action}`, {
+        method: 'POST',
+      });
+      console.log(`✅ Fan ${action} สำเร็จ`);
+      // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
+      return true;
+    } catch (error) {
+      console.error('❌ Fan control failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const controlFeeder = useCallback(async (action: "on" | "off" | "small" | "medium" | "large" | "auto"): Promise<boolean> => {
+    try {
+      let feedAction = action;
+      if (action === 'on' || action === 'auto') feedAction = 'medium';
+      if (action === 'off') return true;
+
+      await apiRequest('/api/control/feed', {
+        method: 'POST',
+        body: JSON.stringify({ action: feedAction }),
+      });
+      console.log(`✅ Feed ${feedAction} สำเร็จ`);
+      // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
+      return true;
+    } catch (error) {
+      console.error('❌ Feeder control failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const controlBlower = useCallback(async (action: "on" | "off" | "toggle"): Promise<boolean> => {
+    try {
+      await apiRequest(`/api/control/blower/${action}`, {
+        method: 'POST',
+      });
+      console.log(`✅ Blower ${action} สำเร็จ`);
+      return true;
+    } catch (error) {
+      console.error('❌ Blower control failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const controlActuator = useCallback(async (action: "up" | "down" | "stop"): Promise<boolean> => {
+    try {
+      await apiRequest(`/api/control/actuator/${action}`, {
+        method: 'POST',
+      });
+      console.log(`✅ Actuator ${action} สำเร็จ`);
+      return true;
+    } catch (error) {
+      console.error('❌ Actuator control failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  // ============================================================================
+  // ADVANCED CONTROL FUNCTIONS (for FeedControl)
+  // ============================================================================
+
+  const setMotorPWM = useCallback(async (motorId: string, speed: number): Promise<boolean> => {
+    try {
+      await apiRequest('/api/control/direct', {
+        method: 'POST',
+        body: JSON.stringify({ command: `PWM:${motorId}:${speed}` }),
+      });
+      console.log(`✅ Motor ${motorId} PWM ${speed} สำเร็จ`);
+      return true;
+    } catch (error) {
+      console.error('❌ Motor PWM failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const calibrateWeight = useCallback(async (knownWeight: number): Promise<boolean> => {
+    try {
+      await apiRequest('/api/control/weight/calibrate', {
+        method: 'POST',
+        body: JSON.stringify({ weight: knownWeight }),
+      });
+      console.log(`✅ Weight calibration ${knownWeight}g สำเร็จ`);
+      return true;
+    } catch (error) {
+      console.error('❌ Weight calibration failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const tareWeight = useCallback(async (): Promise<boolean> => {
+    try {
+      await apiRequest('/api/control/weight/tare', {
+        method: 'POST',
+      });
+      console.log('✅ Weight tare สำเร็จ');
+      return true;
+    } catch (error) {
+      console.error('❌ Weight tare failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const setDeviceTiming = useCallback(async (timings: {
+    actuatorUp: number;
+    actuatorDown: number;
+    augerDuration: number;
+    blowerDuration: number;
+  }): Promise<boolean> => {
+    try {
+      await apiRequest('/api/device/timing', {
+        method: 'POST',
+        body: JSON.stringify(timings),
+      });
+      console.log('✅ Device timing สำเร็จ');
+      return true;
+    } catch (error) {
+      console.error('❌ Device timing failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  // ============================================================================
+  // FEED CONTROL FUNCTIONS (for FeedControl page)
+  // ============================================================================
+
+  const feedFish = useCallback(async (request: {
+    action?: string;
+    amount?: number;
+    actuator_up?: number;
+    actuator_down?: number;
+    auger_duration?: number;
+    blower_duration?: number;
+  }): Promise<any> => {
+    try {
+      const response = await apiRequest('/api/control/feed', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      console.log('✅ Feed fish สำเร็จ');
+      // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
+      return response;
+    } catch (error) {
+      console.error('❌ Feed fish failed:', error);
+      throw error;
+    }
+  }, [apiRequest, fetchData]);
+
+  const getFeedHistory = useCallback(async () => {
+    try {
+      return await apiRequest('/api/feed/history');
+    } catch (error) {
+      console.error('❌ Get feed history failed:', error);
+      return { data: [] };
+    }
+  }, [apiRequest]);
+
+  const getFeedStatistics = useCallback(async () => {
+    try {
+      return await apiRequest('/api/feed/statistics');
+    } catch (error) {
+      console.error('❌ Get feed statistics failed:', error);
+      return {
+        total_amount_today: 0,
+        total_feeds_today: 0,
+        average_per_feed: 0
+      };
+    }
+  }, [apiRequest]);
+
+  const getDeviceTiming = useCallback(async () => {
+    try {
+      return await apiRequest('/api/device/timing');
+    } catch (error) {
+      console.error('❌ Get device timing failed:', error);
+      return {
+        data: {
+          actuatorUp: 3,
+          actuatorDown: 2,
+          augerDuration: 20,
+          blowerDuration: 15
+        }
+      };
+    }
+  }, [apiRequest]);
+
+  const updateDeviceTiming = useCallback(async (timing: any) => {
+    try {
+      return await apiRequest('/api/device/timing', {
+        method: 'POST',
+        body: JSON.stringify(timing),
+      });
+    } catch (error) {
+      console.error('❌ Update device timing failed:', error);
+      return { status: 'failed' };
+    }
+  }, [apiRequest]);
+
+  // ============================================================================
+  // CAMERA FUNCTIONS
+  // ============================================================================
+
+  const takePhoto = useCallback(async () => {
+    try {
+      return await apiRequest('/api/camera/photo', { method: 'POST' });
+    } catch (error) {
+      console.error('❌ Take photo failed:', error);
+      return { status: 'failed' };
+    }
+  }, [apiRequest]);
+
+  const startRecording = useCallback(async (options?: any) => {
+    try {
+      return await apiRequest('/api/camera/recording/start', {
+        method: 'POST',
+        body: JSON.stringify(options || {}),
+      });
+    } catch (error) {
+      console.error('❌ Start recording failed:', error);
+      return { status: 'failed' };
+    }
+  }, [apiRequest]);
+
+  const stopRecording = useCallback(async () => {
+    try {
+      return await apiRequest('/api/camera/recording/stop', { method: 'POST' });
+    } catch (error) {
+      console.error('❌ Stop recording failed:', error);
+      return { status: 'failed' };
+    }
+  }, [apiRequest]);
+
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
+
+  const turnOffAll = useCallback(async (): Promise<boolean> => {
+    try {
+      await Promise.all([
+        controlLED('off'),
+        controlFan('off'),
+        controlBlower('off')
+      ]);
+      console.log('✅ Turn off all สำเร็จ');
+      return true;
+    } catch (error) {
+      console.error('❌ Turn off all failed:', error);
+      return false;
+    }
+  }, [controlLED, controlFan, controlBlower]);
+
+  const sendArduinoCommand = useCallback(async (command: string): Promise<boolean> => {
+    try {
+      await apiRequest('/api/control/direct', {
+        method: 'POST',
+        body: JSON.stringify({ command }),
+      });
+      console.log(`✅ Arduino command "${command}" สำเร็จ`);
+      return true;
+    } catch (error) {
+      console.error('❌ Arduino command failed:', error);
+      return false;
+    }
+  }, [apiRequest]);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      return await apiRequest('/api/health');
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      return { status: 'failed', serial_connected: false };
+    }
+  }, [apiRequest]);
+
+  const getSensor = useCallback(async (sensorName: string) => {
+    try {
+      return await apiRequest(`/api/sensors/${sensorName}`);
+    } catch (error) {
+      console.error(`❌ Get sensor ${sensorName} failed:`, error);
+      return { values: [] };
+    }
+  }, [apiRequest]);
+
+  const getAllSensors = useCallback(async () => {
+    try {
+      return await apiRequest('/api/sensors');
+    } catch (error) {
+      console.error('❌ Get all sensors failed:', error);
+      return { data: {} };
+    }
+  }, [apiRequest]);
+
+  const directControl = useCallback(async (request: { command: string }) => {
+    try {
+      return await apiRequest('/api/control/direct', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+    } catch (error) {
+      console.error('❌ Direct control failed:', error);
+      return { status: 'failed' };
+    }
+  }, [apiRequest]);
+
+  // Return Firebase-compatible object
+  return {
+    // Data
+    data,
+    loading,
+    error,
+    connected: !error && !loading,
+    currentApiUrl,
+    updateNgrokUrl,
+    
+    // Basic Control functions (Firebase-compatible names)
+    controlLED,
+    controlFan,
+    controlFeeder,
+    controlBlower,
+    controlActuator,
+    
+    // Advanced functions
+    setMotorPWM,
+    calibrateWeight,
+    tareWeight,
+    turnOffAll,
+    sendArduinoCommand,
+    setDeviceTiming,
+    
+    // Feed Control functions (for FeedControl page)
+    feedFish,
+    getFeedHistory,
+    getFeedStatistics,
+    getDeviceTiming,
+    updateDeviceTiming,
+    
+    // Camera functions
+    takePhoto,
+    startRecording,
+    stopRecording,
+    
+    // API functions (for FishFeederApiClient compatibility)
+    checkHealth,
+    getSensor,
+    getAllSensors,
+    directControl,
+    
+    // Utility functions
+    refresh: fetchData,
+    fetchOnce: fetchData,
+    apiRequest
+  };
+};
+
+// Default export for backward compatibility
+export default useOptimizedFirebase;

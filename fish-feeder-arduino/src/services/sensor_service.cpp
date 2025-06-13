@@ -7,7 +7,6 @@ Zero-delay operations with state machines
 */
 
 #include "sensor_service.h"
-#include "voltage_sensor.h"
 
 // ===== PERFORMANCE OPTIMIZATION VARIABLES =====
 static bool verboseOutput = false;
@@ -253,10 +252,14 @@ String timestamp = String(millis());
 
 // Compact JSON format for performance
 Serial.print(F("[SEND] {\"sensors\":{"));
-Serial.print(F("\"temp\":"));
+Serial.print(F("\"feed_temp\":"));
 Serial.print(sensors.feed_temp, 1);
-Serial.print(F(",\"hum\":"));
+Serial.print(F(",\"feed_hum\":"));
 Serial.print(sensors.feed_humidity, 0);
+Serial.print(F(",\"ctrl_temp\":"));
+Serial.print(sensors.control_temp, 1);
+Serial.print(F(",\"ctrl_hum\":"));
+Serial.print(sensors.control_humidity, 0);
 // Water temperature removed - DS18B20 no longer used
 Serial.print(F(",\"weight\":"));
 Serial.print(sensors.weight, 2);
@@ -398,6 +401,11 @@ lastOutput = millis();
 
 // ===== GLOBAL INSTANCE =====
 SensorService sensorService;
+
+// ===== GLOBAL SENSOR INSTANCES =====
+SoilSensor soilSensor;        // Default constructor
+VoltageSensor voltageSensor;  // Default constructor
+ACS712Sensor acs712Sensor;    // Default constructor
 
 // ===== SENSOR TESTING FUNCTION =====
 void SensorService::testAllSensors() {

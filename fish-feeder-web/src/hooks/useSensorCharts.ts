@@ -157,15 +157,13 @@ export const useSensorCharts = (options: UseSensorChartsOptions = {}): UseSensor
     // Import API_CONFIG dynamically to avoid circular dependencies
     const { API_CONFIG } = await import('../config/api');
     
-    // Check if we should use offline mode
-    if (API_CONFIG.OFFLINE_MODE || piServerUrl === '' || piServerUrl === 'offline') {
-      // Return mock data for offline mode
+    // Check if we should use Firebase-only mode
+    if (API_CONFIG.FIREBASE_ONLY_MODE || piServerUrl === '' || piServerUrl === 'offline') {
+      // No data available in Firebase-only mode
       setIsOnline(false);
-      setError('Running in offline mode');
+      setError('Running in Firebase-only mode - no API data available');
       
-      // Return appropriate mock data based on endpoint
-      const mockData = getMockData(endpoint);
-      return { status: 'success', data: mockData };
+      return { status: 'error', data: null };
     }
     
     try {
@@ -194,69 +192,15 @@ export const useSensorCharts = (options: UseSensorChartsOptions = {}): UseSensor
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(`Offline mode: ${errorMessage}`);
+      setError(`Connection failed: ${errorMessage}`);
       setIsOnline(false);
       
-      // Return mock data when API fails
-      const mockData = getMockData(endpoint);
-      return { status: 'success', data: mockData };
+      // No fallback data available
+      return { status: 'error', data: null };
     }
   }, [piServerUrl]);
 
-  // Mock data generator for offline mode
-  const getMockData = useCallback((endpoint: string) => {
-    const now = new Date();
-    const timestamp = now.toISOString();
-    
-    if (endpoint.includes('/sensors/live') || endpoint.includes('/sensors/history')) {
-      return Array.from({ length: 50 }, (_, i) => ({
-        timestamp: new Date(now.getTime() - i * 60000).toISOString(),
-        unix_time: Math.floor((now.getTime() - i * 60000) / 1000),
-        date: new Date(now.getTime() - i * 60000).toISOString().split('T')[0],
-        time: new Date(now.getTime() - i * 60000).toTimeString().split(' ')[0],
-        hour: new Date(now.getTime() - i * 60000).getHours(),
-        minute: new Date(now.getTime() - i * 60000).getMinutes(),
-        data: {
-          DHT22_SYSTEM_temperature: 25 + Math.sin(i * 0.1) * 3,
-          DHT22_SYSTEM_humidity: 60 + Math.cos(i * 0.1) * 10,
-          HX711_FEEDER_weight: 5.5 + Math.random() * 0.5,
-          battery_voltage: 12.5 + Math.random() * 0.5,
-          solar_current: Math.max(0, 2 + Math.sin(i * 0.2) * 1.5),
-          load_current: 1.2 + Math.random() * 0.3
-        }
-      })).reverse();
-    }
-    
-    if (endpoint.includes('/analytics/energy')) {
-      return {
-        period: { start_date: timestamp, end_date: timestamp, days: 7, total_readings: 350 },
-        energy_summary: {
-          total_solar_kwh: 45.6,
-          total_load_kwh: 38.2,
-          net_energy: 7.4,
-          self_sufficiency: 85.3,
-          avg_solar_power: 156.8,
-          avg_load_power: 132.1,
-          max_solar_power: 280.5,
-          max_load_power: 245.3
-        }
-      };
-    }
-    
-    if (endpoint.includes('/storage/info')) {
-      return {
-        total_size_gb: 2.5,
-        max_storage_gb: 8.0,
-        usage_percentage: 31.25,
-        file_count: 1250,
-        available_gb: 5.5,
-        memory_buffer_size: 128,
-        write_buffer_size: 64
-      };
-    }
-    
-    return {};
-  }, []);
+
 
   // 📡 Fetch Functions
   const fetchSensorHistory = useCallback(async (params: {
@@ -354,20 +298,19 @@ export const useSensorCharts = (options: UseSensorChartsOptions = {}): UseSensor
     }
   }, [fetchLiveData, fetchEnergyAnalytics, fetchStorageInfo]);
 
-  // 🔄 Real-time Controls
+  // �� Real-time Controls (ON-DEMAND ONLY)
   const startRealTime = useCallback(() => {
     if (realTimeIntervalRef.current) {
       clearInterval(realTimeIntervalRef.current);
     }
     
-    // Use polling for real-time updates
-    realTimeIntervalRef.current = setInterval(() => {
-      fetchLiveData();
-    }, refreshInterval);
+    // 🎯 ON-DEMAND MODE: No automatic polling
+    // Use manual fetchLiveData() calls instead
+    console.log('🎯 Real-time mode: Call fetchLiveData() manually for updates');
     
-    // Initial fetch
+    // Initial fetch only
     fetchLiveData();
-  }, [fetchLiveData, refreshInterval]);
+  }, [fetchLiveData]);
 
   const stopRealTime = useCallback(() => {
     if (realTimeIntervalRef.current) {
@@ -376,7 +319,7 @@ export const useSensorCharts = (options: UseSensorChartsOptions = {}): UseSensor
     }
   }, []);
 
-  // 🚀 Initialize and Cleanup
+  // 🚀 Initialize - NO AUTO-POLLING
   useEffect(() => {
     if (realTimeEnabled) {
       startRealTime();
@@ -387,14 +330,15 @@ export const useSensorCharts = (options: UseSensorChartsOptions = {}): UseSensor
     };
   }, [realTimeEnabled, startRealTime, stopRealTime]);
 
-  // 🔍 Auto-refresh analytics periodically
+  // 🎯 NO AUTO-REFRESH ANALYTICS - Call manually when needed
   useEffect(() => {
-    const analyticsInterval = setInterval(() => {
-      fetchEnergyAnalytics();
-      fetchStorageInfo();
-    }, 300000); // Every 5 minutes
-
-    return () => clearInterval(analyticsInterval);
+    // Load initial data once only
+    fetchEnergyAnalytics();
+    fetchStorageInfo();
+    console.log('🎯 Analytics: ON-DEMAND MODE - No auto-refresh. Call refreshAll() manually.');
+    
+    // No setInterval for better performance!
+    // Use refreshAll() method when manual refresh is needed
   }, [fetchEnergyAnalytics, fetchStorageInfo]);
 
   return {

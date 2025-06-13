@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "fish_feeder": {
+      "sensors": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "controls": {
+        ".read": true, 
+        ".write": "auth != null"
+      },
+      "status": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "commands": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "config": {
+        ".read": "auth != null",
+        ".write": "auth != null"  
+      },
+      "timestamp": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    }
+  }
+} 

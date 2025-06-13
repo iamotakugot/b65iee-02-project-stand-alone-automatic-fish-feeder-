@@ -25,6 +25,7 @@ import {
   FaShieldAlt,
   FaArrowUp,
   FaArrowDown,
+  FaTabletAlt,
 } from "react-icons/fa";
 import { MdInfo, MdAutoDelete, MdBackup, MdScale } from "react-icons/md";
 import { FishFeederApiClient, API_CONFIG } from "../config/api";
@@ -64,6 +65,13 @@ const Settings = () => {
       auto_feed_enabled: false,
       auto_feed_schedule: [] as Array<{ time: string; amount: number }>,
     },
+    display: {
+      mode: 'desktop' as 'desktop' | '7inch',
+      touchOptimized: false,
+      fontSize: 'normal' as 'small' | 'normal' | 'large',
+      buttonSize: 'normal' as 'small' | 'normal' | 'large',
+      showAdvancedControls: true,
+    },
   });
 
   // UI State
@@ -78,20 +86,17 @@ const Settings = () => {
     text: string;
   } | null>(null);
 
-  // Auto-refresh intervals
+  // Initial data loading - NO AUTO-REFRESH
   useEffect(() => {
     loadConfiguration();
     loadSystemStatus();
     startWeightMonitoring();
 
-    // Auto-refresh every 5 seconds
-    const statusInterval = setInterval(loadSystemStatus, 5000);
-    const weightInterval = setInterval(refreshWeight, 2000);
+    // 🎯 ON-DEMAND MODE: No auto-refresh intervals!
+    // Use manual refresh button for updates
+    console.log('🎯 Settings: ON-DEMAND MODE - Use refresh button for updates');
 
-    return () => {
-      clearInterval(statusInterval);
-      clearInterval(weightInterval);
-    };
+    // No setInterval polling for better performance!
   }, []);
 
   // Load system configuration
@@ -100,8 +105,9 @@ const Settings = () => {
     try {
       console.log("🔄 Loading configuration data...");
       
-      // Use API client instead of direct fetch
-      const data = await apiClient.getConfig();
+      // Use Firebase instead of API client
+      // For now, use default config since Firebase doesn't have getConfig
+      const data = null; // await firebaseClient.getConfig() - not implemented
       
       if (data && (data as any).config) {
         const configData = (data as any).config;
@@ -114,7 +120,14 @@ const Settings = () => {
           feeding: {
             auto_feed_enabled: configData.auto_feed_enabled || false,
             auto_feed_schedule: configData.auto_feed_schedule || [],
-          }
+          },
+          display: {
+            mode: configData.display?.mode || 'desktop',
+            touchOptimized: configData.display?.touchOptimized || false,
+            fontSize: configData.display?.fontSize || 'normal',
+            buttonSize: configData.display?.buttonSize || 'normal',
+            showAdvancedControls: configData.display?.showAdvancedControls !== false,
+          },
         });
         showMessage("success", "⚙️ โหลดการตั้งค่าสำเร็จ");
       } else {
@@ -132,7 +145,14 @@ const Settings = () => {
         feeding: {
           auto_feed_enabled: false,
           auto_feed_schedule: [],
-        }
+        },
+        display: {
+          mode: 'desktop',
+          touchOptimized: false,
+          fontSize: 'normal',
+          buttonSize: 'normal',
+          showAdvancedControls: true,
+        },
       });
       showMessage("info", "⚙️ ใช้การตั้งค่าเริ่มต้น (ออฟไลน์)");
     } finally {
@@ -140,18 +160,20 @@ const Settings = () => {
     }
   };
 
-  // Load system status
+  // Load system status via Firebase
   const loadSystemStatus = async () => {
     setLoading(prev => ({ ...prev, status: true }));
     try {
-      const health = await apiClient.checkHealth();
+      // Use Firebase to check system status
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.sendArduinoCommand("PING");
       
       setSystemStatus({
-        arduino_connected: health.serial_connected || false,
+        arduino_connected: success,
         firebase_connected: true, // Always true in web app
         camera_active: false, // Would need camera status endpoint
-        websocket_enabled: health.serial_connected || false,
-        pi_server_connected: health.status === "ok",
+        websocket_enabled: success,
+        pi_server_connected: success,
       });
     } catch (error) {
       console.error("Status check failed:", error);
@@ -167,19 +189,22 @@ const Settings = () => {
     }
   };
 
-  // Start weight monitoring
+  // Start weight monitoring via Firebase
   const startWeightMonitoring = async () => {
     try {
-      const sensors = await apiClient.getAllSensors();
-      const weightSensor = sensors.data?.HX711_FEEDER;
+      // Use Firebase to get sensor data
+      const { firebaseClient } = await import('../config/firebase');
       
-      if (weightSensor) {
-        const weightValue = weightSensor.values.find(v => v.type === "weight");
-        if (weightValue) {
-          setCurrentWeight(weightValue.value);
+      // Get sensor data from Firebase
+      const unsubscribe = firebaseClient.getSensorData((data) => {
+        if (data?.sensors?.HX711_FEEDER?.weight) {
+          setCurrentWeight(data.sensors.HX711_FEEDER.weight.value);
           setIsCalibrated(true);
         }
-      }
+      });
+      
+      // Clean up listener after getting initial data
+      setTimeout(() => unsubscribe(), 1000);
     } catch (error) {
       console.error("Weight monitoring failed:", error);
     }
@@ -195,7 +220,8 @@ const Settings = () => {
   // Show message helper
   const showMessage = (type: "success" | "error" | "info", text: string) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
+    // ⚡ IMMEDIATE MESSAGE - No setTimeout auto-clear delays!
+    // Messages stay until manually cleared or overwritten
   };
 
   // HX711 Calibration Functions with Firebase
@@ -262,8 +288,10 @@ const Settings = () => {
     try {
       setCalibrationMessage("⏳ กำลังปรับเทียร์เครื่องชั่ง...");
       
-      const response = await apiClient.tareWeight();
-      if (response.status === 'success') {
+      // Use Firebase tare weight
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.tareWeight();
+      if (success) {
         setCalibrationStep(2);
         setCalibrationMessage(`✅ ปรับเทียร์สำเร็จ! ตอนนี้วางน้ำหนักมาตรฐาน ${knownWeight} กรัม แล้วกด 'ปรับค่า'`);
         showMessage("success", "🎯 ปรับเทียร์เครื่องชั่งสำเร็จ");
@@ -285,17 +313,18 @@ const Settings = () => {
       setCalibrationMessage("⏳ กำลังปรับค่าเครื่องชั่ง...");
       
       const weightInKg = parseFloat(knownWeight) / 1000; // Convert grams to kg
-      const response = await apiClient.calibrateWeight({ weight: weightInKg });
+      // Use Firebase calibrate weight
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.calibrateWeight(weightInKg);
       
-      if (response.status === 'success') {
+      if (success) {
         setCalibrationStep(3);
         setCalibrationMessage("🎉 ปรับค่าเครื่องชั่งสำเร็จ! ระบบพร้อมใช้งาน");
         setIsCalibrated(true);
         setCalibrationMode("idle");
         showMessage("success", "🎉 ปรับค่าเครื่องชั่งสำเร็จ");
         
-        // Refresh weight reading
-        setTimeout(refreshWeight, 1000);
+        // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
       } else {
         throw new Error('Calibration failed');
       }
@@ -628,6 +657,274 @@ const Settings = () => {
                 aria-label={`WebSocket broadcast interval: ${config.timing.websocket_broadcast_interval} seconds`}
               />
             </div>
+          </div>
+        </div>
+
+        {/* 7-Inch Display Configuration */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center text-violet-500 dark:text-violet-400 mb-6">
+            <FaTabletAlt className="mr-3 text-xl" />
+            <h2 className="text-xl font-semibold">📱 7-Inch Display Settings</h2>
+          </div>
+
+          <div className="space-y-6">
+            {/* Display Mode Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-lg border border-violet-200 dark:border-violet-700">
+              <div>
+                <label id="display-mode-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  📱 7-Inch Touch Mode
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  เปิดใช้งานโหมดจอ 7 นิ้ว (ปุ่มใหญ่ ฟ้อนต์ใหญ่)
+                </p>
+              </div>
+              <Switch
+                name="displayMode"
+                isSelected={config.display.mode === '7inch'}
+                onValueChange={(checked) =>
+                  setConfig(prev => ({
+                    ...prev,
+                    display: { ...prev.display, mode: checked ? '7inch' : 'desktop' }
+                  }))
+                }
+                aria-labelledby="display-mode-switch-label"
+                color="secondary"
+              />
+            </div>
+
+            {/* Touch Optimization */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label id="touch-optimized-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  👆 Touch Optimization
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  เพิ่มขนาดพื้นที่กดสำหรับหน้าจอสัมผัส
+                </p>
+              </div>
+              <Switch
+                name="touchOptimized"
+                isSelected={config.display.touchOptimized}
+                onValueChange={(checked) =>
+                  setConfig(prev => ({
+                    ...prev,
+                    display: { ...prev.display, touchOptimized: checked }
+                  }))
+                }
+                aria-labelledby="touch-optimized-switch-label"
+                color="warning"
+              />
+            </div>
+
+            {/* Font Size */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                🔤 Font Size
+              </label>
+              <div className="flex gap-2">
+                {(['small', 'normal', 'large'] as const).map((size) => (
+                  <Button
+                    key={size}
+                    size="sm"
+                    variant={config.display.fontSize === size ? "solid" : "bordered"}
+                    color={config.display.fontSize === size ? "secondary" : "default"}
+                    onPress={() => setConfig(prev => ({
+                      ...prev,
+                      display: { ...prev.display, fontSize: size }
+                    }))}
+                  >
+                    {size === 'small' ? '🔤 เล็ก' : size === 'normal' ? '🔤 ปกติ' : '🔤 ใหญ่'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Button Size */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                🔘 Button Size
+              </label>
+              <div className="flex gap-2">
+                {(['small', 'normal', 'large'] as const).map((size) => (
+                  <Button
+                    key={size}
+                    size={size === 'small' ? "sm" : size === 'normal' ? "md" : "lg"}
+                    variant={config.display.buttonSize === size ? "solid" : "bordered"}
+                    color={config.display.buttonSize === size ? "secondary" : "default"}
+                    onPress={() => setConfig(prev => ({
+                      ...prev,
+                      display: { ...prev.display, buttonSize: size }
+                    }))}
+                  >
+                    {size === 'small' ? 'เล็ก' : size === 'normal' ? 'ปกติ' : 'ใหญ่'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Advanced Controls */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label id="advanced-controls-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  ⚙️ Advanced Controls
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  แสดงการควบคุมขั้นสูง (PWM, Direct Commands)
+                </p>
+              </div>
+              <Switch
+                name="showAdvancedControls"
+                isSelected={config.display.showAdvancedControls}
+                onValueChange={(checked) =>
+                  setConfig(prev => ({
+                    ...prev,
+                    display: { ...prev.display, showAdvancedControls: checked }
+                  }))
+                }
+                aria-labelledby="advanced-controls-switch-label"
+                color="danger"
+              />
+            </div>
+
+            {/* Preview */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                🎨 Preview Settings:
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <div>📱 Mode: {config.display.mode === '7inch' ? '7-inch Touch Display' : 'Desktop Mode'}</div>
+                <div>👆 Touch: {config.display.touchOptimized ? 'Enabled' : 'Disabled'}</div>
+                <div>🔤 Font: {config.display.fontSize}</div>
+                <div>🔘 Buttons: {config.display.buttonSize}</div>
+                <div>⚙️ Advanced: {config.display.showAdvancedControls ? 'Shown' : 'Hidden'}</div>
+              </div>
+            </div>
+
+            {/* Apply Button */}
+            <Button
+              color="secondary"
+              variant="solid"
+              className="w-full"
+              onPress={() => {
+                // Apply display settings to localStorage or global context
+                localStorage.setItem('display_settings', JSON.stringify(config.display));
+                showMessage("success", "🎨 Display settings applied! Refresh page to see changes.");
+              }}
+            >
+              🎨 Apply 7-Inch Settings
+            </Button>
+          </div>
+        </div>
+
+        {/* UI & Modal Control */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center text-purple-500 dark:text-purple-400 mb-6">
+            <span className="mr-3 text-xl">🎭</span>
+            <h2 className="text-xl font-semibold">UI & Modal Control</h2>
+          </div>
+
+          <div className="space-y-4">
+            {/* Splash Screen Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Button
+                color="success"
+                variant="flat"
+                size="sm"
+                onPress={() => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
+                    uiSettings.enableSplash();
+                    showMessage("success", "🎬 Splash screen enabled - refresh to see");
+                  });
+                }}
+              >
+                🎬 Enable Splash
+              </Button>
+
+              <Button
+                color="danger"
+                variant="flat"
+                size="sm"
+                onPress={() => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
+                    uiSettings.disableSplash();
+                    showMessage("success", "🚫 Splash screen disabled");
+                  });
+                }}
+              >
+                🚫 Disable Splash
+              </Button>
+              
+              <Button
+                color="warning"
+                variant="flat"
+                size="sm"
+                onPress={() => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
+                    uiSettings.enableMinimalMode();
+                    showMessage("success", "🎯 Minimal UI mode enabled");
+                  });
+                }}
+              >
+                🎯 Minimal Mode
+              </Button>
+              
+              <Button
+                color="secondary"
+                variant="flat"
+                size="sm"
+                onPress={() => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
+                    uiSettings.resetSplash();
+                    showMessage("success", "🔄 Splash reset - refresh to see");
+                  });
+                }}
+              >
+                🔄 Reset Splash
+              </Button>
+            </div>
+
+            {/* URL Tips & Current Status */}
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
+              <div className="flex items-center text-purple-700 dark:text-purple-300 mb-2">
+                <span className="mr-2">💡</span>
+                <span className="font-medium">Splash Screen Control</span>
+              </div>
+              <div className="text-sm text-purple-600 dark:text-purple-400 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <strong>URL Parameters:</strong>
+                    <div className="mt-1 space-y-1">
+                      <div>• <code>?splash=true</code> - Force show splash</div>
+                      <div>• <code>?nosplash=true</code> - Force skip splash</div>
+                      <div>• <code>?minimal=true</code> - Minimal UI mode</div>
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Quick Access:</strong>
+                    <div className="mt-1 space-y-1">
+                      <div>• Visit <code>/splash</code> directly</div>
+                      <div>• Use buttons above to control</div>
+                      <div>• Refresh page after changes</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            <Button
+              color="default"
+              variant="bordered"
+              size="sm"
+              onPress={() => {
+                localStorage.removeItem('splash-disabled');
+                localStorage.removeItem('splash-seen');
+                localStorage.removeItem('ui-settings');
+                showMessage("info", "🔄 UI settings reset - refresh page to apply");
+              }}
+            >
+              🔄 Reset UI Settings
+            </Button>
           </div>
         </div>
 

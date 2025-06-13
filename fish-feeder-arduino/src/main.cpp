@@ -28,9 +28,15 @@ Optimized for maximum Pi server throughput
 // ===== INCLUDES =====
 #include <Arduino.h>
 #include <EEPROM.h>
+#include "hardware_pins.h"
 #include "sensor_data.h"
 #include "sensor_service.h"
 #include "weight_sensor.h"
+
+// ===== GLOBAL VARIABLES =====
+Config config;
+SensorData sensors;
+SystemStatus status;
 
 // ===== PERFORMANCE OPTIMIZATION CONSTANTS =====
 #define MAIN_LOOP_FREQUENCY_HZ 100 // ลดจาก 1000Hz เป็น 100Hz (ประหยัด CPU)
@@ -39,11 +45,6 @@ Optimized for maximum Pi server throughput
 #define STATUS_CHECK_INTERVAL_MS 1000 // เพิ่มจาก 100ms เป็น 1000ms
 #define SERIAL_BUFFER_SIZE 256 // เพิ่ม buffer สำหรับความเสถียร
 #define FAST_SERIAL_OUTPUT true // เปิด fast mode เป็น default
-
-// ===== GLOBAL VARIABLES =====
-Config config;
-SensorData sensors;
-SystemStatus status;
 
 // ===== PERFORMANCE TIMING VARIABLES =====
 unsigned long lastSensorRead = 0;
@@ -104,13 +105,22 @@ void handleWebControlCommand(String cmd);
 void handleWebBlowerCommand(String action, String value);
 void handleWebActuatorCommand(String action, String value);
 void handleWebWeightCommand(String action, String value);
-void handleWebFeedCommand(String action, String value);
+void handleWebFeedCommand(String cmd);  // Single parameter version
+void handleWebFeedCommand(String action, String value);  // Two parameter version
 void handleWebConfigCommand(String action, String value);
 void handleDebugCommand(String cmd);
 void handleActuatorDuration(char direction, float duration);
 void handlePWMSpeed(int speed);
 void startFeedingWithParams(float amount, float actuator_up, float actuator_down, float auger_duration, float blower_duration);
 void startFeedingWithCamera(float amount, float actuator_up, float actuator_down, float auger_duration, float blower_duration);
+void showMainMenu();
+void showSensorDetails();
+void handleWeightCalibrationCommand(String cmd);
+void handlePWMControl(String cmd);
+void handleMotorControl(String cmd);
+void handleWebAppCommand(String cmd);
+void executeWebFeedSequence(float amount, float actuator_up, float actuator_down, float auger_duration, float blower_duration);
+void loadWeightCalibrationFromEEPROM();
 
 // ===== PERFORMANCE OPTIMIZATION FUNCTIONS =====
 void optimizedSensorRead();
@@ -118,6 +128,7 @@ void fastJSONOutput();
 void performanceMonitor();
 void enableFastMode();
 void disableFastMode();
+void printUserFriendlyStatus();
 int getFreeMemory();
 String getCurrentTimestamp();
 
@@ -144,107 +155,190 @@ void performStartupSequence();
 
 // ===== SETUP =====
 void setup() {
-Serial.begin(115200); // High-speed communication for MQTT/Firebase
+  // Initialize serial
+  Serial.begin(115200);
+  while (!Serial) delay(10);
 
-printStartupBanner();
-initializeHardware();
-loadConfiguration();
-sensorService.begin();
+  // Print startup banner
+  printStartupBanner();
 
-// PERFORMANCE OPTIMIZATION: Enable fast mode
-enableFastMode();
+  // Initialize all hardware
+  initializeHardware();
 
-Serial.println(F(" Fish Feeder System Ready - PERFORMANCE MODE"));
-Serial.println(F(" Main Loop: 100Hz | Sensors: 2Hz | JSON: 4Hz"));
+  // Load configuration
+  loadConfiguration();
 
-if (!FAST_SERIAL_OUTPUT) {
-printHelp();
+  // Load weight calibration from EEPROM
+  loadWeightCalibrationFromEEPROM();
+  
+  // Initialize sensor service
+  sensorService.begin();
+
+  // Enable fast mode by default for maximum performance
+  enableFastMode();
+
+  Serial.println(F(" Initialization complete - Ready for commands!"));
+  Serial.println(F(" Main Loop: 100Hz | Sensors: 2Hz | JSON: 4Hz"));
+  Serial.println(F(""));
 }
 
-// Minimal startup delay for performance
-delay(500);
+// ===== LOGGING SYSTEM =====
+unsigned long lastSystemLog = 0;
+unsigned long lastCommandLog = 0;
+bool loggingEnabled = true;
 
-// Enhanced startup sequence with calibration check
-performStartupSequence();
+void logSystemStatus() {
+  if (!loggingEnabled) return;
+  
+  Serial.print(F("[LOG:"));
+  Serial.print(millis());
+  Serial.print(F("] "));
+  
+  // Sensor data
+  Serial.print(F("TEMP1:"));
+  Serial.print(sensors.feed_temp, 1);
+  Serial.print(F(",HUM1:"));
+  Serial.print(sensors.feed_humidity, 0);
+  Serial.print(F(",TEMP2:"));
+  Serial.print(sensors.control_temp, 1);
+  Serial.print(F(",HUM2:"));
+  Serial.print(sensors.control_humidity, 0);
+  Serial.print(F(",WEIGHT:"));
+  Serial.print(sensors.weight, 2);
+  Serial.print(F(",BATV:"));
+  Serial.print(sensors.load_voltage, 2);
+  Serial.print(F(",BATI:"));
+  Serial.print(sensors.load_current, 3);
+  Serial.print(F(",SOLV:"));
+  Serial.print(sensors.solar_voltage, 2);
+  Serial.print(F(",SOLI:"));
+  Serial.print(sensors.solar_current, 3);
+  Serial.print(F(",SOIL:"));
+  Serial.print(sensors.soil_moisture, 0);
+  
+  // System status
+  Serial.print(F(",LED:"));
+  Serial.print(status.relay_led ? 1 : 0);
+  Serial.print(F(",FAN:"));
+  Serial.print(status.relay_fan ? 1 : 0);
+  Serial.print(F(",BLOWER:"));
+  Serial.print(status.blower_state ? 1 : 0);
+  Serial.print(F(",ACTUATOR:"));
+  Serial.print(status.actuator_state);
+  Serial.print(F(",AUGER:"));
+  Serial.print(status.auger_state);
+  Serial.print(F(",FEEDING:"));
+  Serial.print(status.is_feeding ? 1 : 0);
+  Serial.print(F(",STATUS:"));
+  
+  if (status.is_feeding) {
+    Serial.print(F("Feeding"));
+  } else if (status.auger_state != "stopped") {
+    Serial.print(F("Auger_Active"));
+  } else if (status.actuator_state != "stopped") {
+    Serial.print(F("Actuator_Active"));
+  } else if (status.blower_state) {
+    Serial.print(F("Blower_Active"));
+  } else {
+    Serial.print(F("Idle"));
+  }
+  
+  Serial.println();
 }
+
+void logCommand(String command, String response = "") {
+  if (!loggingEnabled) return;
+  
+  Serial.print(F("[CMD:"));
+  Serial.print(millis());
+  Serial.print(F("] Received: "));
+  Serial.print(command);
+  
+  if (response.length() > 0) {
+    Serial.print(F(" | Response: "));
+    Serial.print(response);
+  }
+  
+  Serial.println();
+}
+
+void logError(String error) {
+  Serial.print(F("[ERROR:"));
+  Serial.print(millis());
+  Serial.print(F("] "));
+  Serial.println(error);
+}
+
+void logInfo(String info) {
+  Serial.print(F("[INFO:"));
+  Serial.print(millis());
+  Serial.print(F("] "));
+  Serial.println(info);
+}
+
+// ===== HEARTBEAT SYSTEM =====
+unsigned long lastHeartbeat = 0;
+const unsigned long HEARTBEAT_INTERVAL = 30000; // Send heartbeat every 30 seconds
+bool heartbeatEnabled = false;
 
 // ===== OPTIMIZED MAIN LOOP =====
 void loop() {
-unsigned long now = millis();
-mainLoopCounter++;
+// PERFORMANCE MAIN LOOP: 100Hz frequency for optimal Pi communication
+unsigned long currentTime = millis();
 
-// PRIORITY 1: Handle serial commands immediately (non-blocking)
+// Handle serial commands with priority
 handleSerialInput();
 
-// PRIORITY 2: Check feeding progress (critical for safety)
-if (status.is_feeding) {
-checkFeedingProgress();
-// Send feeding progress update every 2 seconds during feeding
-static unsigned long lastFeedUpdate = 0;
-if (now - lastFeedUpdate >= 2000) {
-Serial.print(F("[FEED_PROGRESS] {\"weight\":"));
-Serial.print(sensors.weight, 2);
-Serial.print(F(",\"target\":"));
-Serial.print(status.feed_target, 2);
-Serial.print(F(",\"progress\":"));
-Serial.print(((sensors.weight - status.initial_weight) / status.feed_target * 100), 1);
-Serial.print(F(",\"t\":"));
-Serial.print(millis());
-Serial.println(F("}"));
-lastFeedUpdate = now;
-}
-}
-
-// PRIORITY 3: Check actuator auto-stop (time-critical)
-if (status.actuator_auto_stop && now >= status.actuator_stop_time) {
-stopActuator();
-status.actuator_auto_stop = false;
-if (!fastMode) {
-Serial.println(F("[INFO] Actuator_Auto_Stopped"));
-}
-}
-
-// SMART SCHEDULING: Distribute sensor reads across multiple cycles
-if (now - lastSensorRead >= SENSOR_READ_INTERVAL_MS) {
+// OPTIMIZED SENSOR READING: Distributed across cycles
+if (currentTime - lastSensorRead >= SENSOR_READ_INTERVAL_MS) {
 optimizedSensorRead();
-lastSensorRead = now;
+lastSensorRead = currentTime;
 }
 
-// OPTIMIZED: Fast JSON output for Pi server
-if (now - lastJSONOutput >= JSON_OUTPUT_INTERVAL_MS) {
-fastJSONOutput();
-lastJSONOutput = now;
+// Status checks
+if (currentTime - lastStatusCheck >= STATUS_CHECK_INTERVAL_MS) {
+checkFeedingProgress();
+lastStatusCheck = currentTime;
 }
 
-// ENHANCED: Send error status every 5 seconds
-if (now - lastErrorReport >= 5000) {
-sendErrorStatusToPi();
-lastErrorReport = now;
-}
-
-// ENHANCED: Send configuration every 30 seconds
-if (now - lastConfigReport >= 30000) {
-sendConfigToPi();
-lastConfigReport = now;
-}
-
-// REDUCED FREQUENCY: Status checks every 100ms
-if (now - lastStatusCheck >= STATUS_CHECK_INTERVAL_MS) {
-// Auto fan control (reduced frequency)
-if (config.auto_fan_enabled && now - lastFanCheck >= 5000) { // Every 5 seconds
+// Auto fan control
 checkAutoFan();
-lastFanCheck = now;
+
+// Auto weighing system
+if (auto_weigh_enabled) {
+unsigned long elapsed = currentTime - auto_weigh_start_time;
+if (elapsed >= auto_weigh_duration) {
+auto_weigh_enabled = false;
+Serial.println(F("[AUTO_WEIGH] Session completed"));
+} else if (currentTime - last_auto_weigh_reading >= auto_weigh_interval) {
+Serial.print(F("[AUTO_WEIGH] Weight: "));
+Serial.print(sensors.weight, 3);
+Serial.print(F("kg, Time: "));
+Serial.print(elapsed / 1000);
+Serial.println(F("s"));
+last_auto_weigh_reading = currentTime;
 }
-lastStatusCheck = now;
 }
 
-// PERFORMANCE MONITORING: Every 1000 cycles (1 second at 100Hz)
-if (mainLoopCounter % 1000 == 0) {
+// HEARTBEAT SYSTEM - Send periodic status to confirm Arduino is alive
+if (heartbeatEnabled && (currentTime - lastHeartbeat >= HEARTBEAT_INTERVAL)) {
+Serial.print(F("[HEARTBEAT] ALIVE_"));
+Serial.print(currentTime);
+Serial.print(F(" UPTIME_"));
+Serial.print(currentTime / 1000);
+Serial.print(F("s MEMORY_"));
+Serial.print(getFreeMemory());
+Serial.println(F("bytes"));
+lastHeartbeat = currentTime;
+}
+
+// PERFORMANCE MONITORING: Every 30 seconds in non-fast mode
+if (!fastMode && currentTime > 30000 && (currentTime % 30000) < 100) {
 performanceMonitor();
 }
 
-// ZERO DELAY: Maximum throughput for real-time response
-// No delay() call for maximum performance!
+// Small delay for stability - maintain 100Hz loop frequency
+delayMicroseconds(100); // Micro delay for precise timing
 }
 
 // ===== OPTIMIZED SENSOR READING =====
@@ -278,193 +372,87 @@ sensorService.updateErrorStatus();
 
 // ===== FAST JSON OUTPUT =====
 void fastJSONOutput() {
-if (!fastMode) {
-// Full JSON output for debugging
-sensorService.outputSensorDataJSON();
-} else {
-// FIREBASE-COMPATIBLE JSON OUTPUT for Web App Integration
-Serial.print(F("[SEND] {\"t\":"));
-Serial.print(millis());
-Serial.print(F(",\"sensors\":{"));
-
-    // DHT22_FEEDER - Feeder Temperature & Humidity (Web App Format)
-    Serial.print(F("\"DHT22_FEEDER\":{"));
-    bool hasFeederData = false;
-    if (!isnan(sensors.feed_temp)) {
-      Serial.print(F("\"temperature\":{\"value\":"));
-      Serial.print(sensors.feed_temp, 1);
-      Serial.print(F(",\"unit\":\"°C\",\"timestamp\":"));
-      Serial.print(millis());
-      Serial.print(F("}"));
-      hasFeederData = true;
-    }
-    if (!isnan(sensors.feed_humidity)) {
-      if (hasFeederData) Serial.print(F(","));
-      Serial.print(F("\"humidity\":{\"value\":"));
-      Serial.print(sensors.feed_humidity, 0);
-      Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-      Serial.print(millis());
-      Serial.print(F("}"));
-    }
-    Serial.print(F("},"));
-
-    // DHT22_SYSTEM - Control Box Temperature & Humidity (Web App Format)
-    Serial.print(F("\"DHT22_SYSTEM\":{"));
-    bool hasSystemData = false;
-    if (!isnan(sensors.control_temp)) {
-      Serial.print(F("\"temperature\":{\"value\":"));
-      Serial.print(sensors.control_temp, 1);
-      Serial.print(F(",\"unit\":\"°C\",\"timestamp\":"));
-      Serial.print(millis());
-      Serial.print(F("}"));
-      hasSystemData = true;
-    }
-    if (!isnan(sensors.control_humidity)) {
-      if (hasSystemData) Serial.print(F(","));
-      Serial.print(F("\"humidity\":{\"value\":"));
-      Serial.print(sensors.control_humidity, 0);
-      Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-      Serial.print(millis());
-      Serial.print(F("}"));
-    }
-    Serial.print(F("},"));
-
-    // HX711_FEEDER - Weight Sensor (Changed from WEIGHT, converted to grams)
-    Serial.print(F("\"HX711_FEEDER\":{"));
-    Serial.print(F("\"weight\":{\"value\":"));
-    Serial.print(sensors.weight * 1000, 0); // Convert kg to grams for Web App
-    Serial.print(F(",\"unit\":\"g\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // BATTERY_STATUS - Power System (Web App Format)
-    Serial.print(F("\"BATTERY_STATUS\":{"));
-    Serial.print(F("\"voltage\":{\"value\":"));
-    Serial.print(sensors.load_voltage, 2);
-    Serial.print(F(",\"unit\":\"V\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("},\"current\":{\"value\":"));
-    Serial.print(sensors.load_current, 3);
-    Serial.print(F(",\"unit\":\"A\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // SOIL_MOISTURE - Environment Sensor (Web App Format)
-    Serial.print(F("\"SOIL_MOISTURE\":{"));
-    Serial.print(F("\"moisture\":{\"value\":"));
-    Serial.print(sensors.soil_moisture, 0);
-    Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // SOLAR_VOLTAGE - Solar Panel Voltage (Web App Format)
-    Serial.print(F("\"SOLAR_VOLTAGE\":{"));
-    Serial.print(F("\"voltage\":{\"value\":"));
-    Serial.print(sensors.solar_voltage, 2);
-    Serial.print(F(",\"unit\":\"V\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // SOLAR_CURRENT - Solar Panel Current (Web App Format)
-    Serial.print(F("\"SOLAR_CURRENT\":{"));
-    Serial.print(F("\"current\":{\"value\":"));
-    Serial.print(sensors.solar_current, 3);
-    Serial.print(F(",\"unit\":\"A\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // 🏠 ROOM SENSORS - ใส่ห้องครบ (Web App Format)
-    // ROOM_TEMPERATURE - อุณหภูมิห้อง
-    Serial.print(F("\"ROOM_TEMPERATURE\":{"));
-    Serial.print(F("\"temperature\":{\"value\":"));
-    Serial.print(sensors.control_temp, 1); // ใช้ control temp เป็น room temp
-    Serial.print(F(",\"unit\":\"°C\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // ROOM_HUMIDITY - ความชื้นห้อง
-    Serial.print(F("\"ROOM_HUMIDITY\":{"));
-    Serial.print(F("\"humidity\":{\"value\":"));
-    Serial.print(sensors.control_humidity, 0); // ใช้ control humidity เป็น room humidity
-    Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // LIGHT_LEVEL - ระดับแสง (ใช้ analog pin)
-    float light_level = analogRead(A6) / 1023.0 * 100; // Convert to percentage
-    Serial.print(F("\"LIGHT_LEVEL\":{"));
-    Serial.print(F("\"light\":{\"value\":"));
-    Serial.print(light_level, 0);
-    Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // MOTION_SENSOR - เซ็นเซอร์การเคลื่อนไหว (ใช้ digital pin)
-    bool motion_detected = digitalRead(22); // Digital pin 22
-    Serial.print(F("\"MOTION_SENSOR\":{"));
-    Serial.print(F("\"motion\":{\"value\":"));
-    Serial.print(motion_detected ? 1 : 0);
-    Serial.print(F(",\"unit\":\"bool\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // AIR_QUALITY - คุณภาพอากาศ (ใช้ analog pin)
-    float air_quality = analogRead(A7) / 1023.0 * 100; // Convert to percentage
-    Serial.print(F("\"AIR_QUALITY\":{"));
-    Serial.print(F("\"quality\":{\"value\":"));
-    Serial.print(air_quality, 0);
-    Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}},"));
-
-    // WATER_LEVEL - ระดับน้ำ (ใช้ ultrasonic หรือ float sensor)
-    float water_level = 75.5; // Mock data - ควรเชื่อมต่อเซ็นเซอร์จริง
-    Serial.print(F("\"WATER_LEVEL\":{"));
-    Serial.print(F("\"level\":{\"value\":"));
-    Serial.print(water_level, 1);
-    Serial.print(F(",\"unit\":\"%\",\"timestamp\":"));
-    Serial.print(millis());
-    Serial.print(F("}}"));
-
-// Control States (comprehensive for web app)
-Serial.print(F(",\"controls\":{"));
-Serial.print(F("\"led\":"));
+// Always send standardized JSON format for Pi server compatibility
+Serial.print(F("[DATA] TEMP1:"));
+Serial.print(sensors.feed_temp, 2);
+Serial.print(F(",HUM1:"));
+Serial.print(sensors.feed_humidity, 1);
+Serial.print(F(",TEMP2:"));
+Serial.print(sensors.control_temp, 2);
+Serial.print(F(",HUM2:"));
+Serial.print(sensors.control_humidity, 1);
+Serial.print(F(",WEIGHT:"));
+Serial.print(sensors.weight, 3);
+Serial.print(F(",BATV:"));
+Serial.print(sensors.load_voltage, 2);
+Serial.print(F(",BATI:"));
+Serial.print(sensors.load_current, 3);
+Serial.print(F(",SOLV:"));
+Serial.print(sensors.solar_voltage, 2);
+Serial.print(F(",SOLI:"));
+Serial.print(sensors.solar_current, 3);
+Serial.print(F(",SOIL:"));
+Serial.print(sensors.soil_moisture, 0);
+Serial.print(F(",LED:"));
 Serial.print(status.relay_led ? 1 : 0);
-Serial.print(F(",\"fan\":"));
+Serial.print(F(",FAN:"));
 Serial.print(status.relay_fan ? 1 : 0);
-Serial.print(F(",\"auger\":\""));
-Serial.print(status.auger_state);
-Serial.print(F("\",\"blower\":"));
+Serial.print(F(",BLOWER:"));
 Serial.print(status.blower_state ? 1 : 0);
-Serial.print(F(",\"actuator\":\""));
-Serial.print(status.actuator_state);
-Serial.print(F("\",\"auto_fan\":"));
-Serial.print(status.auto_fan_active ? 1 : 0);
-
-// Feeding Status
-if (status.is_feeding) {
-Serial.print(F(",\"feeding\":1"));
-Serial.print(F(",\"feed_target\":"));
-Serial.print(status.feed_target, 2);
-Serial.print(F(",\"feed_progress\":"));
-Serial.print(((sensors.weight - status.initial_weight) / status.feed_target * 100), 1);
+Serial.print(F(",ACTUATOR:"));
+Serial.print(status.actuator_state); // 0=stop, 1=up, 2=down
+Serial.print(F(",AUGER:"));
+Serial.print(status.auger_state); // 0=stop, 1=forward, 2=reverse
+Serial.print(F(",TIME:"));
+Serial.print(millis() / 1000); // Time in seconds
+Serial.println();
 }
 
-// System Health for web app
-Serial.print(F("},\"system\":{"));
-Serial.print(F("\"temp_ok\":"));
-Serial.print(status.temperature_ok ? 1 : 0);
-Serial.print(F(",\"voltage_ok\":"));
-Serial.print(status.voltage_ok ? 1 : 0);
-Serial.print(F(",\"weight_ok\":"));
-Serial.print(status.weight_sensor_ok ? 1 : 0);
-Serial.print(F(",\"motors_enabled\":"));
-Serial.print(status.motors_enabled ? 1 : 0);
-Serial.print(F(",\"system_ok\":"));
-Serial.print(status.system_ok ? 1 : 0);
-
-Serial.println(F("}}"));
+// ===== USER-FRIENDLY STATUS DISPLAY =====
+void printUserFriendlyStatus() {
+  Serial.println(F(""));
+  Serial.println(F("====== 🐟 FISH FEEDER STATUS ======"));
+  Serial.println(F("📊 SENSOR READINGS:"));
+  
+  // Temperature & Humidity
+  Serial.print(F("🌡️  Feed Tank  : "));
+  if (!isnan(sensors.feed_temp) && sensors.feed_temp > -40) {
+    Serial.print(sensors.feed_temp, 1); Serial.print(F("°C, "));
+    Serial.print(sensors.feed_humidity, 0); Serial.println(F("%"));
+  } else {
+    Serial.println(F("❌ ERROR"));
+  }
+  
+  Serial.print(F("🌡️  Control Box: "));
+  if (!isnan(sensors.control_temp) && sensors.control_temp > -40) {
+    Serial.print(sensors.control_temp, 1); Serial.print(F("°C, "));
+    Serial.print(sensors.control_humidity, 0); Serial.println(F("%"));
+  } else {
+    Serial.println(F("❌ ERROR"));
 }
+
+  // Weight & Power
+  Serial.print(F("⚖️  Food Weight: ")); Serial.print(sensors.weight, 2); Serial.println(F(" kg"));
+  Serial.print(F("🔋 Battery    : ")); Serial.print(sensors.load_voltage, 2); Serial.print(F("V, "));
+  Serial.print(sensors.load_current, 3); Serial.println(F("A"));
+  Serial.print(F("☀️  Solar     : ")); Serial.print(sensors.solar_voltage, 2); Serial.print(F("V, "));
+  Serial.print(sensors.solar_current, 3); Serial.println(F("A"));
+  Serial.print(F("💧 Soil       : ")); Serial.print(sensors.soil_moisture, 0); Serial.println(F("%"));
+  
+  // System Status
+  Serial.println(F("🎛️  SYSTEM STATUS:"));
+  Serial.print(F("💡 LED: ")); Serial.print(status.relay_led ? F("ON ") : F("OFF"));
+  Serial.print(F(" | 🌪️  FAN: ")); Serial.print(status.relay_fan ? F("ON ") : F("OFF"));
+  Serial.print(F(" | ⏰ Uptime: ")); Serial.print(millis() / 1000); Serial.println(F("s"));
+  
+  // Quick health check
+  Serial.print(F("💚 System Health: "));
+  bool allOk = !isnan(sensors.feed_temp) && sensors.feed_temp > -40 && 
+               sensors.solar_voltage > 5.0 && sensors.weight > -10.0;
+  Serial.println(allOk ? F("✅ GOOD") : F("⚠️  CHECK SENSORS"));
+
+  Serial.println(F("====================================="));
+  Serial.println(F(""));
 }
 
 // ===== PERFORMANCE MONITORING =====
@@ -537,16 +525,27 @@ Serial.println(F(" Initializing hardware..."));
 void printHelp() {
 Serial.println(F(""));
 Serial.println(F(" HIGH-PERFORMANCE COMMANDS (115200 baud):"));
-Serial.println(F(" Relay: R:1(LED) R:2(Fan) R:0(All Off)"));
-Serial.println(F(" Auger: G:1(Forward) G:2(Back) G:0(Stop) G:3(Test)"));
-Serial.println(F(" Blower: B:1(On) B:0(Off)"));
-Serial.println(F(" Actuator: A:1(Open) A:2(Close) A:0(Stop)"));
-Serial.println(F(" Feed: FEED:small/medium/large/0.05kg"));
+Serial.println(F(" 🔌 Relay (Enhanced): R:1(IN1 ON) R:2(IN1 OFF) R:3(IN2 ON) R:4(IN2 OFF)"));
+Serial.println(F("                      R:5(BOTH ON) R:0(ALL OFF) R:7(IN1 Toggle) R:8(IN2 Toggle)"));
+Serial.println(F(" ⚙️  Auger: G:1(Forward) G:2(Back) G:0(Stop) G:3(Test)"));
+Serial.println(F(" 🌬️  Blower: B:1(On) B:0(Off)"));
+Serial.println(F(" 🔧 Actuator: A:1(Open) A:2(Close) A:0(Stop)"));
+Serial.println(F(" 🍽️  Feed: FEED:small/medium/large/0.05kg"));
+Serial.println(F(""));
+Serial.println(F(" 📋 MENU SYSTEM:"));
+Serial.println(F(" m - Show main menu with current sensor values"));
+Serial.println(F(" s - Show sensor readings"));
+Serial.println(F(" h - Show this help"));
+Serial.println(F(""));
+Serial.println(F(" 📊 LOGGING SYSTEM:"));
+Serial.println(F("LOG:1 - Enable automatic logging"));
+Serial.println(F("LOG:0 - Disable automatic logging"));
 Serial.println(F(""));
 Serial.println(F(" PERFORMANCE COMMANDS:"));
 Serial.println(F("FAST:1 - Enable fast mode (minimal output)"));
 Serial.println(F("FAST:0 - Disable fast mode (full diagnostics)"));
 Serial.println(F("PERF - Show performance statistics"));
+Serial.println(F("STATUS - Show user-friendly system status"));
 Serial.println(F("FULLDATA - Send all data to Pi server"));
 Serial.println(F(""));
 Serial.println(F(" SENSOR TESTING & TROUBLESHOOTING:"));
@@ -561,6 +560,7 @@ Serial.println(F(" Command response: <1ms average"));
 Serial.println(F(" Sensor updates: 2Hz smart scheduling"));
 Serial.println(F(" JSON output: 4Hz compact protocol"));
 Serial.println(F(" Memory usage: Optimized buffers"));
+Serial.println(F(" Automatic logging: Every 1 second with millis() timestamp"));
 Serial.println(F(""));
 }
 
@@ -671,33 +671,185 @@ parseSingleCommand(cmd);
 void parseSingleCommand(String cmd) {
 // FAST command parsing with switch optimization
 
+// 🚨 LOG ALL COMMANDS RECEIVED
+logCommand(cmd);
+
+// Send immediate acknowledgment for ALL commands
+Serial.print(F("[RECV] "));
+Serial.println(cmd);
+
+// Logging control commands
+if (cmd == "LOG:1") {
+  loggingEnabled = true;
+  Serial.println(F("[ACK] LOG:1 LOGGING_ENABLED"));
+  logInfo("Logging enabled");
+  return;
+} else if (cmd == "LOG:0") {
+  loggingEnabled = false;
+  Serial.println(F("[ACK] LOG:0 LOGGING_DISABLED"));
+  Serial.println(F("[INFO] Logging disabled"));
+  return;
+}
+
+// Heartbeat/Ping command
+if (cmd == "PING") {
+  Serial.println(F("[ACK] PING PONG"));
+  return;
+}
+
+// Connection test command
+if (cmd == "TEST_CONNECTION") {
+  Serial.println(F("[ACK] TEST_CONNECTION ARDUINO_READY"));
+  Serial.print(F("[INFO] System_Time: "));
+  Serial.print(millis());
+  Serial.println(F("ms"));
+  return;
+}
+
+// Data request commands
+if (cmd == "GET_DATA" || cmd == "REQUEST_DATA") {
+  Serial.println(F("[ACK] GET_DATA SENDING_CURRENT_DATA"));
+  fastJSONOutput(); // Send current sensor data
+  return;
+}
+
+// Get specific sensor data
+if (cmd == "GET_SENSORS") {
+  Serial.println(F("[ACK] GET_SENSORS SENSOR_DATA"));
+  fastJSONOutput();
+  return;
+}
+
+// Get system status
+if (cmd == "GET_STATUS") {
+  Serial.println(F("[ACK] GET_STATUS SYSTEM_STATUS"));
+  printUserFriendlyStatus();
+  return;
+}
+
+// Heartbeat control commands
+if (cmd == "HEARTBEAT:1" || cmd == "HEARTBEAT_ON") {
+  heartbeatEnabled = true;
+  lastHeartbeat = millis(); // Reset heartbeat timer
+  Serial.println(F("[ACK] HEARTBEAT:1 HEARTBEAT_ENABLED"));
+  return;
+} else if (cmd == "HEARTBEAT:0" || cmd == "HEARTBEAT_OFF") {
+  heartbeatEnabled = false;
+  Serial.println(F("[ACK] HEARTBEAT:0 HEARTBEAT_DISABLED"));
+  return;
+}
+
 // Performance commands
 if (cmd == "FAST:1") {
 enableFastMode();
+Serial.println(F("[ACK] FAST:1 FAST_MODE_ENABLED"));
+logInfo("Fast mode enabled");
 return;
 } else if (cmd == "FAST:0") {
 disableFastMode();
+Serial.println(F("[ACK] FAST:0 NORMAL_MODE_ENABLED"));
+logInfo("Normal mode enabled");
 return;
 } else if (cmd == "PERF") {
+Serial.println(F("[ACK] PERF PERFORMANCE_MONITOR"));
 performanceMonitor();
 return;
 } else if (cmd == "TEST") {
 // SENSOR TEST COMMAND
+Serial.println(F("[ACK] TEST SENSOR_TEST_STARTED"));
+logInfo("Testing all sensors...");
 Serial.println(F(" Testing all sensors..."));
 sensorService.testAllSensors();
+Serial.println(F("[INFO] SENSOR_TEST_COMPLETED"));
 return;
 } else if (cmd == "INIT") {
 // RE-INITIALIZE SENSORS
+Serial.println(F("[ACK] INIT SENSOR_REINIT_STARTED"));
+logInfo("Re-initializing sensors...");
 Serial.println(F(" Re-initializing sensors..."));
 sensorService.begin();
+Serial.println(F("[INFO] SENSOR_REINIT_COMPLETED"));
 return;
 } else if (cmd == "FULLDATA") {
 // Send all available data immediately for web app
+Serial.println(F("[ACK] FULLDATA SENDING_COMPREHENSIVE_DATA"));
+logInfo("Sending comprehensive data");
 Serial.println(F("[INFO] Sending comprehensive data..."));
 fastJSONOutput();
 sendErrorStatusToPi();
 sendConfigToPi();
 if (!fastMode) sensorService.outputSystemStatus();
+Serial.println(F("[INFO] COMPREHENSIVE_DATA_SENT"));
+        return;
+            } else if (cmd == "STATUS" || cmd == "status") {
+        // แสดงสถานะระบบแบบอ่านง่าย (เฉพาะเมื่อไม่ใช่ fast mode)
+        Serial.println(F("[ACK] STATUS SYSTEM_STATUS"));
+        if (!fastMode) {
+            printUserFriendlyStatus();
+        } else {
+            // Fast mode - ส่งข้อมูลแบบเร็ว
+            fastJSONOutput();
+        }
+        Serial.println(F("[INFO] STATUS_SENT"));
+        return;
+    }
+    
+    // ===== NEW: PI SERVER FEED CONTROL COMMANDS =====
+    if (cmd.startsWith("TIMING:")) {
+        // Format: TIMING:actuator_up:actuator_down:auger_duration:blower_duration
+        // Example: TIMING:3:2:20:15
+        int colon1 = cmd.indexOf(':', 7);  // After "TIMING:"
+        int colon2 = cmd.indexOf(':', colon1 + 1);
+        int colon3 = cmd.indexOf(':', colon2 + 1);
+        
+        if (colon1 > 0 && colon2 > 0 && colon3 > 0) {
+            float actuator_up = cmd.substring(7, colon1).toFloat();
+            float actuator_down = cmd.substring(colon1 + 1, colon2).toFloat();
+            float auger_duration = cmd.substring(colon2 + 1, colon3).toFloat();
+            float blower_duration = cmd.substring(colon3 + 1).toFloat();
+            
+            // Update device timing configuration
+            config.actuator_up_time = actuator_up;
+            config.actuator_down_time = actuator_down;
+            config.auger_duration = auger_duration;
+            config.blower_duration = blower_duration;
+            
+            // Save to EEPROM
+            saveConfiguration();
+            
+            Serial.print(F("[ACK] TIMING:"));
+            Serial.print(actuator_up, 1);
+            Serial.print(F(":"));
+            Serial.print(actuator_down, 1);
+            Serial.print(F(":"));
+            Serial.print(auger_duration, 1);
+            Serial.print(F(":"));
+            Serial.print(blower_duration, 1);
+            Serial.println(F(" TIMING_UPDATED"));
+        } else {
+            Serial.println(F("[NAK] TIMING INVALID_FORMAT"));
+        }
+        return;
+    }
+    
+    if (cmd.startsWith("FEED:")) {
+        // Format: FEED:amount
+        // Example: FEED:100
+        float amount = cmd.substring(5).toFloat();
+        
+        if (amount > 0 && amount <= 1000) {
+            Serial.print(F("[ACK] FEED:"));
+            Serial.print(amount);
+            Serial.println(F(" FEED_STARTED"));
+            // Use current device timing configuration
+            startFeedingWithParams(amount, 
+                                   config.actuator_up_time, 
+                                   config.actuator_down_time, 
+                                   config.auger_duration, 
+                                   config.blower_duration);
+        } else {
+            Serial.println(F("[NAK] FEED INVALID_AMOUNT"));
+        }
 return;
 }
 
@@ -715,11 +867,13 @@ auto_weigh_enabled = true;
 auto_weigh_start_time = millis();
 last_auto_weigh_reading = 0;
 
-Serial.print(F("[AUTO_WEIGH] Started for "));
+Serial.print(F("[ACK] AUTO_WEIGH:"));
 Serial.print(auto_weigh_duration / 1000);
-Serial.print(F(" seconds, interval "));
+Serial.print(F(":"));
 Serial.print(auto_weigh_interval / 1000);
-Serial.println(F(" seconds"));
+Serial.println(F(" AUTO_WEIGH_STARTED"));
+} else {
+Serial.println(F("[NAK] AUTO_WEIGH INVALID_FORMAT"));
 }
 return;
 }
@@ -727,7 +881,7 @@ return;
 // Stop Auto Weighing
 if (cmd.equals("AUTO_WEIGH_STOP")) {
 auto_weigh_enabled = false;
-Serial.println(F("[AUTO_WEIGH] Stopped"));
+Serial.println(F("[ACK] AUTO_WEIGH_STOP AUTO_WEIGH_STOPPED"));
 return;
 }
 
@@ -769,72 +923,229 @@ float duration = cmd.substring(2).toFloat();
 handleActuatorDuration('2', duration);
 }
 break;
-case 'T':
-if (cmd == "TARE") {
-weightSensor.tare();
-Serial.println(F("[ACK] TARE Weight_Tared"));
-}
-break;
+    case 'T':
+        if (cmd == "TARE") {
+            weightSensor.tare();
+            Serial.println(F("[ACK] TARE WEIGHT_TARED"));
+        }
+        break;
+    case 'm':
+    case 'M':
+        if (cmd == "m" || cmd == "M") {
+            Serial.println(F("[ACK] MENU MAIN_MENU_DISPLAYED"));
+            showMainMenu();
+        }
+        break;
+    case 's':
+    case 'S':
+        if (cmd == "s") {
+            Serial.println(F("[ACK] SENSORS SENSOR_DETAILS_DISPLAYED"));
+            showSensorDetails();
+        }
+        break;
+    case 'h':
+    case 'H':
+        if (cmd == "h" || cmd == "H") {
+            Serial.println(F("[ACK] HELP HELP_DISPLAYED"));
+            printHelp();
+        }
+        break;
+    case '1':
+        if (cmd == "1") {
+            Serial.println(F("[ACK] 1 FAN_ON_SHORTCUT"));
+            handleRelayCommand('1'); // IN1 (FAN) ON
+        }
+        break;
+    case '2':
+        if (cmd == "2") {
+            Serial.println(F("[ACK] 2 FAN_OFF_SHORTCUT"));
+            handleRelayCommand('2'); // IN1 (FAN) OFF
+        }
+        break;
+    case '3':
+        if (cmd == "3") {
+            Serial.println(F("[ACK] 3 LED_ON_SHORTCUT"));
+            handleRelayCommand('3'); // IN2 (LED) ON
+        }
+        break;
+    case '4':
+        if (cmd == "4") {
+            Serial.println(F("[ACK] 4 LED_OFF_SHORTCUT"));
+            handleRelayCommand('4'); // IN2 (LED) OFF
+        }
+        break;
+    case '5':
+        if (cmd == "5") {
+            Serial.println(F("[ACK] 5 FAN_LED_ON_SHORTCUT"));
+            handleRelayCommand('5'); // BOTH ON
+        }
+        break;
+    case '6':
+        if (cmd == "6") {
+            weightSensor.tare();
+            Serial.println(F("[ACK] 6 SCALE_TARED_SHORTCUT"));
+        }
+        break;
 default:
 // Handle longer commands
 if (cmd.startsWith("SPD:")) {
 int speed = cmd.substring(4).toInt();
+Serial.print(F("[ACK] SPD:"));
+Serial.print(speed);
+Serial.println(F(" PWM_SPEED_SET"));
 handlePWMSpeed(speed);
 } else if (cmd.startsWith("CAL:")) {
+Serial.print(F("[ACK] CAL:"));
+Serial.print(cmd.substring(4));
+Serial.println(F(" CALIBRATION_CMD"));
 handleCalibrationCommand(cmd.substring(4));
 } else if (cmd.startsWith("HX:")) {
+Serial.print(F("[ACK] HX:"));
+Serial.print(cmd.substring(3));
+Serial.println(F(" HX711_CMD"));
 handleHX711Command(cmd.substring(3));
 } else if (cmd.startsWith("CFG:")) {
+Serial.print(F("[ACK] CFG:"));
+Serial.print(cmd.substring(4));
+Serial.println(F(" CONFIG_CMD"));
 handleConfigCommand(cmd.substring(4));
-} else if (cmd.startsWith("FEED:")) {
-handleFeedCommand(cmd.substring(5));
-} else if (cmd.startsWith("S:ALL")) {
-if (!fastMode) sensorService.outputSensorData();
-} else if (cmd.startsWith("DEBUG:")) {
-handleDebugCommand(cmd.substring(6));
-} else if (cmd.startsWith("[CONTROL]:")) {
-handleWebControlCommand(cmd.substring(10));
-} else {
-Serial.print(F(" Unknown: "));
-Serial.println(cmd);
-}
+        } else if (cmd.startsWith("FEED:")) {
+            Serial.print(F("[ACK] FEED:"));
+            Serial.print(cmd.substring(5));
+            Serial.println(F(" FEED_CMD"));
+            handleFeedCommand(cmd.substring(5));
+        } else if (cmd.startsWith("FEED_WEB:")) {
+            Serial.print(F("[ACK] FEED_WEB:"));
+            Serial.print(cmd.substring(9));
+            Serial.println(F(" WEB_FEED_CMD"));
+            handleWebFeedCommand(cmd.substring(9));
+        } else if (cmd.startsWith("WEB_FEED:")) {
+            // Enhanced feed command from Web App with timing parameters
+            Serial.print(F("[ACK] WEB_FEED:"));
+            Serial.print(cmd.substring(9));
+            Serial.println(F(" ENHANCED_WEB_FEED_CMD"));
+            handleWebFeedCommand(cmd.substring(9));
+        } else if (cmd.startsWith("WEIGHT_CAL:")) {
+            Serial.print(F("[ACK] WEIGHT_CAL:"));
+            Serial.print(cmd.substring(11));
+            Serial.println(F(" WEIGHT_CALIBRATION_CMD"));
+            handleWeightCalibrationCommand(cmd.substring(11));
+        } else if (cmd.startsWith("S:ALL")) {
+            Serial.println(F("[ACK] S:ALL SENSOR_DATA_OUTPUT"));
+            if (!fastMode) sensorService.outputSensorData();
+        } else if (cmd.startsWith("DEBUG:")) {
+            Serial.print(F("[ACK] DEBUG:"));
+            Serial.print(cmd.substring(6));
+            Serial.println(F(" DEBUG_CMD"));
+            handleDebugCommand(cmd.substring(6));
+        } else if (cmd.startsWith("[CONTROL]:")) {
+            Serial.print(F("[ACK] CONTROL:"));
+            Serial.print(cmd.substring(10));
+            Serial.println(F(" WEB_CONTROL_CMD"));
+            handleWebControlCommand(cmd.substring(10));
+        } else if (cmd.startsWith("PWM:")) {
+            Serial.print(F("[ACK] PWM:"));
+            Serial.print(cmd.substring(4));
+            Serial.println(F(" PWM_CONTROL_CMD"));
+            handlePWMControl(cmd.substring(4));
+        } else if (cmd.startsWith("MOTOR:")) {
+            Serial.print(F("[ACK] MOTOR:"));
+            Serial.print(cmd.substring(6));
+            Serial.println(F(" MOTOR_CONTROL_CMD"));
+            handleMotorControl(cmd.substring(6));
+        } else if (cmd.startsWith("WEB_")) {
+            Serial.print(F("[ACK] WEB_:"));
+            Serial.print(cmd.substring(4));
+            Serial.println(F(" WEB_APP_CMD"));
+            handleWebAppCommand(cmd.substring(4));
+        } else {
+            Serial.print(F("[NAK] UNKNOWN_CMD: "));
+            Serial.println(cmd);
+        }
 break;
 }
 }
 
-// ===== OPTIMIZED RELAY CONTROL =====
+// ===== ENHANCED RELAY CONTROL: IN1/IN2 SEPARATE ON/OFF =====
 void handleRelayCommand(char cmd) {
   switch (cmd) {
-    case '1': // LED On
-      digitalWrite(RELAY_LED, LOW);  // Active LOW relay
-      status.relay_led = true;
-      Serial.println(F("[RELAY] LED ON"));
-      break;
-    case '2': // Fan On  
+    // === IN1 (FAN) CONTROL - PIN 52 ===
+    case '1': // IN1 ON
       digitalWrite(RELAY_FAN, LOW);  // Active LOW relay
       status.relay_fan = true;
-      Serial.println(F("[RELAY] FAN ON"));
+      Serial.println(F("[ACK] R:1 FAN_ON"));
+      logInfo("FAN ON");
       break;
-    case '3': // LED Off
+      
+    case '2': // IN1 OFF  
+      digitalWrite(RELAY_FAN, HIGH); // Active LOW relay
+      status.relay_fan = false;
+      Serial.println(F("[ACK] R:2 FAN_OFF"));
+      logInfo("FAN OFF");
+      break;
+      
+    // === IN2 (LED) CONTROL - PIN 50 ===
+    case '3': // IN2 ON
+      digitalWrite(RELAY_LED, LOW);  // Active LOW relay
+      status.relay_led = true;
+      Serial.println(F("[ACK] R:3 LED_ON"));
+      logInfo("LED ON");
+      break;
+      
+    case '4': // IN2 OFF
       digitalWrite(RELAY_LED, HIGH); // Active LOW relay
       status.relay_led = false;
-      Serial.println(F("[RELAY] LED OFF"));
+      Serial.println(F("[ACK] R:4 LED_OFF"));
+      logInfo("LED OFF");
       break;
-    case '4': // Fan Off
-      digitalWrite(RELAY_FAN, HIGH); // Active LOW relay  
-      status.relay_fan = false;
-      Serial.println(F("[RELAY] FAN OFF"));
+      
+    // === COMBINED CONTROLS ===
+    case '5': // BOTH ON
+      digitalWrite(RELAY_FAN, LOW);
+      digitalWrite(RELAY_LED, LOW);
+      status.relay_fan = true;
+      status.relay_led = true;
+      Serial.println(F("[ACK] R:5 FAN_LED_ON"));
+      logInfo("FAN+LED ON");
       break;
-    case '0': // All Off
-      digitalWrite(RELAY_LED, HIGH);
+      
+    case '0': // ALL OFF
       digitalWrite(RELAY_FAN, HIGH);
-      status.relay_led = false;
+      digitalWrite(RELAY_LED, HIGH);
       status.relay_fan = false;
-      Serial.println(F("[RELAY] ALL OFF"));
+      status.relay_led = false;
+      Serial.println(F("[ACK] R:0 ALL_RELAY_OFF"));
+      logInfo("ALL RELAYS OFF");
       break;
+      
+    // === LEGACY COMPATIBILITY ===
+    case '7': // IN1 TOGGLE (legacy)
+      status.relay_fan = !status.relay_fan;
+      digitalWrite(RELAY_FAN, status.relay_fan ? LOW : HIGH);
+      Serial.print(F("[ACK] R:7 FAN_TOGGLE_"));
+      Serial.println(status.relay_fan ? "ON" : "OFF");
+      logInfo(status.relay_fan ? "FAN TOGGLE ON" : "FAN TOGGLE OFF");
+      break;
+      
+    case '8': // IN2 TOGGLE (legacy)
+      status.relay_led = !status.relay_led;
+      digitalWrite(RELAY_LED, status.relay_led ? LOW : HIGH);
+      Serial.print(F("[ACK] R:8 LED_TOGGLE_"));
+      Serial.println(status.relay_led ? "ON" : "OFF");
+      logInfo(status.relay_led ? "LED TOGGLE ON" : "LED TOGGLE OFF");
+      break;
+      
     default:
-      Serial.print(F("[ERROR] Invalid relay command: "));
-      Serial.println(cmd);
+      Serial.print(F("[NAK] R:"));
+      Serial.print(cmd);
+      Serial.println(F(" INVALID_RELAY_CMD"));
+      logError("Invalid relay command: R:" + String(cmd));
+      Serial.println(F("[HELP] Enhanced Relay Commands:"));
+      Serial.println(F("  R:1 = IN1 (FAN) ON    | R:2 = IN1 (FAN) OFF"));
+      Serial.println(F("  R:3 = IN2 (LED) ON    | R:4 = IN2 (LED) OFF"));
+      Serial.println(F("  R:5 = BOTH ON         | R:0 = ALL OFF"));
+      Serial.println(F("  R:7 = IN1 Toggle      | R:8 = IN2 Toggle"));
+      break;
   }
 }
 
@@ -846,40 +1157,42 @@ digitalWrite(AUGER_IN1, HIGH);
 digitalWrite(AUGER_IN2, LOW);
 analogWrite(AUGER_ENA, config.auger_speed_forward);
 status.auger_state = "forward";
-if (!fastMode) {
-Serial.print(F(" Auger Forward ("));
+Serial.print(F("[ACK] G:1 AUGER_FORWARD_"));
 Serial.print(config.auger_speed_forward * 100 / 255);
-Serial.println(F("%)"));
-} else {
-Serial.println(F("[ACK] G:1 AUGER_FORWARD"));
-}
+Serial.println(F("%"));
+logInfo("AUGER FORWARD " + String(config.auger_speed_forward * 100 / 255) + "%");
 break;
 case '2':
 digitalWrite(AUGER_IN1, LOW);
 digitalWrite(AUGER_IN2, HIGH);
 analogWrite(AUGER_ENA, config.auger_speed_backward);
 status.auger_state = "backward";
-if (!fastMode) {
-Serial.print(F(" Auger Backward ("));
+Serial.print(F("[ACK] G:2 AUGER_BACKWARD_"));
 Serial.print(config.auger_speed_backward * 100 / 255);
-Serial.println(F("%)"));
-} else {
-Serial.println(F("[ACK] G:2 AUGER_BACKWARD"));
-}
+Serial.println(F("%"));
+logInfo("AUGER BACKWARD " + String(config.auger_speed_backward * 100 / 255) + "%");
 break;
 case '0':
 stopAuger();
 Serial.println(F("[ACK] G:0 AUGER_STOP"));
+logInfo("AUGER STOP");
 break;
 case '3':
 if (!fastMode) {
+Serial.println(F("[ACK] G:3 AUGER_SPEED_TEST_STARTED"));
 speedTestAuger();
+Serial.println(F("[INFO] G:3 AUGER_SPEED_TEST_COMPLETED"));
+logInfo("AUGER SPEED TEST");
 } else {
 Serial.println(F("[NAK] G:3 DISABLED_IN_FAST_MODE"));
+logError("AUGER test disabled in fast mode");
 }
 break;
 default:
-Serial.println(F("[NAK] G:? INVALID_AUGER_CMD"));
+Serial.print(F("[NAK] G:"));
+Serial.print(cmd);
+Serial.println(F(" INVALID_AUGER_CMD"));
+logError("Invalid auger command: G:" + String(cmd));
 break;
 }
 }
@@ -917,12 +1230,14 @@ analogWrite(BLOWER_PWM_R, config.blower_speed);
 analogWrite(BLOWER_PWM_L, 0);
 status.blower_state = true;
 Serial.println(F("[ACK] B:1 BLOWER_ON"));
+logInfo("BLOWER ON " + String(config.blower_speed * 100 / 255) + "%");
 break;
 case '0':
 analogWrite(BLOWER_PWM_R, 0);
 analogWrite(BLOWER_PWM_L, 0);
 status.blower_state = false;
 Serial.println(F("[ACK] B:0 BLOWER_OFF"));
+logInfo("BLOWER OFF");
 break;
 case '2':
 // Toggle blower
@@ -936,6 +1251,7 @@ if (status.blower_state) {
 }
 Serial.print(F("[ACK] B:2 BLOWER_TOGGLE_"));
 Serial.println(status.blower_state ? "ON" : "OFF");
+logInfo(status.blower_state ? "BLOWER TOGGLE ON" : "BLOWER TOGGLE OFF");
 break;
 default:
 // Handle speed control: B:speed (where speed = 0-255)
@@ -949,8 +1265,10 @@ Serial.print(F("[ACK] B:"));
 Serial.print(cmd);
 Serial.print(F(" BLOWER_SPEED_"));
 Serial.println(speed);
+logInfo("BLOWER SPEED " + String(speed) + " (" + String(speed * 100 / 255) + "%)");
 } else {
 Serial.println(F("[NAK] B:? INVALID_BLOWER_CMD"));
+logError("Invalid blower command: B:" + String(cmd));
 }
 break;
 }
@@ -981,6 +1299,7 @@ digitalWrite(ACTUATOR_IN2, LOW);
 analogWrite(ACTUATOR_ENA, config.actuator_speed);
 status.actuator_state = "opening";
 Serial.println(F("[ACK] A:1 ACTUATOR_OPEN"));
+logInfo("ACTUATOR OPEN " + String(config.actuator_speed * 100 / 255) + "%");
 break;
 case '2':
 digitalWrite(ACTUATOR_IN1, LOW);
@@ -988,13 +1307,16 @@ digitalWrite(ACTUATOR_IN2, HIGH);
 analogWrite(ACTUATOR_ENA, config.actuator_speed);
 status.actuator_state = "closing";
 Serial.println(F("[ACK] A:2 ACTUATOR_CLOSE"));
+logInfo("ACTUATOR CLOSE " + String(config.actuator_speed * 100 / 255) + "%");
 break;
 case '0':
 stopActuator();
 Serial.println(F("[ACK] A:0 ACTUATOR_STOP"));
+logInfo("ACTUATOR STOP");
 break;
 default:
 Serial.println(F("[NAK] A:? INVALID_ACTUATOR_CMD"));
+logError("Invalid actuator command: A:" + String(cmd));
 break;
 }
 }
@@ -1061,6 +1383,211 @@ Serial.println(F("[NAK] CFG:? INVALID_CONFIG"));
 }
 
 // ===== FEEDING CONTROL =====
+// ===== WEB APP ENHANCED FEED COMMAND =====
+void handleWebFeedCommand(String cmd) {
+    // Format: FEED_WEB:amount:actuator_up:actuator_down:auger_duration:blower_duration
+    // Example: FEED_WEB:100:3:2:20:15
+    
+    Serial.println(F("[WEB_FEED] Processing enhanced feed command from Web App"));
+    
+    // Parse parameters
+    int firstColon = cmd.indexOf(':');
+    int secondColon = cmd.indexOf(':', firstColon + 1);
+    int thirdColon = cmd.indexOf(':', secondColon + 1);
+    int fourthColon = cmd.indexOf(':', thirdColon + 1);
+    int fifthColon = cmd.indexOf(':', fourthColon + 1);
+    
+    if (firstColon == -1) {
+        // Simple feed command (legacy support)
+        handleFeedCommand(cmd);
+        return;
+    }
+    
+    // Extract parameters
+    float amount = cmd.substring(0, firstColon).toFloat();
+    float actuator_up = secondColon > 0 ? cmd.substring(firstColon + 1, secondColon).toFloat() : 3.0;
+    float actuator_down = thirdColon > 0 ? cmd.substring(secondColon + 1, thirdColon).toFloat() : 2.0;
+    float auger_duration = fourthColon > 0 ? cmd.substring(thirdColon + 1, fourthColon).toFloat() : 20.0;
+    float blower_duration = fifthColon > 0 ? cmd.substring(fourthColon + 1, fifthColon).toFloat() : 15.0;
+    
+    // Store timing parameters for Pi server
+    status.pi_actuator_up = actuator_up;
+    status.pi_actuator_down = actuator_down;
+    status.pi_auger_duration = auger_duration;
+    status.pi_blower_duration = blower_duration;
+    
+    Serial.print(F("[WEB_FEED] Amount: "));
+    Serial.print(amount);
+    Serial.println(F("g"));
+    Serial.print(F("[WEB_FEED] Timing: actuator "));
+    Serial.print(actuator_up);
+    Serial.print(F("s↑/"));
+    Serial.print(actuator_down);
+    Serial.print(F("s↓, auger "));
+    Serial.print(auger_duration);
+    Serial.print(F("s, blower "));
+    Serial.print(blower_duration);
+    Serial.println(F("s"));
+    
+    // Validate parameters
+    if (amount < 10 || amount > 2000) {
+        Serial.println(F("[WEB_FEED] ERROR: Invalid amount (10-2000g)"));
+        return;
+    }
+    
+    if (actuator_up < 0.5 || actuator_up > 30) {
+        Serial.println(F("[WEB_FEED] ERROR: Invalid actuator up time (0.5-30s)"));
+        return;
+    }
+    
+    // Record initial weight
+    float initial_weight = sensors.weight;
+    status.initial_weight = initial_weight;
+    status.feed_target = amount;
+    status.feed_start_time = millis();
+    status.is_feeding = true;
+    status.feed_step = 1;
+    
+    Serial.print(F("[WEB_FEED] Starting 4-step feed sequence..."));
+    Serial.print(F(" Initial weight: "));
+    Serial.print(initial_weight, 2);
+    Serial.println(F("kg"));
+    
+    // Execute enhanced feed sequence with Web App timing
+    executeWebFeedSequence(amount, actuator_up, actuator_down, auger_duration, blower_duration);
+}
+
+void executeWebFeedSequence(float amount, float actuator_up, float actuator_down, float auger_duration, float blower_duration) {
+    Serial.println(F("[WEB_FEED] ⚡ ENHANCED FEED SEQUENCE"));
+    
+    // Step 1: Actuator UP with precise timing
+    status.feed_step = 1;
+    Serial.print(F("[WEB_FEED] Step 1/4: Actuator UP ("));
+    Serial.print(actuator_up);
+    Serial.println(F("s)"));
+    
+    digitalWrite(ACTUATOR_IN1, HIGH);
+    digitalWrite(ACTUATOR_IN2, LOW);
+    analogWrite(ACTUATOR_ENA, config.actuator_speed);
+    status.actuator_state = "opening";
+    
+    // Non-blocking delay with status updates
+    unsigned long step_start = millis();
+    while (millis() - step_start < (actuator_up * 1000)) {
+        handleSerialInput(); // Keep responding to commands
+        if (millis() - step_start > 0 && (millis() - step_start) % 500 == 0) {
+            Serial.print(F("."));
+        }
+        delay(10);
+    }
+    Serial.println(F(" ✅"));
+    
+    // Step 2: Auger ON with precise timing
+    status.feed_step = 2;
+    Serial.print(F("[WEB_FEED] Step 2/4: Auger ON ("));
+    Serial.print(auger_duration);
+    Serial.println(F("s)"));
+    
+    digitalWrite(AUGER_IN1, HIGH);
+    digitalWrite(AUGER_IN2, LOW);
+    analogWrite(AUGER_ENA, config.auger_speed_forward);
+    status.auger_state = "forward";
+    status.auger_running = true;
+    
+    step_start = millis();
+    while (millis() - step_start < (auger_duration * 1000)) {
+        handleSerialInput();
+        // Send weight updates during feeding
+        if ((millis() - step_start) % 2000 == 0) {
+            Serial.print(F("[WEB_FEED] Weight: "));
+            Serial.print(sensors.weight, 2);
+            Serial.print(F("kg, Progress: "));
+            Serial.print(((millis() - step_start) / (auger_duration * 1000.0)) * 100, 1);
+            Serial.println(F("%"));
+        }
+        delay(10);
+    }
+    
+    // Stop auger
+    stopAllMotors();
+    status.auger_state = "stopped";
+    status.auger_running = false;
+    Serial.println(F(" ✅"));
+    
+    // Step 3: Actuator DOWN with precise timing
+    status.feed_step = 3;
+    Serial.print(F("[WEB_FEED] Step 3/4: Actuator DOWN ("));
+    Serial.print(actuator_down);
+    Serial.println(F("s)"));
+    
+    digitalWrite(ACTUATOR_IN1, LOW);
+    digitalWrite(ACTUATOR_IN2, HIGH);
+    analogWrite(ACTUATOR_ENA, config.actuator_speed);
+    status.actuator_state = "closing";
+    
+    step_start = millis();
+    while (millis() - step_start < (actuator_down * 1000)) {
+        handleSerialInput();
+        delay(10);
+    }
+    
+    stopActuator();
+    status.actuator_state = "stopped";
+    Serial.println(F(" ✅"));
+    
+    // Step 4: Blower ON with precise timing
+    status.feed_step = 4;
+    Serial.print(F("[WEB_FEED] Step 4/4: Blower ON ("));
+    Serial.print(blower_duration);
+    Serial.println(F("s)"));
+    
+    analogWrite(BLOWER_PWM_R, config.blower_speed);
+    analogWrite(BLOWER_PWM_L, config.blower_speed);
+    status.blower_state = true;
+    
+    step_start = millis();
+    while (millis() - step_start < (blower_duration * 1000)) {
+        handleSerialInput();
+        delay(10);
+    }
+    
+    // Stop blower
+    analogWrite(BLOWER_PWM_R, 0);
+    analogWrite(BLOWER_PWM_L, 0);
+    status.blower_state = false;
+    Serial.println(F(" ✅"));
+    
+    // Feed sequence complete
+    status.is_feeding = false;
+    status.feed_step = 0;
+    float final_weight = sensors.weight;
+    float fed_amount = (final_weight - status.initial_weight) * 1000; // Convert kg to grams
+    
+    Serial.println(F("[WEB_FEED] 🎉 FEED SEQUENCE COMPLETE"));
+    Serial.print(F("[WEB_FEED] Target: "));
+    Serial.print(amount);
+    Serial.print(F("g, Fed: "));
+    Serial.print(fed_amount, 1);
+    Serial.print(F("g, Accuracy: "));
+    Serial.print((fed_amount / amount) * 100, 1);
+    Serial.println(F("%"));
+    
+    // Send completion status to Pi server
+    Serial.print(F("[FEED_COMPLETE] {\"target\":"));
+    Serial.print(amount);
+    Serial.print(F(",\"actual\":"));
+    Serial.print(fed_amount, 2);
+    Serial.print(F(",\"initial_weight\":"));
+    Serial.print(status.initial_weight, 3);
+    Serial.print(F(",\"final_weight\":"));
+    Serial.print(final_weight, 3);
+    Serial.print(F(",\"duration_ms\":"));
+    Serial.print(millis() - status.feed_start_time);
+    Serial.print(F(",\"timestamp\":"));
+    Serial.print(millis());
+    Serial.println(F("}"));
+}
+
 void handleFeedCommand(String cmd) {
 // NEW: Check for Pi Server feed sequence command
 if (cmd.startsWith("SEQ:")) {
@@ -1070,15 +1597,25 @@ return;
 
 float amount = 0;
 
-if (cmd == "SMALL") amount = config.feed_small;
-else if (cmd == "MEDIUM") amount = config.feed_medium;
-else if (cmd == "LARGE") amount = config.feed_large;
-else amount = cmd.toFloat();
+if (cmd == "SMALL") {
+  amount = config.feed_small;
+  logInfo("FEED SMALL " + String(amount) + "kg");
+} else if (cmd == "MEDIUM") {
+  amount = config.feed_medium;
+  logInfo("FEED MEDIUM " + String(amount) + "kg");
+} else if (cmd == "LARGE") {
+  amount = config.feed_large;
+  logInfo("FEED LARGE " + String(amount) + "kg");
+} else {
+  amount = cmd.toFloat();
+  logInfo("FEED CUSTOM " + String(amount) + "kg");
+}
 
 if (amount > 0 && amount <= 1.0) {
 startFeeding(amount);
 } else {
 Serial.println(F("[NAK] FEED INVALID_AMOUNT"));
+logError("FEED invalid amount: " + cmd);
 }
 }
 
@@ -1506,6 +2043,236 @@ Serial.println(F("DEBUG:ALL - Run all tests"));
 }
 }
 
+// ===== ENHANCED PWM CONTROL FOR WEB APP =====
+void handlePWMControl(String cmd) {
+    // Format: PWM:device:speed
+    // Examples: PWM:auger:200, PWM:blower:255, PWM:actuator:180
+    
+    int firstColon = cmd.indexOf(':');
+    if (firstColon == -1) {
+        Serial.println(F("[PWM] ERROR: Invalid format. Use PWM:device:speed"));
+        return;
+    }
+    
+    String device = cmd.substring(0, firstColon);
+    int speed = cmd.substring(firstColon + 1).toInt();
+    
+    // Clamp speed to valid PWM range
+    speed = constrain(speed, 0, 255);
+    
+    device.toLowerCase();
+    
+    if (device == "auger") {
+        config.auger_speed_forward = speed;
+        analogWrite(AUGER_ENA, speed);
+        Serial.print(F("[PWM] Auger speed: "));
+        Serial.print(speed);
+        Serial.print(F(" ("));
+        Serial.print((speed * 100) / 255);
+        Serial.println(F("%)"));
+        
+    } else if (device == "blower") {
+        config.blower_speed = speed;
+        analogWrite(BLOWER_PWM_R, speed);
+        status.blower_state = (speed > 0);
+        Serial.print(F("[PWM] Blower speed: "));
+        Serial.print(speed);
+        Serial.print(F(" ("));
+        Serial.print((speed * 100) / 255);
+        Serial.println(F("%)"));
+        
+    } else if (device == "actuator") {
+        config.actuator_speed = speed;
+        analogWrite(ACTUATOR_ENA, speed);
+        Serial.print(F("[PWM] Actuator speed: "));
+        Serial.print(speed);
+        Serial.print(F(" ("));
+        Serial.print((speed * 100) / 255);
+        Serial.println(F("%)"));
+        
+    } else {
+        Serial.print(F("[PWM] ERROR: Unknown device '"));
+        Serial.print(device);
+        Serial.println(F("'. Use: auger, blower, actuator"));
+        return;
+    }
+    
+    // Save to EEPROM
+    saveConfiguration();
+    
+    // Send JSON response for Web App
+    Serial.print(F("[PWM_RESPONSE] {\"device\":\""));
+    Serial.print(device);
+    Serial.print(F("\",\"speed\":"));
+    Serial.print(speed);
+    Serial.print(F(",\"percentage\":"));
+    Serial.print((speed * 100) / 255);
+    Serial.print(F(",\"timestamp\":"));
+    Serial.print(millis());
+    Serial.println(F("}"));
+}
+
+void handleMotorControl(String cmd) {
+    // Format: MOTOR:device:action:duration
+    // Examples: MOTOR:auger:forward:10, MOTOR:blower:on:5, MOTOR:actuator:up:3
+    
+    int firstColon = cmd.indexOf(':');
+    int secondColon = cmd.indexOf(':', firstColon + 1);
+    
+    if (firstColon == -1 || secondColon == -1) {
+        Serial.println(F("[MOTOR] ERROR: Invalid format. Use MOTOR:device:action:duration"));
+        return;
+    }
+    
+    String device = cmd.substring(0, firstColon);
+    String action = cmd.substring(firstColon + 1, secondColon);
+    float duration = cmd.substring(secondColon + 1).toFloat();
+    
+    device.toLowerCase();
+    action.toLowerCase();
+    
+    Serial.print(F("[MOTOR] "));
+    Serial.print(device);
+    Serial.print(F(" "));
+    Serial.print(action);
+    Serial.print(F(" for "));
+    Serial.print(duration);
+    Serial.println(F("s"));
+    
+    if (device == "auger") {
+        if (action == "forward" || action == "on") {
+            digitalWrite(AUGER_IN1, HIGH);
+            digitalWrite(AUGER_IN2, LOW);
+            analogWrite(AUGER_ENA, config.auger_speed_forward);
+            status.auger_state = "forward";
+            status.auger_running = true;
+        } else if (action == "backward" || action == "reverse") {
+            digitalWrite(AUGER_IN1, LOW);
+            digitalWrite(AUGER_IN2, HIGH);
+            analogWrite(AUGER_ENA, config.auger_speed_backward);
+            status.auger_state = "backward";
+            status.auger_running = true;
+        } else if (action == "stop" || action == "off") {
+            stopAuger();
+            return;
+        }
+        
+        // Auto-stop after duration
+        if (duration > 0) {
+            status.auger_auto_stop = true;
+            status.auger_stop_time = millis() + (duration * 1000);
+        }
+        
+    } else if (device == "blower") {
+        if (action == "on" || action == "start") {
+            analogWrite(BLOWER_PWM_R, config.blower_speed);
+            analogWrite(BLOWER_PWM_L, 0);
+            status.blower_state = true;
+        } else if (action == "off" || action == "stop") {
+            analogWrite(BLOWER_PWM_R, 0);
+            analogWrite(BLOWER_PWM_L, 0);
+            status.blower_state = false;
+            return;
+        }
+        
+        // Auto-stop after duration
+        if (duration > 0) {
+            status.blower_auto_stop = true;
+            status.blower_stop_time = millis() + (duration * 1000);
+        }
+        
+    } else if (device == "actuator") {
+        if (action == "up" || action == "open" || action == "extend") {
+            digitalWrite(ACTUATOR_IN1, HIGH);
+            digitalWrite(ACTUATOR_IN2, LOW);
+            analogWrite(ACTUATOR_ENA, config.actuator_speed);
+            status.actuator_state = "opening";
+        } else if (action == "down" || action == "close" || action == "retract") {
+            digitalWrite(ACTUATOR_IN1, LOW);
+            digitalWrite(ACTUATOR_IN2, HIGH);
+            analogWrite(ACTUATOR_ENA, config.actuator_speed);
+            status.actuator_state = "closing";
+        } else if (action == "stop") {
+            stopActuator();
+            return;
+        }
+        
+        // Auto-stop after duration
+        if (duration > 0) {
+            status.actuator_auto_stop = true;
+            status.actuator_stop_time = millis() + (duration * 1000);
+        }
+        
+    } else {
+        Serial.print(F("[MOTOR] ERROR: Unknown device '"));
+        Serial.print(device);
+        Serial.println(F("'. Use: auger, blower, actuator"));
+        return;
+    }
+    
+    Serial.println(F("[MOTOR] Command executed ✅"));
+}
+
+void handleWebAppCommand(String cmd) {
+    // Enhanced Web App commands
+    // Format: WEB_command:params
+    
+    if (cmd.startsWith("STATUS")) {
+        // Send comprehensive status for Web App
+        Serial.println(F("[WEB_STATUS] Sending complete system status..."));
+        fastJSONOutput();
+        sendConfigToPi();
+        
+    } else if (cmd.startsWith("FEED_PRESETS")) {
+        // Send feed presets
+        Serial.println(F("[WEB_PRESETS] {\"small\":50,\"medium\":100,\"large\":200,\"xl\":1000}"));
+        
+    } else if (cmd.startsWith("DEVICE_TIMING")) {
+        // Send current device timing
+        Serial.print(F("[WEB_TIMING] {\"actuator_up\":"));
+        Serial.print(config.actuator_up_time);
+        Serial.print(F(",\"actuator_down\":"));
+        Serial.print(config.actuator_down_time);
+        Serial.print(F(",\"auger_duration\":"));
+        Serial.print(config.auger_duration);
+        Serial.print(F(",\"blower_duration\":"));
+        Serial.print(config.blower_duration);
+        Serial.println(F("}"));
+        
+    } else if (cmd.startsWith("PERFORMANCE")) {
+        // Send performance stats
+        Serial.print(F("[WEB_PERF] {\"uptime\":"));
+        Serial.print(millis());
+        Serial.print(F(",\"free_memory\":"));
+        Serial.print(getFreeMemory());
+        Serial.print(F(",\"loop_frequency\":"));
+        Serial.print(status.loop_frequency);
+        Serial.print(F(",\"sensor_reads\":"));
+        Serial.print(status.sensor_reads);
+        Serial.println(F("}"));
+        
+    } else if (cmd.startsWith("EMERGENCY_STOP")) {
+        // Emergency stop all motors
+        Serial.println(F("[WEB_EMERGENCY] 🛑 EMERGENCY STOP - ALL MOTORS OFF"));
+        stopAllMotors();
+        digitalWrite(RELAY_LED, HIGH);
+        digitalWrite(RELAY_FAN, HIGH);
+        status.relay_led = false;
+        status.relay_fan = false;
+        status.emergency_stop = true;
+        
+    } else if (cmd.startsWith("RESET_EMERGENCY")) {
+        // Reset emergency stop
+        Serial.println(F("[WEB_EMERGENCY] ✅ Emergency stop reset"));
+        status.emergency_stop = false;
+        status.motors_enabled = true;
+        
+    } else {
+        Serial.print(F("[WEB_APP] Unknown command: WEB_"));
+        Serial.println(cmd);
+    }
+}
+
 // NEW: Pi Server Compatible Functions
 void handleActuatorDuration(char direction, float duration) {
 if (duration <= 0 || duration > 30) {
@@ -1592,8 +2359,8 @@ Serial.print(millis());
 Serial.print(F(",\"errors\":["));
 
 bool first = true;
-const char* sensorNames[] = {"DHT_FEED", "DHT_CTRL", "RESERVED", "WEIGHT", "SOIL", "SOL_V", "SOL_I", "LOAD_V", "LOAD_I"};
-for (int i = 0; i < 9; i++) {
+const char* sensorNames[] = {"DHT_FEED", "DHT_CTRL", "RESERVED", "WEIGHT", "SOIL", "SOL_V", "SOL_I", "LOAD_V"};  // 8 elements
+for (int i = 0; i < 8; i++) {
 if (sensors.errors[i]) {
 if (!first) Serial.print(F(","));
 Serial.print(F("\""));
@@ -1844,4 +2611,340 @@ void performStartupSequence() {
   Serial.println(F("[STARTUP] Actuator test complete"));
   
   Serial.println(F("[STARTUP] System ready!"));
-} 
+}
+
+// เพิ่มฟังก์ชันแสดงเมนูหลัก
+void showMainMenu() {
+Serial.println(F(""));
+Serial.println(F("╔══════════════════════════════════════════════════════════════════════════════╗"));
+Serial.println(F("║                    🐟 FISH FEEDER MAIN MENU                                 ║"));
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+Serial.println(F("║  📊 CURRENT SENSOR VALUES:                                                  ║"));
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+
+// แสดงค่า sensor ปัจจุบัน
+Serial.print(F("║  🌡️  Feed Tank     : "));
+Serial.print(sensors.feed_temp, 1);
+Serial.print(F("°C  │  💧 Humidity: "));
+Serial.print(sensors.feed_humidity, 1);
+Serial.println(F("%               ║"));
+
+Serial.print(F("║  🌡️  Control Box   : "));
+Serial.print(sensors.control_temp, 1);
+Serial.print(F("°C  │  💧 Humidity: "));
+Serial.print(sensors.control_humidity, 1);
+Serial.println(F("%               ║"));
+
+Serial.print(F("║  ⚖️  Weight        : "));
+Serial.print(sensors.weight, 2);
+Serial.println(F(" kg                                    ║"));
+
+Serial.print(F("║  💧 Soil Moisture : "));
+Serial.print(sensors.soil_moisture, 0);
+Serial.println(F("%                                       ║"));
+
+Serial.print(F("║  🔋 Battery       : "));
+Serial.print(sensors.load_voltage, 1);
+Serial.print(F("V  │  ⚡ Current: "));
+Serial.print(sensors.load_current, 2);
+Serial.println(F("A             ║"));
+
+Serial.print(F("║  ☀️  Solar         : "));
+Serial.print(sensors.solar_voltage, 1);
+Serial.print(F("V  │  ⚡ Current: "));
+Serial.print(sensors.solar_current, 2);
+Serial.println(F("A              ║"));
+
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+Serial.println(F("║  🎮 DEVICE STATUS:                                                          ║"));
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+
+Serial.print(F("║  💡 LED Relay     : "));
+Serial.print(status.relay_led ? F("ON ") : F("OFF"));
+Serial.print(F("  │  🌪️  Fan Relay  : "));
+Serial.print(status.relay_fan ? F("ON                    ║") : F("OFF                   ║"));
+
+Serial.print(F("║  🌬️  Blower       : "));
+Serial.print(status.blower_state ? F("ON ") : F("OFF"));
+Serial.print(F("  │  ⚙️  Auger      : "));
+Serial.print(status.auger_state);
+Serial.println(F("               ║"));
+
+Serial.print(F("║  🔧 Actuator     : "));
+Serial.print(status.actuator_state);
+Serial.println(F("                                      ║"));
+
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+Serial.println(F("║  📋 QUICK COMMANDS (Enhanced Relay Control):                               ║"));
+Serial.println(F("╠══════════════════════════════════════════════════════════════════════════════╣"));
+Serial.println(F("║  1 - IN1 (FAN) ON        │  2 - IN1 (FAN) OFF       │  3 - IN2 (LED) ON  ║"));
+Serial.println(F("║  4 - IN2 (LED) OFF       │  5 - BOTH ON              │  6 - Tare Scale   ║"));
+Serial.println(F("║  s - Sensor Details      │  h - Help                 │  m - This Menu    ║"));
+Serial.println(F("╚══════════════════════════════════════════════════════════════════════════════╝"));
+Serial.println(F(""));
+Serial.print(F("Enter command: "));
+}
+
+// เพิ่มฟังก์ชันแสดงรายละเอียด sensor
+void showSensorDetails() {
+Serial.println(F(""));
+Serial.println(F("╔══════════════════════════════════════════════════════════════════════════════╗"));
+Serial.println(F("║                    📊 DETAILED SENSOR READINGS                              ║"));
+Serial.println(F("╚══════════════════════════════════════════════════════════════════════════════╝"));
+
+// DHT22 Feed Tank
+Serial.print(F("🌡️  DHT22 Feed Tank (Pin 46)     : "));
+if (!sensors.errors[0] && !sensors.errors[1]) {
+Serial.print(sensors.feed_temp, 2);
+Serial.print(F("°C, "));
+Serial.print(sensors.feed_humidity, 2);
+Serial.println(F("% ✅"));
+} else {
+Serial.println(F("ERROR - Check wiring ❌"));
+}
+
+// DHT22 Control Box
+Serial.print(F("🌡️  DHT22 Control Box (Pin 48)   : "));
+if (!sensors.errors[2] && !sensors.errors[3]) {
+Serial.print(sensors.control_temp, 2);
+Serial.print(F("°C, "));
+Serial.print(sensors.control_humidity, 2);
+Serial.println(F("% ✅"));
+} else {
+Serial.println(F("ERROR - Check wiring ❌"));
+}
+
+// Weight Sensor
+Serial.print(F("⚖️  HX711 Weight (Pins 20,21)    : "));
+if (!sensors.errors[4]) {
+Serial.print(sensors.weight, 3);
+Serial.println(F(" kg ✅"));
+} else {
+Serial.println(F("ERROR - Check HX711 wiring ❌"));
+}
+
+// Soil Moisture
+Serial.print(F("💧 Soil Moisture (Pin A2)       : "));
+if (!sensors.errors[5]) {
+Serial.print(sensors.soil_moisture, 1);
+Serial.println(F("% ✅"));
+} else {
+Serial.println(F("ERROR - Check sensor ❌"));
+}
+
+// Battery Monitoring
+Serial.print(F("🔋 Battery Voltage (Pin A1)     : "));
+if (!sensors.errors[6]) {
+Serial.print(sensors.load_voltage, 2);
+Serial.println(F(" V ✅"));
+} else {
+Serial.println(F("ERROR - Check voltage divider ❌"));
+}
+
+Serial.print(F("⚡ Battery Current (Pin A0)     : "));
+Serial.print(sensors.load_current, 3);
+Serial.println(F(" A"));
+
+// Solar Monitoring
+Serial.print(F("☀️  Solar Voltage (Pin A3)       : "));
+Serial.print(sensors.solar_voltage, 2);
+Serial.println(F(" V"));
+
+Serial.print(F("⚡ Solar Current (Pin A4)       : "));
+Serial.print(sensors.solar_current, 3);
+Serial.println(F(" A"));
+
+Serial.println(F(""));
+Serial.print(F("Press 'm' for main menu: "));
+}
+
+// ===== ENHANCED HX711 WEIGHT CALIBRATION WITH EEPROM =====
+void handleWeightCalibrationCommand(String cmd) {
+    // Format: WEIGHT_CAL:action:value
+    // Examples: WEIGHT_CAL:calibrate:1.000, WEIGHT_CAL:tare, WEIGHT_CAL:reset
+    
+    int firstColon = cmd.indexOf(':');
+    if (firstColon == -1) {
+        Serial.println(F("[WEIGHT_CAL] ERROR: Invalid format. Use WEIGHT_CAL:action:value"));
+        return;
+    }
+    
+    String action = cmd.substring(0, firstColon);
+    String valueStr = cmd.substring(firstColon + 1);
+    
+    action.toLowerCase();
+    
+    if (action == "calibrate") {
+        float knownWeight = valueStr.toFloat();
+        if (knownWeight <= 0) {
+            Serial.println(F("[WEIGHT_CAL] ERROR: Weight must be > 0"));
+            return;
+        }
+        
+        Serial.print(F("[WEIGHT_CAL] Starting calibration with "));
+        Serial.print(knownWeight, 3);
+        Serial.println(F(" kg"));
+        
+        // Get average reading
+        float reading = 0;
+        for (int i = 0; i < 10; i++) {
+            reading += weightSensor.getScale()->get_value();
+            delay(100);
+        }
+        reading /= 10.0;
+        
+        if (reading == 0) {
+            Serial.println(F("[WEIGHT_CAL] ERROR: No signal from weight sensor"));
+            return;
+        }
+        
+        // Calculate scale factor
+        float scaleFactor = reading / knownWeight;
+        long offset = weightSensor.getScale()->get_offset();
+        
+        // Save to EEPROM
+        EEPROM.put(EEPROM_SCALE_ADDR, scaleFactor);
+        EEPROM.put(EEPROM_SCALE_ADDR + sizeof(float), offset);
+        
+        // Apply calibration
+        weightSensor.getScale()->set_scale(scaleFactor);
+        
+        Serial.println(F("[WEIGHT_CAL] ✅ Calibration successful:"));
+        Serial.print(F("   Known weight: "));
+        Serial.print(knownWeight, 3);
+        Serial.println(F(" kg"));
+        Serial.print(F("   Raw reading: "));
+        Serial.println(reading, 3);
+        Serial.print(F("   Scale factor: "));
+        Serial.println(scaleFactor, 6);
+        Serial.print(F("   Offset: "));
+        Serial.println(offset);
+        Serial.println(F("💾 Saved to EEPROM"));
+        
+        // Send JSON response for Web App
+        Serial.print(F("[WEIGHT_CAL_RESULT] {\"status\":\"success\",\"known_weight\":"));
+        Serial.print(knownWeight, 3);
+        Serial.print(F(",\"raw_reading\":"));
+        Serial.print(reading, 3);
+        Serial.print(F(",\"scale_factor\":"));
+        Serial.print(scaleFactor, 6);
+        Serial.print(F(",\"offset\":"));
+        Serial.print(offset);
+        Serial.print(F(",\"timestamp\":"));
+        Serial.print(millis());
+        Serial.println(F("}"));
+        
+    } else if (action == "tare") {
+        Serial.println(F("[WEIGHT_CAL] Taring weight sensor..."));
+        weightSensor.tare();
+        
+        long newOffset = weightSensor.getScale()->get_offset();
+        
+        // Update EEPROM with new offset
+        EEPROM.put(EEPROM_SCALE_ADDR + sizeof(float), newOffset);
+        
+        Serial.println(F("[WEIGHT_CAL] ✅ Tare completed"));
+        Serial.print(F("   New offset: "));
+        Serial.println(newOffset);
+        Serial.println(F("💾 Offset saved to EEPROM"));
+        
+        // Send JSON response
+        Serial.print(F("[WEIGHT_CAL_RESULT] {\"status\":\"success\",\"action\":\"tare\",\"offset\":"));
+        Serial.print(newOffset);
+        Serial.print(F(",\"timestamp\":"));
+        Serial.print(millis());
+        Serial.println(F("}"));
+        
+    } else if (action == "reset") {
+        Serial.println(F("[WEIGHT_CAL] Resetting calibration..."));
+        
+        // Reset to defaults
+        float defaultScale = 1.0;
+        long defaultOffset = 0;
+        
+        EEPROM.put(EEPROM_SCALE_ADDR, defaultScale);
+        EEPROM.put(EEPROM_SCALE_ADDR + sizeof(float), defaultOffset);
+        
+        weightSensor.getScale()->set_scale(defaultScale);
+        weightSensor.getScale()->set_offset(defaultOffset);
+        
+        Serial.println(F("[WEIGHT_CAL] ✅ Calibration reset"));
+        Serial.println(F("💾 Defaults saved to EEPROM"));
+        
+        // Send JSON response
+        Serial.print(F("[WEIGHT_CAL_RESULT] {\"status\":\"success\",\"action\":\"reset\",\"scale_factor\":"));
+        Serial.print(defaultScale, 1);
+        Serial.print(F(",\"offset\":"));
+        Serial.print(defaultOffset);
+        Serial.print(F(",\"timestamp\":"));
+        Serial.print(millis());
+        Serial.println(F("}"));
+        
+    } else if (action == "load") {
+        Serial.println(F("[WEIGHT_CAL] Loading calibration from EEPROM..."));
+        loadWeightCalibrationFromEEPROM();
+        
+    } else if (action == "status") {
+        // Send current calibration status
+        float scaleFactor;
+        long offset;
+        EEPROM.get(EEPROM_SCALE_ADDR, scaleFactor);
+        EEPROM.get(EEPROM_SCALE_ADDR + sizeof(float), offset);
+        
+        Serial.println(F("[WEIGHT_CAL] Current calibration status:"));
+        Serial.print(F("   Scale factor: "));
+        Serial.println(scaleFactor, 6);
+        Serial.print(F("   Offset: "));
+        Serial.println(offset);
+        Serial.print(F("   Current weight: "));
+        Serial.print(sensors.weight, 3);
+        Serial.println(F(" kg"));
+        
+        // Send JSON response
+        Serial.print(F("[WEIGHT_CAL_STATUS] {\"scale_factor\":"));
+        Serial.print(scaleFactor, 6);
+        Serial.print(F(",\"offset\":"));
+        Serial.print(offset);
+        Serial.print(F(",\"current_weight\":"));
+        Serial.print(sensors.weight, 3);
+        Serial.print(F(",\"timestamp\":"));
+        Serial.print(millis());
+        Serial.println(F("}"));
+        
+    } else {
+        Serial.print(F("[WEIGHT_CAL] ERROR: Unknown action '"));
+        Serial.print(action);
+        Serial.println(F("'"));
+        Serial.println(F("[HELP] Valid actions: calibrate:weight, tare, reset, load, status"));
+    }
+}
+
+void loadWeightCalibrationFromEEPROM() {
+    float scaleFactor;
+    long offset;
+    
+    // Load from EEPROM
+    EEPROM.get(EEPROM_SCALE_ADDR, scaleFactor);
+    EEPROM.get(EEPROM_SCALE_ADDR + sizeof(float), offset);
+    
+    // Validate scale factor
+    if (scaleFactor < 1.0 || scaleFactor > 100000.0 || isnan(scaleFactor)) {
+        Serial.println(F("[WEIGHT_CAL] Invalid scale factor in EEPROM, using defaults"));
+        scaleFactor = 1.0;
+        offset = 0;
+        
+        // Save defaults
+        EEPROM.put(EEPROM_SCALE_ADDR, scaleFactor);
+        EEPROM.put(EEPROM_SCALE_ADDR + sizeof(float), offset);
+    }
+    
+    // Apply calibration
+    weightSensor.getScale()->set_scale(scaleFactor);
+    weightSensor.getScale()->set_offset(offset);
+    
+    Serial.println(F("[WEIGHT_CAL] ✅ Calibration loaded from EEPROM:"));
+    Serial.print(F("   Scale factor: "));
+    Serial.println(scaleFactor, 6);
+    Serial.print(F("   Offset: "));
+    Serial.println(offset);
+}

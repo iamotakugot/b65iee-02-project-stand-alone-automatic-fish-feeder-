@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { MdSpaceDashboard, MdDining, MdThermostat, MdSettings, MdTune } from "react-icons/md";
+import { MdSpaceDashboard, MdDining, MdThermostat, MdSettings, MdTune, MdBugReport } from "react-icons/md";
 import { FiBarChart } from "react-icons/fi";
 import { HiCodeBracket } from "react-icons/hi2";
 import { MdChevronLeft, MdChevronRight } from "react-icons/md";
@@ -72,6 +72,12 @@ const Sidebar = () => {
       label: "JSON Debug",
       shortLabel: "Debug",
       icon: <HiCodeBracket className="w-5 h-5 sm:w-6 sm:h-6" />,
+    },
+    {
+      path: "/system-test",
+      label: "System Test & QA",
+      shortLabel: "Test",
+      icon: <MdBugReport className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
     { 
       path: "/settings", 

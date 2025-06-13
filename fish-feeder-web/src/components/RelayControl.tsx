@@ -38,12 +38,28 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
 
       abortControllerRef.current = new AbortController();
 
-      const response = (await Promise.race([
-        apiClient.getRelayStatus(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), API_CONFIG.TIMEOUT),
-        ),
-      ])) as any;
+      // Get status from Firebase
+      const { firebaseClient } = await import('../config/firebase');
+      const response: any = await new Promise((resolve) => {
+        const unsubscribe = firebaseClient.getSensorData((data) => {
+          if (data?.status) {
+            resolve({
+              status: "success",
+              relay_status: {
+                led: data.control?.led === "on" || false,
+                fan: data.control?.fan === "on" || false
+              }
+            });
+            unsubscribe();
+          }
+        });
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          unsubscribe();
+          resolve({ status: "timeout" });
+        }, 5000);
+      });
 
       if (response?.status === "success" && response.relay_status) {
         const newStatus = response.relay_status;
@@ -84,10 +100,19 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
 
         console.log(`🎛️ Controlling ${type.toUpperCase()}: ${action}`);
 
-        const response =
-          type === "led"
-            ? await apiClient.controlLED(action)
-            : await apiClient.controlFan(action);
+        // Use Firebase control
+        const { firebaseClient } = await import('../config/firebase');
+        const success = type === "led"
+          ? await firebaseClient.controlLED(action)
+          : await firebaseClient.controlFan(action);
+        
+        const response = success ? { 
+          status: "success", 
+          relay_status: {
+            ...relayStatus,
+            [type]: action === "on" || (action === "toggle" && !relayStatus[type])
+          }
+        } : { status: "failed" };
 
         if (response?.status === "success" && response.relay_status) {
           // Update status immediately for better UX
@@ -98,7 +123,7 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
           // Fetch fresh status after a short delay
           setTimeout(fetchRelayStatus, 100);
         } else {
-          throw new Error(response?.message || `Failed to control ${type}`);
+          throw new Error(`Failed to control ${type}`);
         }
       } catch (err) {
         console.error(`❌ ${type.toUpperCase()} control failed:`, err);

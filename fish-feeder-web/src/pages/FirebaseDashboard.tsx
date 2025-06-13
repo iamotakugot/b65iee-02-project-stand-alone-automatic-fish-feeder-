@@ -13,20 +13,129 @@ import {
   hasSensorData,
   getSensorSummary,
 } from "../utils/firebaseSensorUtils";
+import { useApi } from "../contexts/ApiContext";
+import { useState } from "react";
+import LogViewer from "../components/LogViewer";
+import { logger } from "../utils/logger";
 
 const FirebaseDashboard = () => {
+  const [loading, setLoading] = useState(false);
+  const { controlLED: apiControlLED, controlFan: apiControlFan, controlFeeder: apiControlFeeder } = useApi();
+
   const {
     data: firebaseData,
     sensorData,
-    loading,
+    loading: dataLoading,
     error,
     lastUpdate,
     isConnected,
-    controlLED,
-    controlFan,
-    turnOffAll,
-    sendCommand,
   } = useFirebaseSensorData();
+
+  const controlLED = async (action: 'on' | 'off' | 'toggle') => {
+    logger.buttonPress(`LED_${action.toUpperCase()}`, 'FirebaseDashboard', { action });
+    
+    try {
+      setLoading(true);
+      console.log(`🔵 Using Firebase for LED control: ${action}`);
+      const result = await apiControlLED(action);
+      console.log(`LED ${action} response:`, result);
+      
+      logger.info('CONTROL', 'LED_CONTROL_SUCCESS', { action, result });
+      return result.status === 'success';
+    } catch (error) {
+      console.error("LED control failed:", error);
+      logger.error('CONTROL', 'LED_CONTROL_FAILED', { action, error });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const controlFan = async (action: 'on' | 'off' | 'toggle') => {
+    logger.buttonPress(`FAN_${action.toUpperCase()}`, 'FirebaseDashboard', { action });
+    
+    try {
+      setLoading(true);
+      console.log(`🌀 Using Firebase for Fan control: ${action}`);
+      const result = await apiControlFan(action);
+      console.log(`Fan ${action} response:`, result);
+      
+      logger.info('CONTROL', 'FAN_CONTROL_SUCCESS', { action, result });
+      return result.status === 'success';
+    } catch (error) {
+      console.error("Fan control failed:", error);
+      logger.error('CONTROL', 'FAN_CONTROL_FAILED', { action, error });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const controlFeeder = async (preset: 'small' | 'medium' | 'large') => {
+    try {
+      setLoading(true);
+      console.log(`🍚 Using Firebase for Feeder control: ${preset}`);
+      const result = await apiControlFeeder(preset);
+      console.log(`Feeder ${preset} response:`, result);
+      return result.status === 'success';
+    } catch (error) {
+      console.error("Feeder control failed:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendCommand = async (command: string) => {
+    try {
+      setLoading(true);
+      console.log(`🔥 Firebase command: ${command}`);
+      
+      // Use Firebase direct command for all commands
+      const { firebaseClient } = await import('../config/firebase');
+      let success = false;
+      
+      // Map commands to appropriate Firebase methods
+      if (command.startsWith('B:')) {
+        success = await firebaseClient.sendBlowerCommand(command);
+      } else if (command.startsWith('A:')) {
+        success = await firebaseClient.sendActuatorCommand(command);
+      } else if (command.startsWith('G:')) {
+        success = await firebaseClient.sendMotorCommand(command);
+      } else if (command.startsWith('R:')) {
+        success = await firebaseClient.sendRelayCommand(command);
+      } else {
+        // For other commands like get_status, feed_small, etc.
+        success = await firebaseClient.sendArduinoCommand(command);
+      }
+      
+      console.log(`Command "${command}" sent via Firebase:`, success);
+      return success;
+    } catch (error) {
+      console.error("Command failed:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const turnOffAll = async () => {
+    try {
+      setLoading(true);
+      console.log('🔥 Firebase: Turn off all devices');
+      // Turn off all devices using Firebase
+      await Promise.all([
+        controlLED('off'),
+        controlFan('off'),
+      ]);
+      return true;
+    } catch (error) {
+      console.error("Turn off all failed:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const connectionStatus = isConnected
     ? "✅ เชื่อมต่อ Firebase แล้ว - ข้อมูลสด"
@@ -69,7 +178,7 @@ const FirebaseDashboard = () => {
     );
   }
 
-  if (loading && !firebaseData) {
+  if (dataLoading && !firebaseData) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -118,8 +227,11 @@ const FirebaseDashboard = () => {
           >
             {isConnected ? "Live Data" : "Disconnected"}
           </strong>
-          {loading && (
+          {dataLoading && (
             <span className="ml-2 text-blue-500 dark:text-blue-400">🔄 Updating...</span>
+          )}
+          {loading && (
+            <span className="ml-2 text-orange-500 dark:text-orange-400">⚡ Sending Command...</span>
           )}
         </div>
 
@@ -446,19 +558,28 @@ const FirebaseDashboard = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => controlLED('on')}
-                    className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+                    }`}
                   >
                     ON
                   </button>
                   <button
                     onClick={() => controlLED('off')}
-                    className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'
+                    }`}
                   >
                     OFF
                   </button>
                   <button
                     onClick={() => controlLED('toggle')}
-                    className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
                   >
                     TOGGLE
                   </button>
@@ -473,22 +594,372 @@ const FirebaseDashboard = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => controlFan('on')}
-                    className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+                    }`}
                   >
                     ON
                   </button>
                   <button
                     onClick={() => controlFan('off')}
-                    className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'
+                    }`}
                   >
                     OFF
                   </button>
                   <button
                     onClick={() => controlFan('toggle')}
-                    className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors"
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
                   >
                     TOGGLE
                   </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Blower Control */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">🌪️ Blower</span>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          // ใช้ Firebase commands
+                          const success = await sendCommand('B:0');
+                          console.log('Blower OFF (Firebase):', success);
+                        } else {
+                          // ใช้ Pi Server API
+                          const response = await fetch('http://localhost:5000/api/control/blower/off', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Blower OFF (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Blower OFF failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-2 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'
+                    }`}
+                  >
+                    OFF
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          // ใช้ Firebase commands
+                          const success = await sendCommand('B:128');
+                          console.log('Blower 50% (Firebase):', success);
+                        } else {
+                          // ใช้ Pi Server API
+                          const response = await fetch('http://localhost:5000/api/control/blower/on', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ speed: 128 })
+                          });
+                          const result = await response.json();
+                          console.log('Blower 50% (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Blower 50% failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-2 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
+                  >
+                    50%
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          // ใช้ Firebase commands
+                          const success = await sendCommand('B:255');
+                          console.log('Blower MAX (Firebase):', success);
+                        } else {
+                          // ใช้ Pi Server API
+                          const response = await fetch('http://localhost:5000/api/control/blower/on', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ speed: 255 })
+                          });
+                          const result = await response.json();
+                          console.log('Blower MAX (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Blower MAX failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-2 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600'
+                    }`}
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Actuator Control */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">🔧 Actuator</span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('A:1');
+                          console.log('Actuator UP (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/actuator/up', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Actuator UP (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Actuator UP failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+                    }`}
+                  >
+                    OPEN
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('A:2');
+                          console.log('Actuator DOWN (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/actuator/down', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Actuator DOWN (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Actuator DOWN failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
+                  >
+                    CLOSE
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('A:0');
+                          console.log('Actuator STOP (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/actuator/stop', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Actuator STOP (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Actuator STOP failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'
+                    }`}
+                  >
+                    STOP
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Auger Control */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">⚙️ Auger</span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('G:1');
+                          console.log('Auger FORWARD (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/auger/forward', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Auger FORWARD (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Auger FORWARD failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'
+                    }`}
+                  >
+                    FWD
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('G:2');
+                          console.log('Auger REVERSE (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/auger/reverse', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Auger REVERSE (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Auger REVERSE failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
+                  >
+                    REV
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const isProduction = window.location.hostname !== 'localhost';
+                        
+                        if (isProduction) {
+                          const success = await sendCommand('G:0');
+                          console.log('Auger STOP (Firebase):', success);
+                        } else {
+                          const response = await fetch('http://localhost:5000/api/control/auger/stop', {
+                            method: 'POST'
+                          });
+                          const result = await response.json();
+                          console.log('Auger STOP (API):', result);
+                        }
+                      } catch (error) {
+                        console.error('Auger STOP failed:', error);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`px-3 py-1 text-white text-xs rounded-md transition-colors ${
+                      loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'
+                    }`}
+                  >
+                    STOP
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Control Status Display */}
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Current Status</h3>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span>💡 LED:</span>
+                  <span className={`font-semibold ${firebaseData?.control?.led === 'on' ? 'text-green-600' : 'text-gray-500'}`}>
+                    {firebaseData?.control?.led === 'on' ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>🌪️ Fan:</span>
+                  <span className={`font-semibold ${firebaseData?.control?.fan === 'on' ? 'text-green-600' : 'text-gray-500'}`}>
+                    {firebaseData?.control?.fan === 'on' ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>🌪️ Blower:</span>
+                  <span className={`font-semibold ${firebaseData?.control?.blower === 'on' ? 'text-green-600' : 'text-gray-500'}`}>
+                    {firebaseData?.control?.blower === 'on' ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>🔧 Actuator:</span>
+                  <span className={`font-semibold ${firebaseData?.control?.actuator && firebaseData?.control?.actuator !== 'stop' ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {firebaseData?.control?.actuator?.toUpperCase() || 'STOP'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>⚙️ Auger:</span>
+                  <span className={`font-semibold ${firebaseData?.control?.relay1 || firebaseData?.control?.relay2 ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {firebaseData?.control?.relay1 ? 'FWD' : firebaseData?.control?.relay2 ? 'REV' : 'STOP'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>📡 Arduino:</span>
+                  <span className={`font-semibold ${firebaseData?.status?.arduino_connected ? 'text-green-600' : 'text-red-500'}`}>
+                    {firebaseData?.status?.arduino_connected ? 'CONNECTED' : 'OFFLINE'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -497,9 +968,24 @@ const FirebaseDashboard = () => {
             <div className="mt-6">
               <button
                 onClick={turnOffAll}
-                className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+                disabled={loading}
+                className={`w-full px-4 py-3 font-semibold rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                  loading 
+                    ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
               >
-                🚨 TURN OFF ALL DEVICES
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Turning Off...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚨</span>
+                    <span>TURN OFF ALL DEVICES</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -514,28 +1000,40 @@ const FirebaseDashboard = () => {
             <div className="space-y-3">
               <button
                 onClick={() => sendCommand('get_status')}
-                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                disabled={loading}
+                className={`w-full px-4 py-2 rounded-lg transition-colors text-sm ${
+                  loading ? 'bg-gray-400 cursor-not-allowed text-gray-200' : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
               >
                 📊 Get Status
               </button>
               
               <button
                 onClick={() => sendCommand('feed_small')}
-                className="w-full px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
+                disabled={loading}
+                className={`w-full px-4 py-2 rounded-lg transition-colors text-sm ${
+                  loading ? 'bg-gray-400 cursor-not-allowed text-gray-200' : 'bg-purple-500 hover:bg-purple-600 text-white'
+                }`}
               >
                 🐟 Feed Small
               </button>
               
               <button
                 onClick={() => sendCommand('feed_medium')}
-                className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors text-sm"
+                disabled={loading}
+                className={`w-full px-4 py-2 rounded-lg transition-colors text-sm ${
+                  loading ? 'bg-gray-400 cursor-not-allowed text-gray-200' : 'bg-orange-500 hover:bg-orange-600 text-white'
+                }`}
               >
                 🍽️ Feed Medium
               </button>
               
               <button
                 onClick={() => sendCommand('tare_scale')}
-                className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm"
+                disabled={loading}
+                className={`w-full px-4 py-2 rounded-lg transition-colors text-sm ${
+                  loading ? 'bg-gray-400 cursor-not-allowed text-gray-200' : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
               >
                 ⚖️ Tare Scale
               </button>
@@ -582,6 +1080,9 @@ const FirebaseDashboard = () => {
 
         </div>
       </div>
+
+      {/* Log Viewer Component */}
+      <LogViewer />
     </div>
   );
 };
