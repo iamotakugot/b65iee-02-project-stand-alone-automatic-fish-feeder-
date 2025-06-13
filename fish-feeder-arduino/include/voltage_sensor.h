@@ -6,13 +6,14 @@
 
 class VoltageSensor {
 private:
-    uint8_t solarVoltagePin;
-    uint8_t loadVoltagePin;
-    float solarVoltageFactor;
-    float loadVoltageFactor;
+    uint8_t solarPin;
+    uint8_t loadPin;
+    float vRef;
+    float dividerRatio;
 
 public:
-    VoltageSensor(uint8_t solarPin, uint8_t loadPin);
+    VoltageSensor() : solarPin(A3), loadPin(A1), vRef(5.0), dividerRatio(4.50) {}  // Default constructor (4.50 ตาม reference)
+    VoltageSensor(uint8_t solarPin, uint8_t loadPin);  // Constructor with pins
     
     void begin();
     bool readSolarVoltage(float& voltage);

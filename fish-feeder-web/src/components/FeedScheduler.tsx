@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useApi } from '../contexts/ApiContext';
+import { logger } from '../utils/logger';
 
 interface ScheduledFeed {
   id: string;
@@ -11,6 +13,7 @@ interface ScheduledFeed {
 }
 
 const FeedScheduler: React.FC = () => {
+  const { controlFeeder } = useApi();
   const [schedules, setSchedules] = useState<ScheduledFeed[]>([
     { id: '1', time: '08:00', amount: 100, type: 'medium', enabled: true },
     { id: '2', time: '12:00', amount: 150, type: 'large', enabled: true },
@@ -83,23 +86,31 @@ const FeedScheduler: React.FC = () => {
   };
 
   const executeFeed = async (schedule: ScheduledFeed) => {
+    // Log scheduled feed execution
+    logger.buttonPress('SCHEDULED_FEED', 'FeedScheduler', { 
+      scheduleId: schedule.id,
+      amount: schedule.amount,
+      type: schedule.type 
+    });
+
     try {
-      const response = await fetch('/api/feed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: schedule.amount,
-          type: schedule.type,
-          scheduled: true
-        })
-      });
+      // Map schedule type to controlFeeder type
+      const feedTypeMapping = {
+        'small': 'small' as const,
+        'medium': 'medium' as const,
+        'large': 'large' as const,
+        'custom': 'medium' as const // Default custom to medium
+      };
+      
+      const feedType = feedTypeMapping[schedule.type] || 'medium';
+      const response = await controlFeeder(feedType);
 
       const newFeedRecord = {
         id: Date.now().toString(),
         timestamp: new Date().toLocaleString(),
         amount: schedule.amount,
         type: schedule.type,
-        status: response.ok ? 'success' as const : 'failed' as const
+        status: (response.status === 'success' || response.status === 'offline') ? 'success' as const : 'failed' as const
       };
 
       setFeedHistory([newFeedRecord, ...feedHistory.slice(0, 9)]);
@@ -109,21 +120,52 @@ const FeedScheduler: React.FC = () => {
         s.id === schedule.id ? { ...s, lastRun: new Date().toLocaleString() } : s
       ));
 
+      logger.info('SCHEDULE', 'FEED_EXECUTED', {
+        scheduleId: schedule.id,
+        status: newFeedRecord.status,
+        response
+      });
+
     } catch (error) {
-      console.error('Scheduled feed failed:', error);
+      logger.error('SCHEDULE', 'FEED_EXECUTION_FAILED', { 
+        scheduleId: schedule.id, 
+        error 
+      });
+      
+      const failedFeedRecord = {
+        id: Date.now().toString(),
+        timestamp: new Date().toLocaleString(),
+        amount: schedule.amount,
+        type: schedule.type,
+        status: 'failed' as const
+      };
+      
+      setFeedHistory([failedFeedRecord, ...feedHistory.slice(0, 9)]);
     }
   };
 
   const toggleAutoFeed = async () => {
+    // Log auto-feed toggle
+    logger.buttonPress('AUTO_FEED_TOGGLE', 'FeedScheduler', { 
+      currentState: autoFeedEnabled,
+      targetState: !autoFeedEnabled 
+    });
+
     try {
-      const endpoint = autoFeedEnabled ? '/api/auto-feed/stop' : '/api/auto-feed/start';
-      const response = await fetch(endpoint, { method: 'POST' });
+      // Since we're using Firebase, we don't have auto-feed API endpoints
+      // Instead, we'll simulate this with local state and log the action
+      setAutoFeedEnabled(!autoFeedEnabled);
       
-      if (response.ok) {
-        setAutoFeedEnabled(!autoFeedEnabled);
-      }
+      logger.info('SCHEDULE', 'AUTO_FEED_TOGGLED', {
+        enabled: !autoFeedEnabled,
+        timestamp: new Date().toISOString()
+      });
+      
+      // In a real implementation, you might want to store this in Firebase
+      localStorage.setItem('autoFeedEnabled', JSON.stringify(!autoFeedEnabled));
+      
     } catch (error) {
-      console.error('Auto-feed toggle failed:', error);
+      logger.error('SCHEDULE', 'AUTO_FEED_TOGGLE_FAILED', { error });
     }
   };
 

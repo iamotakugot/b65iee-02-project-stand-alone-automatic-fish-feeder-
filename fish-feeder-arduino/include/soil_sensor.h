@@ -9,7 +9,8 @@ private:
     uint8_t pin;
 
 public:
-    SoilSensor(uint8_t pin);
+    SoilSensor() : pin(A2) {}  // Default constructor uses A2
+    SoilSensor(uint8_t pin);   // Constructor with pin parameter
     
     void begin();
     bool readMoisture(float& moisture);

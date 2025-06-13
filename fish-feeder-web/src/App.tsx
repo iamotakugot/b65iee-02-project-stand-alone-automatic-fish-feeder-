@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 
 import Layout from "@/components/Layout";
 import AppRouter from "@/components/AppRouter";
+import { ApiProvider, useApi } from "./contexts/ApiContext";
 
 // Lazy load components for better performance
 const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
@@ -16,8 +17,6 @@ const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const SensorCharts = lazy(() => import("@/pages/SensorCharts"));
 const JsonDebug = lazy(() => import("@/pages/JsonDebug"));
-// const Rules = lazy(() => import("@/pages/Rules"));
-// const FeedHistory = lazy(() => import("@/pages/FeedHistory"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -29,10 +28,38 @@ const LoadingSpinner = () => (
   </div>
 );
 
-function App() {
+// Inner App component that uses API context
+const AppContent = () => {
+  const { connected, error } = useApi();
+
+  // Check if we're in Firebase hosting mode
+  const isFirebaseHosting = () => {
+    if (typeof window === 'undefined') return false;
+    return window.location.hostname.includes('.web.app') || 
+           window.location.hostname.includes('firebase') ||
+           window.location.hostname.includes('firebaseapp.com');
+  };
+
+  const isOfflineMode = isFirebaseHosting();
+
   return (
-    <Suspense fallback={<LoadingSpinner />}>
       <AppRouter>
+      {/* API Status Banner - Moved to bottom-right corner */}
+      <div className={`fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
+        isOfflineMode || connected 
+          ? 'bg-green-600 text-white' 
+          : 'bg-red-600 text-white'
+      }`}>
+        {isOfflineMode 
+          ? '🔥 Firebase Mode - Controls via Firebase DB' 
+          : connected 
+            ? '🟢 Pi Server Mode - Direct API Connection' 
+            : '🔴 Connection Failed - Switching to Firebase Mode'
+        }
+        {error && !isOfflineMode && ` - ${error}`}
+      </div>
+
+      <div> {/* Removed padding since banner is no longer at top */}
         <Routes>
           {/* Splash Screen - หน้าแรกที่แสดง */}
           <Route path="/splash" element={<SplashScreen />} />
@@ -48,12 +75,21 @@ function App() {
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
             <Route element={<JsonDebug />} path="json-debug" />
-            {/* <Route element={<Rules />} path="rules" /> */}
-            {/* <Route element={<FeedHistory />} path="feed-history" /> */}
             <Route element={<Settings />} path="settings" />
+            <Route element={<SimpleControl />} path="simple-control" />
           </Route>
         </Routes>
+      </div>
       </AppRouter>
+  );
+};
+
+function App() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ApiProvider>
+        <AppContent />
+      </ApiProvider>
     </Suspense>
   );
 }

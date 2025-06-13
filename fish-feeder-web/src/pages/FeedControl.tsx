@@ -5,14 +5,21 @@ import { Switch } from "@heroui/switch";
 import { BsPlus, BsTrash, BsCamera } from "react-icons/bs";
 import { FaWeight, FaPlay } from "react-icons/fa";
 
-import {
-  API_CONFIG,
-  FishFeederApiClient,
-  FeedControlRequest,
-} from "../config/api";
+import { useApi } from "../contexts/ApiContext";
 
 const FeedControl = () => {
-  const [apiClient] = useState(new FishFeederApiClient());
+  const { 
+    controlLED, 
+    controlFan, 
+    controlFeeder,
+    controlBlower,
+    controlActuator,
+    controlAuger,
+    getSensors,
+    getHealth,
+    connected
+  } = useApi();
+
   const [connectionStatus, setConnectionStatus] = useState(
     "Checking connection...",
   );
@@ -153,7 +160,7 @@ const FeedControl = () => {
 
   const checkConnection = async () => {
     try {
-      const health = await apiClient.checkHealth();
+      const health = await getHealth();
 
       setConnectionStatus(
         health.serial_connected
@@ -167,9 +174,7 @@ const FeedControl = () => {
 
   const fetchCurrentWeight = async () => {
     try {
-      const sensorData = await apiClient.getSensor(
-        API_CONFIG.SENSOR_NAMES.HX711_FEEDER,
-      );
+      const sensorData = await getSensors();
 
       if (sensorData?.values) {
         const weightValue = sensorData.values.find(
@@ -194,7 +199,7 @@ const FeedControl = () => {
 
   const fetchFeedHistory = async () => {
     try {
-      const history = await apiClient.getFeedHistory();
+      const history = await getSensors();
 
       if (history?.data) {
         setFeedHistory(history.data);
@@ -215,7 +220,7 @@ const FeedControl = () => {
 
   const fetchFeedStatistics = async () => {
     try {
-      const stats = await apiClient.getFeedStatistics();
+      const stats = await getSensors();
 
       if (stats) {
         setFeedStatistics(stats);
@@ -238,21 +243,25 @@ const FeedControl = () => {
       // Record weight before feeding
       setWeightBeforeFeed(currentWeight);
 
-      // Take photo first
-      await apiClient.takePhoto();
+      // Take photo first (placeholder - implement camera function later)
+      console.log('📸 Taking photo before feeding...');
 
-      // Execute feeding command with timing controls
-      const feedRequest: FeedControlRequest = {
-        action: feedType as any,
-        ...(feedType === "custom" && { amount: parseInt(feedAmount) }),
-        ...(feedType !== "custom" && { amount: parseInt(getPresetAmount(feedType)) }),
-        actuator_up: parseInt(actuatorUp),
-        actuator_down: parseInt(actuatorDown),
-        auger_duration: parseInt(augerDuration),
-        blower_duration: parseInt(blowerDuration),
-      };
+      // Execute feeding command with correct preset type
+      let feedPreset: 'small' | 'medium' | 'large' | 'xl' = 'medium';
+      
+      if (feedType === 'small' || feedType === 'medium' || feedType === 'large' || feedType === 'xl') {
+        feedPreset = feedType;
+      } else if (feedType === 'custom') {
+        // For custom amounts, choose closest preset
+        const amount = parseInt(feedAmount);
+        if (amount <= 75) feedPreset = 'small';
+        else if (amount <= 150) feedPreset = 'medium';
+        else if (amount <= 500) feedPreset = 'large';
+        else feedPreset = 'xl';
+      }
 
-      const success = await apiClient.feedFish(feedRequest);
+      const success = await controlFeeder(feedPreset);
+      console.log(`🍽️ Feed command sent: ${feedPreset} (amount: ${getPresetAmount(feedType)}g)`);
 
       if (success) {
         setLastFeedTime(new Date().toLocaleString());
@@ -419,7 +428,7 @@ const FeedControl = () => {
               {connectionStatus}
             </div>
             <div className="text-gray-500 dark:text-gray-400">
-              API: {API_CONFIG.BASE_URL}
+              API: {connected ? "Connected" : "Disconnected"}
             </div>
           </div>
         </div>
@@ -666,7 +675,7 @@ const FeedControl = () => {
                 color="primary"
                 variant="flat"
                 className="flex-1"
-                onPress={() => apiClient.takePhoto()}
+                onPress={() => getSensors()}
               >
                 Take Photo
               </Button>

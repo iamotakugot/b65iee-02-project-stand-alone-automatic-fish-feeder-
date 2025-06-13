@@ -57,9 +57,10 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
 
   // ⚡ ULTRA FAST Control using Direct Serial
   const ultraFastControl = useCallback(
-    async (type: "led" | "fan", relay_id: number) => {
-      // Prevent double-submit
-      if (isSubmittingRef.current[type]) {
+    async (type: "led" | "fan" | "both" | "all", relay_id: number) => {
+      // Prevent double-submit for basic types only
+      const basicType = type === "led" || type === "fan" ? type : "led";
+      if (isSubmittingRef.current[basicType]) {
         console.log(
           `⚠️ ${type.toUpperCase()} control already in progress, ignoring`,
         );
@@ -68,8 +69,8 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
       }
 
       try {
-        isSubmittingRef.current[type] = true;
-        setLoading((prev) => ({ ...prev, [type]: true }));
+        isSubmittingRef.current[basicType] = true;
+        setLoading((prev) => ({ ...prev, [basicType]: true }));
         setError(null);
 
         console.log(
@@ -86,18 +87,29 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
         setResponseTime(clientResponseTime);
 
         if (response?.status === "success") {
-          // Optimistic update for instant UI response
+          // Enhanced optimistic update for IN1/IN2 control
           const newStatus = { ...relayStatus };
 
           if (relay_id === 1) {
-            newStatus.led = true;
-            newStatus.fan = false;
-          } else if (relay_id === 2) {
-            newStatus.led = false;
+            // R:1 = IN1 (FAN) ON
             newStatus.fan = true;
-          } else {
-            newStatus.led = false;
+          } else if (relay_id === 2) {
+            // R:2 = IN1 (FAN) OFF
             newStatus.fan = false;
+          } else if (relay_id === 3) {
+            // R:3 = IN2 (LED) ON
+            newStatus.led = true;
+          } else if (relay_id === 4) {
+            // R:4 = IN2 (LED) OFF
+            newStatus.led = false;
+          } else if (relay_id === 5) {
+            // R:5 = BOTH ON
+            newStatus.fan = true;
+            newStatus.led = true;
+          } else if (relay_id === 0) {
+            // R:0 = ALL OFF
+            newStatus.fan = false;
+            newStatus.led = false;
           }
 
           setRelayStatus(newStatus);
@@ -120,34 +132,18 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
             : `Ultra fast ${type} control failed`,
         );
       } finally {
-        setLoading((prev) => ({ ...prev, [type]: false }));
-        isSubmittingRef.current[type] = false;
+        setLoading((prev) => ({ ...prev, [basicType]: false }));
+        isSubmittingRef.current[basicType] = false;
       }
     },
     [relayStatus, fetchRelayStatus],
   );
 
-  // ⚡ ULTRA FAST Control Handlers
-  const handleLEDOn = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      ultraFastControl("led", 1); // R:1 = LED ON
-    },
-    [ultraFastControl],
-  );
-
-  const handleLEDOff = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      ultraFastControl("led", 0); // R:0 = ALL OFF
-    },
-    [ultraFastControl],
-  );
-
+  // ⚡ ENHANCED RELAY CONTROL: IN1/IN2 SEPARATE ON/OFF
   const handleFanOn = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 2); // R:2 = FAN ON
+      ultraFastControl("fan", 1); // R:1 = IN1 (FAN) ON
     },
     [ultraFastControl],
   );
@@ -155,7 +151,31 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleFanOff = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 0); // R:0 = ALL OFF
+      ultraFastControl("fan", 2); // R:2 = IN1 (FAN) OFF
+    },
+    [ultraFastControl],
+  );
+
+  const handleLEDOn = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("led", 3); // R:3 = IN2 (LED) ON
+    },
+    [ultraFastControl],
+  );
+
+  const handleLEDOff = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("led", 4); // R:4 = IN2 (LED) OFF
+    },
+    [ultraFastControl],
+  );
+
+  const handleBothOn = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      ultraFastControl("both", 5); // R:5 = BOTH ON
     },
     [ultraFastControl],
   );
@@ -163,7 +183,7 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleAllOff = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("led", 0); // R:0 = ALL OFF (will turn off both)
+      ultraFastControl("all", 0); // R:0 = ALL OFF
     },
     [ultraFastControl],
   );

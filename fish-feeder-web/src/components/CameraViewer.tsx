@@ -11,6 +11,7 @@ import {
 } from "react-icons/io";
 import { FaExpand, FaCompress } from "react-icons/fa";
 import { API_CONFIG } from "../config/api";
+import { logger } from "../utils/logger";
 
 interface CameraViewerProps {
   className?: string;
@@ -35,10 +36,19 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // Get camera URLs (supports both local and PageKite)
   const getCameraUrls = () => {
-    const baseUrl = API_CONFIG.OFFLINE_MODE ? 
-      'https://b65iee02.pagekite.me' : // PageKite external access
-      API_CONFIG.BASE_URL; // Local Pi server
+    // In Firebase hosting mode, disable camera functionality
+    if (API_CONFIG.OFFLINE_MODE) {
+      logger.info('CAMERA', 'DISABLED_FIREBASE_MODE', { 
+        reason: 'Camera disabled in Firebase hosting mode' 
+      });
+      return {
+        stream: '',
+        snapshot: '',
+        status: ''
+      };
+    }
 
+    const baseUrl = API_CONFIG.BASE_URL;
     return {
       stream: `${baseUrl}/api/camera/stream`,
       snapshot: `${baseUrl}/api/camera/snapshot`,
@@ -48,11 +58,23 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // Start camera streaming
   const startStreaming = () => {
+    logger.buttonPress('CAMERA_START_STREAMING', 'CameraViewer');
+    
     setIsLoading(true);
     setConnectionStatus('connecting');
     setError(null);
 
     const urls = getCameraUrls();
+    
+    // Check if camera is disabled in Firebase mode
+    if (!urls.stream) {
+      setIsStreaming(false);
+      setConnectionStatus('disconnected');
+      setIsLoading(false);
+      setError('📷 Camera unavailable in Firebase hosting mode. Use local development mode for camera access.');
+      logger.warn('CAMERA', 'DISABLED_MODE', { mode: 'Firebase hosting' });
+      return;
+    }
     
     if (imgRef.current) {
       imgRef.current.src = urls.stream;
@@ -62,6 +84,7 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
         setConnectionStatus('connected');
         setIsLoading(false);
         setError(null);
+        logger.info('CAMERA', 'STREAMING_STARTED', { url: urls.stream });
       };
 
       imgRef.current.onerror = () => {
@@ -69,6 +92,7 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
         setConnectionStatus('disconnected');
         setIsLoading(false);
         setError('📷 Camera connection failed. Please check Pi server.');
+        logger.error('CAMERA', 'STREAMING_FAILED', { url: urls.stream });
       };
     }
   };
@@ -86,9 +110,19 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
 
   // Take snapshot
   const takeSnapshot = async () => {
+    logger.buttonPress('CAMERA_TAKE_SNAPSHOT', 'CameraViewer');
+    
     setIsLoading(true);
     try {
       const urls = getCameraUrls();
+      
+      // Check if camera is disabled in Firebase mode
+      if (!urls.snapshot) {
+        setError('❌ Snapshot unavailable in Firebase hosting mode.');
+        logger.warn('CAMERA', 'SNAPSHOT_DISABLED', { mode: 'Firebase hosting' });
+        return;
+      }
+      
       const response = await fetch(urls.snapshot);
       
       if (response.ok) {
@@ -103,11 +137,14 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        logger.info('CAMERA', 'SNAPSHOT_SUCCESS', { filename: link.download });
       } else {
         throw new Error('Snapshot failed');
       }
     } catch (error) {
       setError('❌ Snapshot failed. Check camera connection.');
+      logger.error('CAMERA', 'SNAPSHOT_FAILED', { error });
     } finally {
       setIsLoading(false);
     }

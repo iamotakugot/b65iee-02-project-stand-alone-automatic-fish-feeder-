@@ -4,106 +4,155 @@
  * Updated for performance optimization and better error handling
  */
 
-export const API_CONFIG = {
-  // Base URL for the Pi Server API
-  // [SECURE] HTTPS REQUIRED for Firebase hosting to avoid Mixed Content errors
-  BASE_URL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+// ===== ENVIRONMENT & DEPLOYMENT CONFIGURATION =====
+const getApiBaseUrl = (): string => {
+  // Priority order for API URL resolution:
+  // 1. Runtime environment variable (from Firebase hosting)
+  // 2. Build-time environment variable (from .env.production)
+  // 3. ngrok URL (from localStorage or detection)
+  // 4. Development localhost
+  // 5. Production fallback
 
-  // Offline mode when API is not available
-  // Auto-enable offline mode for production Firebase hosting
-  OFFLINE_MODE: import.meta.env.VITE_API_URL === "disabled" || 
-                (typeof window !== 'undefined' && 
-                 window.location.hostname.includes('firebase') || 
-                 window.location.hostname.includes('.web.app') ||
-                 window.location.protocol === 'https:' && 
-                 (import.meta.env.VITE_API_URL || "").includes('localhost')) || 
-                false,
-
-  // [SECURE] HTTPS Configuration Helper
-  getSecureURL: (url?: string): string => {
-    const baseUrl = url || API_CONFIG.BASE_URL;
-    
-    // If running on HTTPS site, ensure API URL is also HTTPS
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      if (baseUrl.startsWith('http://')) {
-        console.warn('[MIXED_CONTENT] HTTPS site trying to access HTTP API');
-        console.warn('[FIX] Use ngrok tunnel or enable HTTPS on Pi server');
-        console.warn('[INFO] See: HTTPS_FIX_GUIDE.md for solutions');
-        
-        // Force offline mode instead of attempting HTTPS conversion
-        // which will fail without proper SSL setup
-        API_CONFIG.OFFLINE_MODE = true;
-        return 'offline';
-      }
+  // Check runtime environment (Firebase hosting)
+  if (typeof window !== 'undefined') {
+    // Check if we have stored ngrok URL
+    const storedNgrokUrl = localStorage.getItem('NGROK_API_URL');
+    if (storedNgrokUrl && storedNgrokUrl.includes('ngrok')) {
+      console.log('🌐 Using stored ngrok URL:', storedNgrokUrl);
+      return storedNgrokUrl;
     }
     
-    return baseUrl;
-  },
+    // Check if we're on Firebase hosting
+    if (window.location.hostname.includes('web.app') || 
+        window.location.hostname.includes('firebaseapp.com')) {
+      console.log('🔥 Running on Firebase hosting');
+      
+      // Try to get ngrok URL from build-time env
+      const buildTimeUrl = process.env.REACT_APP_API_BASE_URL;
+      if (buildTimeUrl && buildTimeUrl.includes('ngrok')) {
+        console.log('🌐 Using build-time ngrok URL:', buildTimeUrl);
+        return buildTimeUrl;
+      }
+    }
+  }
 
-  // API Endpoints (Updated for new backend)
-  ENDPOINTS: {
-    // Core endpoints
-    HEALTH: "/health",
-    SENSORS: "/api/sensors",
-    SENSOR_BY_NAME: "/api/sensors", // Will append /{sensor_name}
+  // Development mode
+  if (process.env.NODE_ENV === 'development') {
+    return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+  }
 
-    // Device Control endpoints (Updated for new server)
-    CONTROL_DIRECT: "/api/control/direct",
+  // Production fallback
+  return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+};
 
-    // Relay Control endpoints (NEW)
-    RELAY_STATUS: "/api/relay/status",
-    RELAY_LED: "/api/relay/led",
-    RELAY_FAN: "/api/relay/fan",
+// Auto-detect and store ngrok URL if available
+const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
+  try {
+    // List of potential ngrok URLs to try
+    const potentialUrls = [
+      // Check if we have a stored URL first
+      localStorage.getItem('NGROK_API_URL'),
+      // Check build-time environment
+      process.env.REACT_APP_API_BASE_URL,
+      // Try common ngrok patterns
+      'https://fish-feeder-api.ngrok.io',
+    ].filter(Boolean);
 
-    // ULTRA FAST Control (NEW)
-    CONTROL_ULTRA: "/api/control/ultra",
+    for (const url of potentialUrls) {
+      if (url && url.includes('ngrok')) {
+        try {
+          // Create AbortController for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          const response = await fetch(`${url}/api/health`, { 
+            method: 'GET',
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            console.log('✅ ngrok URL detected and verified:', url);
+            localStorage.setItem('NGROK_API_URL', url);
+            localStorage.setItem('NGROK_DETECTED_AT', new Date().toISOString());
+            return url;
+          }
+        } catch (e) {
+          console.log(`❌ ngrok URL test failed: ${url}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.log('ngrok auto-detection failed:', error);
+  }
+  
+  return null;
+};
 
-    // Legacy endpoints (may not be implemented yet)
-    CONTROL_BLOWER: "/api/control/blower",
-    CONTROL_ACTUATOR: "/api/control/actuator",
-    CONTROL_FEED: "/api/control/feed",
-    CONTROL_CONFIG: "/api/control/config",
+// Get base URL for configuration
+const BASE_API_URL = getApiBaseUrl();
 
-    // Weight calibration endpoints
-    WEIGHT_CALIBRATE: "/api/control/weight/calibrate",
-    WEIGHT_TARE: "/api/control/weight/tare",
-    WEIGHT_RESET: "/api/control/weight/reset",
+// 🎯 แก้ไข: บังคับใช้ localhost เมื่อไม่มี ngrok URL
+const FORCE_LOCALHOST = typeof window !== 'undefined' && 
+                       window.location.hostname.includes('.web.app') &&
+                       !localStorage.getItem('NGROK_API_URL');
 
-    // Camera endpoints
-    VIDEO_FEED: "/api/camera/video_feed",
-    PHOTO: "/api/camera/photo",
-    RECORD_START: "/api/camera/record/start",
-    RECORD_STOP: "/api/camera/record/stop",
+const FINAL_API_URL = FORCE_LOCALHOST ? 'http://localhost:5000' : BASE_API_URL;
 
-    // Feed history endpoints
-    FEED_HISTORY: "/api/feed/history",
-    FEED_HISTORY_FILTER: "/api/feed/history/filter",
-    FEED_STATISTICS: "/api/feed/statistics",
-    FEED_SESSION: "/api/feed/session", // Will append /{session_id}
+// 🛡️ ตรวจสอบปัญหา CORS/Mixed Content
+const checkCorsIssue = (): { hasCorsIssue: boolean; solution: string } => {
+  if (typeof window === 'undefined') return { hasCorsIssue: false, solution: '' };
+  
+  const isHttps = window.location.protocol === 'https:';
+  const isFirebaseHosting = window.location.hostname.includes('.web.app');
+  const usingLocalhost = FINAL_API_URL.includes('localhost');
+  
+  if (isHttps && isFirebaseHosting && usingLocalhost) {
+    return {
+      hasCorsIssue: true,
+      solution: `🔐 เว็บ HTTPS ไม่สามารถเรียก HTTP localhost ได้\n\n✅ วิธีแก้ไข:\n1. เปิดเว็บใน localhost: http://localhost:3000\n2. หรือใช้ ngrok สำหรับ HTTPS tunnel\n\nAPI ปัจจุบัน: ${FINAL_API_URL}`
+    };
+  }
+  
+  return { hasCorsIssue: false, solution: '' };
+};
 
-    // Firebase sync
-    SYNC: "/api/sensors/sync",
+// ตรวจสอบปัญหา CORS และแสดงคำเตือน
+const corsCheck = checkCorsIssue();
+if (corsCheck.hasCorsIssue) {
+  console.warn('⚠️ CORS Issue Detected:', corsCheck.solution);
+}
 
-    // Device Timing endpoints
-    DEVICE_TIMING: "/device/timing",
-    DEVICE_TIMING_UPDATE: "/device/timing",
-    CAMERA_RECORDING_START: "/camera/recording/start",
-    CAMERA_RECORDING_STOP: "/camera/recording/stop",
-    CAMERA_RECORDING_STATUS: "/camera/recording/status",
-    CAMERA_RECORDINGS: "/camera/recordings",
-    CAMERA_RESOLUTION: "/camera/resolution",
-  },
-
-  // Optimized timeouts for better performance
-  TIMEOUT: 5000, // Increased from 300ms to 5s for stability
-  FAST_TIMEOUT: 1000, // For quick operations
-
-  // Cache settings
-  CACHE_DURATION: 30000, // 30 seconds cache for sensor data
-
-  // Retry settings
+// Enhanced API Configuration with ngrok support
+export const API_CONFIG = {
+  BASE_URL: FINAL_API_URL, // 🎯 ใช้ FINAL_API_URL แทน BASE_API_URL
+  TIMEOUT: 10000,
+  FAST_TIMEOUT: 1000,
+  RETRY_DELAY: 1000,
   MAX_RETRIES: 3,
-  RETRY_DELAY: 1000, // 1 second
+  CACHE_DURATION: 30000,
+
+  // ngrok specific configuration
+  NGROK_CONFIG: {
+    AUTO_DETECT: true,
+    DETECTION_INTERVAL: 60000,
+    STORE_IN_LOCALSTORAGE: true,
+    FALLBACK_TO_LOCALHOST: true
+  },
+
+  // Firebase hosting configuration
+  FIREBASE_CONFIG: {
+    ENABLE_OFFLINE_MODE: process.env.REACT_APP_ENABLE_OFFLINE_MODE === 'true' || 
+                        (typeof window !== 'undefined' && 
+                         (window.location.hostname.includes('.web.app') || 
+                          window.location.hostname.includes('firebase'))),
+    CACHE_API_RESPONSES: true,
+    MOCK_WHEN_OFFLINE: true
+  },
+
+  // Offline mode configuration - ปิดการใช้ offline mode เพื่อให้เรียก Pi server ได้
+  OFFLINE_MODE: false, // 🎯 แก้ไข: ไม่ใช้ offline mode เพื่อให้เรียก Pi server ได้
 
   // Refresh intervals optimized for performance
   REFRESH_INTERVALS: {
@@ -111,6 +160,39 @@ export const API_CONFIG = {
     STATUS: 3000, // 3 seconds
     FAST_STATUS: 1000, // 1 second for ultra-fast operations
     SLOW_STATUS: 10000, // 10 seconds for less critical data
+  },
+
+  // API Endpoints
+  ENDPOINTS: {
+    // Health and status
+    HEALTH: "/api/health",
+    SENSORS: "/api/sensors",
+    STATUS: "/api/status",
+    RELAY_STATUS: "/api/relay_status",
+
+    // Control endpoints
+    LED_CONTROL: "/api/control_led",
+    FAN_CONTROL: "/api/control_fan",
+    BLOWER_CONTROL: "/api/control_blower",
+    ACTUATOR_CONTROL: "/api/control_actuator",
+    FEED_CONTROL: "/api/control_feed",
+    ULTRA_FAST: "/api/control/ultra",
+
+    // Feed system
+    FEED_FISH: "/api/feed_fish",
+    FEED_HISTORY: "/api/feed_history",
+    FEED_STATS: "/api/feed_statistics",
+    DEVICE_TIMING: "/api/device_timing",
+
+    // Firebase sync
+    FIREBASE_SYNC: "/api/firebase_sync",
+    CONFIG: "/api/config",
+
+    // Camera system
+    CAMERA_PHOTO: "/camera/photo",
+    CAMERA_RECORDING: "/camera/recording",
+    CAMERA_RECORDINGS: "/camera/recordings",
+    CAMERA_RESOLUTION: "/camera/resolution",
   },
 
   // Sensor name mappings (for backward compatibility)
@@ -131,7 +213,7 @@ export const API_CONFIG = {
     SOLAR_CURRENT: "LOAD_CURRENT", // Legacy alias
     SOIL_MOISTURE: "SOIL_MOISTURE",
 
-    // 🏠 ROOM SENSORS - ใส่ห้องครบ
+    // Room sensors
     ROOM_TEMPERATURE: "ROOM_TEMPERATURE",
     ROOM_HUMIDITY: "ROOM_HUMIDITY", 
     LIGHT_LEVEL: "LIGHT_LEVEL",
@@ -619,9 +701,11 @@ export interface UltraFastResponse extends ApiResponse<any> {
 export class FishFeederApiClient {
   private baseURL: string;
   private abortController: AbortController | null = null;
+  private corsIssue: boolean = false;
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
+    this.corsIssue = checkCorsIssue().hasCorsIssue;
   }
 
   /**
@@ -633,13 +717,26 @@ export class FishFeederApiClient {
     useCache: boolean = true,
     timeout: number = API_CONFIG.TIMEOUT,
   ): Promise<any> {
+    // ตรวจสอบปัญหา CORS ก่อน
+    if (this.corsIssue) {
+      console.warn(`🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`);
+      return {
+        status: 'offline',
+        message: `CORS/Mixed Content: HTTPS site cannot access HTTP localhost. Open http://localhost:3000 or setup ngrok.`,
+        timestamp: new Date().toISOString(),
+        corsIssue: true
+      };
+    }
+
     // Handle offline mode
     if (API_CONFIG.OFFLINE_MODE) {
       console.log(`🔄 API Offline Mode: Skipping ${endpoint}`);
       return this.getMockResponse(endpoint);
     }
-    // 🔒 Use secure URL to prevent Mixed Content errors
-    const secureBaseURL = API_CONFIG.getSecureURL(this.baseURL);
+    const baseURL = this.baseURL || API_CONFIG.BASE_URL;
+    
+    // Get final URL - use ngrok if available, fallback to base URL
+    const secureBaseURL = baseURL;
     const url = `${secureBaseURL}${endpoint}`;
     const cacheKey = `${options.method || "GET"}:${url}`;
 
@@ -743,7 +840,7 @@ export class FishFeederApiClient {
   // Get specific sensor (cached)
   async getSensor(sensorName: string): Promise<SensorReading> {
     return this.enhancedFetch(
-      `${API_CONFIG.ENDPOINTS.SENSOR_BY_NAME}/${sensorName}`,
+      `${API_CONFIG.ENDPOINTS.SENSORS}/${sensorName}`,
       { method: API_CONFIG.METHODS.GET },
       true,
       API_CONFIG.TIMEOUT,
@@ -764,7 +861,7 @@ export class FishFeederApiClient {
     action: "on" | "off" | "toggle",
   ): Promise<RelayStatusResponse> {
     return this.enhancedFetch(
-      `${API_CONFIG.ENDPOINTS.RELAY_LED}/${action}`,
+      `${API_CONFIG.ENDPOINTS.LED_CONTROL}/${action}`,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.FAST_TIMEOUT,
@@ -775,7 +872,7 @@ export class FishFeederApiClient {
     action: "on" | "off" | "toggle",
   ): Promise<RelayStatusResponse> {
     return this.enhancedFetch(
-      `${API_CONFIG.ENDPOINTS.RELAY_FAN}/${action}`,
+      `${API_CONFIG.ENDPOINTS.FAN_CONTROL}/${action}`,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.FAST_TIMEOUT,
@@ -785,7 +882,7 @@ export class FishFeederApiClient {
   // Ultra fast relay control
   async ultraFastRelay(relayId: number): Promise<UltraFastResponse> {
     return this.enhancedFetch(
-      `${API_CONFIG.ENDPOINTS.CONTROL_ULTRA}/${relayId}`,
+      `${API_CONFIG.ENDPOINTS.ULTRA_FAST}/${relayId}`,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.FAST_TIMEOUT,
@@ -795,7 +892,7 @@ export class FishFeederApiClient {
   // Control methods
   async controlBlower(request: BlowerControlRequest): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_BLOWER,
+      API_CONFIG.ENDPOINTS.BLOWER_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(request),
@@ -807,7 +904,7 @@ export class FishFeederApiClient {
 
   async controlActuator(request: ActuatorControlRequest): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_ACTUATOR,
+      API_CONFIG.ENDPOINTS.ACTUATOR_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(request),
@@ -819,7 +916,7 @@ export class FishFeederApiClient {
 
   async controlFeed(request: FeedControlRequest): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_FEED,
+      API_CONFIG.ENDPOINTS.FEED_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(request),
@@ -841,7 +938,7 @@ export class FishFeederApiClient {
 
   async getFeedStatistics(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.FEED_STATISTICS,
+      API_CONFIG.ENDPOINTS.FEED_STATS,
       { method: API_CONFIG.METHODS.GET },
       true, // Cache statistics
       API_CONFIG.TIMEOUT,
@@ -851,7 +948,7 @@ export class FishFeederApiClient {
   // Firebase sync
   async syncToFirebase(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.SYNC,
+      API_CONFIG.ENDPOINTS.FIREBASE_SYNC,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.TIMEOUT,
@@ -861,7 +958,7 @@ export class FishFeederApiClient {
   // Get system configuration
   async getConfig(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_CONFIG,
+      API_CONFIG.ENDPOINTS.CONFIG,
       { method: API_CONFIG.METHODS.GET },
       true, // Cache config data
       API_CONFIG.TIMEOUT,
@@ -1041,7 +1138,7 @@ export class FishFeederApiClient {
     blowerDuration: number;
   }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.DEVICE_TIMING_UPDATE,
+      API_CONFIG.ENDPOINTS.DEVICE_TIMING,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(timing),
@@ -1057,7 +1154,7 @@ export class FishFeederApiClient {
     resolution?: string;
   }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CAMERA_RECORDING_START,
+      API_CONFIG.ENDPOINTS.CAMERA_RECORDING,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(options || {}),
@@ -1069,7 +1166,7 @@ export class FishFeederApiClient {
 
   async stopRecording(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CAMERA_RECORDING_STOP,
+      API_CONFIG.ENDPOINTS.CAMERA_RECORDING,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.TIMEOUT,
@@ -1078,7 +1175,7 @@ export class FishFeederApiClient {
 
   async getRecordingStatus(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CAMERA_RECORDING_STATUS,
+      API_CONFIG.ENDPOINTS.STATUS,
       { method: API_CONFIG.METHODS.GET },
       false,
       API_CONFIG.FAST_TIMEOUT,
@@ -1110,7 +1207,7 @@ export class FishFeederApiClient {
   async controlLEDSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
     const command = action === 'on' ? 'R:1' : 'R:3';
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_DIRECT,
+      API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify({ command }),
@@ -1123,7 +1220,7 @@ export class FishFeederApiClient {
   async controlFanSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
     const command = action === 'on' ? 'R:2' : 'R:4';
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_DIRECT,
+      API_CONFIG.ENDPOINTS.FAN_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify({ command }),
@@ -1135,7 +1232,7 @@ export class FishFeederApiClient {
 
   async allRelaysOff(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_DIRECT,
+      API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify({ command: 'R:0' }),
@@ -1148,7 +1245,7 @@ export class FishFeederApiClient {
   // Direct control method (existing)
   async directControl(request: { command: string }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.CONTROL_DIRECT,
+      API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(request),
@@ -1170,7 +1267,7 @@ export class FishFeederApiClient {
 
   async calibrateWeight(request: { weight: number }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.WEIGHT_CALIBRATE,
+      "/api/control/weight/calibrate",
       {
         method: API_CONFIG.METHODS.POST,
         body: JSON.stringify(request),
@@ -1182,7 +1279,7 @@ export class FishFeederApiClient {
 
   async tareWeight(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.WEIGHT_TARE,
+      "/api/control/weight/tare",
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.TIMEOUT,
@@ -1191,7 +1288,7 @@ export class FishFeederApiClient {
 
   async takePhoto(): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
-      API_CONFIG.ENDPOINTS.PHOTO,
+      API_CONFIG.ENDPOINTS.CAMERA_PHOTO,
       { method: API_CONFIG.METHODS.POST },
       false,
       API_CONFIG.TIMEOUT,

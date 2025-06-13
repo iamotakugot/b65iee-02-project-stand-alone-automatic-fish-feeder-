@@ -24,13 +24,8 @@ import {
   BlowerControlRequest,
 } from "../config/api";
 
-// Firebase imports
+// Firebase imports - use firebaseClient for all Firebase operations
 import { firebaseClient } from "../config/firebase";
-import { getDatabase } from "firebase/database";
-import { ref, set, get, onValue, off } from "firebase/database";
-
-// Get database instance
-const database = getDatabase();
 
 // Define the SliderStepMark type based on HeroUI docs
 type SliderStepMark = {
@@ -100,10 +95,9 @@ const FanTempControl = () => {
     { value: 255, label: "255" },
   ];
 
-  // Firebase functions
+  // Firebase functions using firebaseClient
   const saveSettingsToFirebase = async (settings: Partial<FanControlSettings>) => {
     try {
-      const settingsRef = ref(database, 'fish_feeder/fan_control/settings');
       const fullSettings: FanControlSettings = {
         temperatureThreshold,
         fanSpeed: blowerSpeed,
@@ -113,9 +107,11 @@ const FanTempControl = () => {
         ...settings,
       };
       
-      await set(settingsRef, fullSettings);
-      setLastSyncTime(new Date().toLocaleTimeString());
-      console.log("Settings saved to Firebase:", fullSettings);
+      const result = await firebaseClient.saveFanSettings(fullSettings);
+      if (result) {
+        setLastSyncTime(new Date().toLocaleTimeString());
+        console.log("Settings saved to Firebase:", fullSettings);
+      }
     } catch (error) {
       console.error("Failed to save settings to Firebase:", error);
     }
@@ -123,11 +119,9 @@ const FanTempControl = () => {
 
   const loadSettingsFromFirebase = async () => {
     try {
-      const settingsRef = ref(database, 'fish_feeder/fan_control/settings');
-      const snapshot = await get(settingsRef);
+      const settings = await firebaseClient.loadFanSettings();
       
-      if (snapshot.exists()) {
-        const settings: FanControlSettings = snapshot.val();
+      if (settings) {
         setTemperatureThreshold(settings.temperatureThreshold);
         setBlowerSpeed(settings.fanSpeed);
         setAutoFanMode(settings.autoMode);
@@ -150,24 +144,19 @@ const FanTempControl = () => {
     }
   };
 
-  // Real-time Firebase listener
+  // Real-time Firebase listener using firebaseClient
   useEffect(() => {
     if (autoSyncEnabled) {
-      const settingsRef = ref(database, 'fish_feeder/fan_control/settings');
-      
-      const unsubscribe = onValue(settingsRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const settings: FanControlSettings = snapshot.val();
-          setTemperatureThreshold(settings.temperatureThreshold);
-          setBlowerSpeed(settings.fanSpeed);
-          setAutoFanMode(settings.autoMode);
-          setHysteresis(settings.hysteresis);
-          setLastSyncTime(new Date().toLocaleTimeString());
-          setFirebaseConnected(true);
-        }
+      const unsubscribe = firebaseClient.subscribeFanSettings((settings: FanControlSettings) => {
+        setTemperatureThreshold(settings.temperatureThreshold);
+        setBlowerSpeed(settings.fanSpeed);
+        setAutoFanMode(settings.autoMode);
+        setHysteresis(settings.hysteresis);
+        setLastSyncTime(new Date().toLocaleTimeString());
+        setFirebaseConnected(true);
       });
 
-      return () => off(settingsRef, 'value', unsubscribe);
+      return unsubscribe;
     }
   }, [autoSyncEnabled]);
 
@@ -202,12 +191,10 @@ const FanTempControl = () => {
       
       // Send current temperature data to Firebase for Pi server access
       try {
-        const tempRef = ref(database, 'fish_feeder/fan_control/current_temperature');
-        await set(tempRef, {
-          systemTemp: systemTemp?.value || 0,
-          feederTemp: feederTemp?.value || 0,
-          timestamp: new Date().toISOString(),
-        });
+        await firebaseClient.updateCurrentTemperature(
+          systemTemp?.value || 0,
+          feederTemp?.value || 0
+        );
       } catch (fbError) {
         console.error("Failed to update temperature in Firebase:", fbError);
       }
@@ -261,14 +248,12 @@ const FanTempControl = () => {
 
       // Update Firebase with fan status
       try {
-        const statusRef = ref(database, 'fish_feeder/fan_control/status');
-        await set(statusRef, {
-          fanStatus: command === "R:2",
-          command: command,
-          timestamp: new Date().toISOString(),
-          temperature: systemTemperature,
-          threshold: temperatureThreshold,
-        });
+        await firebaseClient.updateFanStatus(
+          command === "R:2",
+          command,
+          systemTemperature,
+          temperatureThreshold
+        );
       } catch (fbError) {
         console.error("Failed to update fan status in Firebase:", fbError);
       }

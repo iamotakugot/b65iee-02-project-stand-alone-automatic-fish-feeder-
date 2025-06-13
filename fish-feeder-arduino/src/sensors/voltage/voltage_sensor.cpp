@@ -1,45 +1,39 @@
 #include "voltage_sensor.h"
 
 VoltageSensor::VoltageSensor(uint8_t solarPin, uint8_t loadPin) 
-: solarVoltagePin(solarPin), loadVoltagePin(loadPin) {
-solarVoltageFactor = 4.50; // Voltage divider factor for solar
-loadVoltageFactor = 4.50; // Voltage divider factor for load
+    : solarPin(solarPin), loadPin(loadPin), vRef(5.0), dividerRatio(4.50) {
 }
 
 void VoltageSensor::begin() {
-pinMode(solarVoltagePin, INPUT);
-pinMode(loadVoltagePin, INPUT);
+pinMode(solarPin, INPUT);
+pinMode(loadPin, INPUT);
 delay(50);
 Serial.println(" Voltage sensors initialized");
 }
 
 bool VoltageSensor::readSolarVoltage(float& voltage) {
-const float vRef = 5.0;
-const int sampleCount = 50;
-
+const int sampleCount = 150;
 long sum = 0;
 for (int i = 0; i < sampleCount; i++) {
-sum += analogRead(solarVoltagePin);
+sum += analogRead(solarPin);
 delayMicroseconds(500);
 }
 
-voltage = (sum / (float)sampleCount / 1023.0) * vRef * solarVoltageFactor;
+voltage = (sum / (float)sampleCount / 1023.0) * vRef * dividerRatio;
 if (voltage < 1.0) voltage = 0.0;
 
 return isValidReading(voltage);
 }
 
 bool VoltageSensor::readLoadVoltage(float& voltage) {
-const float vRef = 5.0;
-const int sampleCount = 50;
-
+const int sampleCount = 150;
 long sum = 0;
 for (int i = 0; i < sampleCount; i++) {
-sum += analogRead(loadVoltagePin);
+sum += analogRead(loadPin);
 delayMicroseconds(500);
 }
 
-voltage = (sum / (float)sampleCount / 1023.0) * vRef * loadVoltageFactor;
+voltage = (sum / (float)sampleCount / 1023.0) * vRef * dividerRatio;
 
 return isValidReading(voltage);
 }
@@ -107,5 +101,4 @@ Serial.print((solarValid && loadValid) ? "OK" : "ERROR");
 Serial.println("]");
 }
 
-// ===== GLOBAL INSTANCE =====
-VoltageSensor voltageSensor(SOLAR_VOLTAGE_PIN, LOAD_VOLTAGE_PIN); 
+// Global instance moved to sensor_service.cpp to avoid conflicts 

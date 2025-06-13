@@ -6,14 +6,15 @@
 
 class ACS712Sensor {
 private:
-    uint8_t solarCurrentPin;
-    uint8_t loadCurrentPin;
-    float solarOffset;
-    float loadOffset;
+    uint8_t solarPin;
+    uint8_t loadPin;
+    float vRef;
+    float sensitivity;  // V/A for ACS712-30A (0.066 V/A = 66mV/A)
+    float zeroPoint;    // Voltage at 0A (typically 2.500V)
 
 public:
-    ACS712Sensor(uint8_t solarPin, uint8_t loadPin);
-    
+    ACS712Sensor() : solarPin(A4), loadPin(A0), vRef(5.0), sensitivity(0.066), zeroPoint(2.500) {}  // Default for ACS712-30A
+    ACS712Sensor(uint8_t solarPin, uint8_t loadPin);  // Constructor with pins
     void begin();
     bool readSolarCurrent(float& current);
     bool readLoadCurrent(float& current);
