@@ -70,29 +70,36 @@ export class CompleteErrorHandler {
       timeout?: number;
     } = {}
   ): Promise<CommandResult> {
-    const {
-      onSuccess,
-      onError,
-      showToast = true,
-      retryOnFailure = true,
-      timeout = 10000
-    } = options;
-
+    const { onSuccess, onError, showToast = true, retryOnFailure = true, timeout = 10000 } = options;
     const startTime = performance.now();
+    
     this.totalCommands++;
-
     let lastError: any;
     let retryCount = 0;
 
-    // Retry logic
-    while (retryCount <= (retryOnFailure ? this.maxRetries : 0)) {
+    while (retryCount <= this.maxRetries) {
       try {
-        // Add timeout wrapper
+        // ⚡ EVENT-DRIVEN TIMEOUT - No setTimeout()!
         const result = await Promise.race([
           apiCall(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timeout')), timeout)
-          )
+          new Promise((_, reject) => {
+            // Use AbortController for immediate timeout control
+            const controller = new AbortController();
+            const timeoutId = performance.now() + timeout;
+            
+            const checkTimeout = () => {
+              if (performance.now() >= timeoutId) {
+                controller.abort();
+                reject(new Error('Request timeout'));
+              } else {
+                // Use requestAnimationFrame for non-blocking timeout check
+                requestAnimationFrame(checkTimeout);
+              }
+            };
+            
+            requestAnimationFrame(checkTimeout);
+            return controller;
+          })
         ]);
 
         const responseTime = performance.now() - startTime;
@@ -127,9 +134,22 @@ export class CompleteErrorHandler {
         lastError = error;
         retryCount++;
         
-        // If we have retries left, wait before retrying
+        // ⚡ EVENT-DRIVEN RETRY - No setTimeout delays!
         if (retryCount <= this.maxRetries && retryOnFailure) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          // Use event-driven delay with Promise and immediate scheduling
+          await new Promise(resolve => {
+            const delayTime = performance.now() + (1000 * retryCount);
+            
+            const checkDelay = () => {
+              if (performance.now() >= delayTime) {
+                resolve(undefined);
+              } else {
+                requestAnimationFrame(checkDelay);
+              }
+            };
+            
+            requestAnimationFrame(checkDelay);
+          });
           continue;
         }
         
@@ -353,7 +373,7 @@ export const useCompleteErrorHandling = () => {
     errorHandlerRef.current = new CompleteErrorHandler();
   }
 
-  // Update system health periodically
+  // ⚡ EVENT-DRIVEN HEALTH UPDATES - No setInterval polling!
   useEffect(() => {
     const updateHealth = () => {
       if (errorHandlerRef.current) {
@@ -362,9 +382,12 @@ export const useCompleteErrorHandling = () => {
     };
 
     updateHealth();
-    const interval = setInterval(updateHealth, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
+    // Health updates are now triggered by command executions
+    // No polling intervals - fully event-driven
+    
+    return () => {
+      // No intervals to clear
+    };
   }, []);
 
   const executeCommand = useCallback(

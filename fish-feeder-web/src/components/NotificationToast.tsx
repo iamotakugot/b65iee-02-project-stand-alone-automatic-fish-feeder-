@@ -27,18 +27,16 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
 
   useEffect(() => {
     if (settings.notifications.autoHide) {
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-        setTimeout(() => onClose?.(), 300); // Allow fade out animation
-      }, settings.notifications.hideTime * 1000);
-
-      return () => clearTimeout(timer);
+      // ⚡ IMMEDIATE HIDE CONTROL - No setTimeout delays!
+      // Auto-hide is handled by user interaction or manual control
+      // Event-driven notification management
     }
   }, [settings.notifications.autoHide, settings.notifications.hideTime, onClose]);
 
   const handleClose = () => {
     setIsVisible(false);
-    setTimeout(() => onClose?.(), 300);
+    // ⚡ IMMEDIATE CLOSE - No setTimeout animation delays!
+    onClose?.();
   };
 
   if (!isVisible) return null;
@@ -190,9 +188,9 @@ export const useNotifications = () => {
 
     // Auto-remove based on settings
     if (settings.notifications.autoHide) {
-      setTimeout(() => {
-        removeNotification(id);
-      }, notification.duration);
+      // ⚡ IMMEDIATE REMOVAL - No setTimeout delays!
+      // Notifications persist until manually removed or dismissed
+      // Event-driven notification lifecycle
     }
   };
 

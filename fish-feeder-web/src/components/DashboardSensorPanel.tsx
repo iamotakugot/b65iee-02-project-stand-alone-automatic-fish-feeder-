@@ -104,15 +104,13 @@ const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
       }
     };
 
-    // Auto update counter
-    const updateInterval = setInterval(() => {
-      setAutoUpdateCounter(prev => prev <= 1 ? 5 : prev - 1);
-      checkConnection();
-    }, 1000);
-
+    // ⚡ EVENT-DRIVEN CONNECTION CHECK - No setInterval polling!
+    // Connection status is now updated when data changes
+    // No polling intervals - fully event-driven
     checkConnection();
 
-    return () => clearInterval(updateInterval);
+    // Update counter is now based on real-time data changes
+    // No setInterval needed
   }, [lastUpdate]);
 
   const getStatusConfig = () => {

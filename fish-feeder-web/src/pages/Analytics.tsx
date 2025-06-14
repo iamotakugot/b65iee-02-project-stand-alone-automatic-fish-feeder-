@@ -66,12 +66,13 @@ const Analytics = () => {
         }
       });
 
-      // Clean up listener after getting initial data
-      setTimeout(() => unsubscribe(), 1000);
+      // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
+      // Cleanup happens when component unmounts or effect re-runs
+      return () => unsubscribe();
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error("Failed to fetch analytics data:", error);
+      console.error("Failed to fetch analytics data:", error);
       }
 
       // **UPDATED: Enhanced fallback data with new sensors**

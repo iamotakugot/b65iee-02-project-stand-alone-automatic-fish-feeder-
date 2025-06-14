@@ -59,11 +59,11 @@ const ControlPanel: React.FC = () => {
         
         logger.info('MOTOR', 'COMMAND_SUCCESS', { motor, command, response });
         
-        // Auto-stop after timeout for safety
+        // ⚡ IMMEDIATE STATUS UPDATE - No setTimeout delays!
+        // Use event-driven approach instead of timeout safety
         if (command === '1') {
-          setTimeout(() => {
-            setMotorStatus(prev => ({ ...prev, [motor]: 'stopped' }));
-          }, 30000); // 30 second timeout
+          // Status will be updated by real-time monitoring
+          logger.warn('MOTOR', 'AUTO_TIMEOUT_DISABLED', { motor, message: 'Using event-driven status monitoring' });
         }
       } else {
         throw new Error(`Command failed: ${response.message || 'Unknown error'}`);

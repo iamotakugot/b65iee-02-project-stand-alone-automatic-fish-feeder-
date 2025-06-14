@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFirebaseSensorData } from './useFirebaseSensorData';
+import { FishFeederApiClient } from '../config/api';
 
 // 🚀 COMPLETE ERROR HANDLING & COMMUNICATION DEBUG
 // ================================================
@@ -72,7 +73,7 @@ class ErrorLogger {
     
     // Only log non-connection errors for debugging
     if (!message.includes('CONNECTION_FAILED') && !message.includes('net::ERR_CONNECTION_REFUSED')) {
-      console.error(`[ERROR] ${category}: ${message}`, details);
+    console.error(`[ERROR] ${category}: ${message}`, details);
     }
   }
 
@@ -85,7 +86,7 @@ class ErrorLogger {
       this.errors.failed_commands++;
       // Only log non-connection command failures
       if (!command.includes('CONNECTION_FAILED')) {
-        console.error(`[FAILED] Command: ${command}`, response);
+      console.error(`[FAILED] Command: ${command}`, response);
       }
     }
   }
@@ -198,6 +199,110 @@ export const useApiConnection = () => {
     turnOffAll: firebaseTurnOffAll,
     sendCommand: firebaseSendCommand
   } = useFirebaseSensorData();
+
+  // 🔥 FIREBASE-ONLY MODE - แก้ไข CORS Issue
+  const isFirebaseOnlyMode = typeof window !== 'undefined' && 
+                            (window.location.hostname.includes('.web.app') || 
+                             window.location.hostname.includes('firebaseapp.com'));
+
+  // ===== API CLIENT INITIALIZATION =====
+  const [apiClient] = useState(() => new FishFeederApiClient());
+
+  // ===== COMBINED DATA STATE =====
+  const [combinedData, setCombinedData] = useState<ApiData>({
+    sensors: {},
+    status: {
+      online: false,
+      arduino_connected: false,
+      last_updated: new Date().toISOString()
+    },
+    timestamp: new Date().toISOString()
+  });
+
+  // ===== FIREBASE-ONLY MODE FUNCTIONS =====
+  const firebaseOnlyControlLED = useCallback(async (action: 'on' | 'off' | 'toggle') => {
+    try {
+      const success = await firebaseControlLED(action);
+      errorLogger.logCommand(success, `LED_${action.toUpperCase()}_FIREBASE_ONLY`);
+      if (success) {
+        healthMonitor.recordSuccess();
+      } else {
+        healthMonitor.recordFailure();
+      }
+      return {
+        status: success ? 'success' : 'error',
+        message: success ? `LED ${action} command sent via Firebase` : `LED ${action} command failed`,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      errorLogger.logError('FIREBASE', `LED control failed: ${error}`, { action });
+      healthMonitor.recordFailure();
+      throw error;
+    }
+  }, [firebaseControlLED]);
+
+  const firebaseOnlyControlFan = useCallback(async (action: 'on' | 'off' | 'toggle') => {
+    try {
+      const success = await firebaseControlFan(action);
+      errorLogger.logCommand(success, `FAN_${action.toUpperCase()}_FIREBASE_ONLY`);
+      if (success) {
+        healthMonitor.recordSuccess();
+      } else {
+        healthMonitor.recordFailure();
+      }
+      return {
+        status: success ? 'success' : 'error',
+        message: success ? `Fan ${action} command sent via Firebase` : `Fan ${action} command failed`,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      errorLogger.logError('FIREBASE', `Fan control failed: ${error}`, { action });
+      healthMonitor.recordFailure();
+      throw error;
+    }
+  }, [firebaseControlFan]);
+
+  const firebaseOnlyControlFeeder = useCallback(async (action: string) => {
+    try {
+      const success = await firebaseControlFeeder(action as any);
+      errorLogger.logCommand(success, `FEEDER_${action.toUpperCase()}_FIREBASE_ONLY`);
+      if (success) {
+        healthMonitor.recordSuccess();
+      } else {
+        healthMonitor.recordFailure();
+      }
+      return {
+        status: success ? 'success' : 'error',
+        message: success ? `Feeder ${action} command sent via Firebase` : `Feeder ${action} command failed`,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      errorLogger.logError('FIREBASE', `Feeder control failed: ${error}`, { action });
+      healthMonitor.recordFailure();
+      throw error;
+    }
+  }, [firebaseControlFeeder]);
+
+  const firebaseOnlyTurnOffAll = useCallback(async () => {
+    try {
+      const success = await firebaseTurnOffAll();
+      errorLogger.logCommand(success, 'TURN_OFF_ALL_FIREBASE_ONLY');
+      if (success) {
+        healthMonitor.recordSuccess();
+      } else {
+        healthMonitor.recordFailure();
+      }
+      return {
+        status: success ? 'success' : 'error',
+        message: success ? 'All devices turned off via Firebase' : 'Turn off all command failed',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      errorLogger.logError('FIREBASE', `Turn off all failed: ${error}`);
+      healthMonitor.recordFailure();
+      throw error;
+    }
+  }, [firebaseTurnOffAll]);
 
   // ===== ERROR HANDLING WRAPPER =====
   const withErrorHandling = useCallback(async <T>(
@@ -480,13 +585,11 @@ export const useApiConnection = () => {
     timestamp: firebaseData.timestamp || new Date().toISOString()
   } : null;
 
-  // ===== UPDATE CONNECTION HEALTH PERIODICALLY =====
+  // ⚡ EVENT-DRIVEN CONNECTION HEALTH - No setInterval polling!
   useEffect(() => {
-    const interval = setInterval(() => {
-      setConnectionHealth(healthMonitor.getHealth());
-    }, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
+    // Connection health is now updated by Firebase events
+    // No polling intervals - fully event-driven
+    setConnectionHealth(healthMonitor.getHealth());
   }, []);
 
   // ===== LOG FIREBASE ERRORS =====

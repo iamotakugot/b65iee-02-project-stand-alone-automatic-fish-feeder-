@@ -43,7 +43,8 @@ const QuickAccessPanel: React.FC = () => {
       logger.error('FEED', 'QUICK_FEED_ERROR', { amount, type, error });
     } finally {
       setIsFeeding(false);
-      setTimeout(() => setLastAction(''), 3000);
+      // ⚡ IMMEDIATE MESSAGE CLEAR - No setTimeout delays!
+      // Messages persist until next action or manual clear
     }
   };
 
@@ -68,7 +69,8 @@ const QuickAccessPanel: React.FC = () => {
       logger.error('EMERGENCY', 'STOP_COMMAND_FAILED', { error });
     }
     
-    setTimeout(() => setLastAction(''), 3000);
+    // ⚡ IMMEDIATE MESSAGE CLEAR - No setTimeout delays!
+    // Messages persist until next action or manual clear
   };
 
   const getBatteryColor = (voltage: number) => {

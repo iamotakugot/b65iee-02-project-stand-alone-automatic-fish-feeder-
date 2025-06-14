@@ -11,6 +11,9 @@ interface ApiContextType {
   fetchSensorData: () => Promise<boolean>;
   fetchCachedSensorData: () => Promise<boolean>;
   syncToFirebase: () => Promise<boolean>;
+  // Legacy compatibility
+  getSensors: () => Promise<any>;
+  getHealth: () => Promise<any>;
   // Control functions
   controlLED: (action: 'on' | 'off' | 'toggle') => Promise<boolean>;
   controlFan: (action: 'on' | 'off' | 'toggle') => Promise<boolean>;
@@ -47,6 +50,41 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  // Legacy compatibility functions
+  const getSensors = async () => {
+    const success = await apiHook.fetchSensorData();
+    if (success && apiHook.sensorData) {
+      return {
+        values: [
+          {
+            type: 'weight',
+            value: apiHook.sensorData.weight || 0,
+            unit: 'g'
+          },
+          {
+            type: 'temperature',
+            value: apiHook.sensorData.feed_temperature || 0,
+            unit: '°C'
+          },
+          {
+            type: 'humidity',
+            value: apiHook.sensorData.feed_humidity || 0,
+            unit: '%'
+          }
+        ]
+      };
+    }
+    return null;
+  };
+
+  const getHealth = async () => {
+    const success = await apiHook.fetchSensorData();
+    return {
+      status: success ? 'healthy' : 'error',
+      connected: apiHook.isConnected
+    };
+  };
+
   const contextValue: ApiContextType = {
     sensorData: apiHook.sensorData,
     loading: apiHook.loading,
@@ -56,6 +94,8 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetchSensorData: apiHook.fetchSensorData,
     fetchCachedSensorData: apiHook.fetchCachedSensorData,
     syncToFirebase: apiHook.syncToFirebase,
+    getSensors,
+    getHealth,
     controlLED: apiHook.controlLED,
     controlFan: apiHook.controlFan,
     controlFeeder: apiHook.controlFeeder,

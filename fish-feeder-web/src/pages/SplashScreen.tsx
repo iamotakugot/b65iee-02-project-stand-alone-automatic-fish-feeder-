@@ -8,33 +8,21 @@ const SplashScreen = () => {
   const [showTeam, setShowTeam] = useState(false);
 
   useEffect(() => {
-    // Show team members after 1 second (faster)
-    const teamTimer = setTimeout(() => {
-      setShowTeam(true);
-    }, 1000);
+    // ⚡ IMMEDIATE TEAM DISPLAY - No setTimeout delays!
+    setShowTeam(true);
     
-    // Progress bar animation (faster)
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 5; // Faster progress
-      });
-    }, 30);
+    // ⚡ IMMEDIATE PROGRESS COMPLETION - Event-driven UI
+    setProgress(100);
 
-    // Auto navigate after 3 seconds (much faster)
-    const autoNavigateTimer = setTimeout(() => {
+    // ⚡ MANUAL NAVIGATION ONLY - No auto setTimeout navigation!
+    // User-controlled navigation via Skip button only
+    
+    // Check URL parameter for auto-skip
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('nosplash') === 'true') {
       localStorage.setItem("splash-seen", "true");
       navigate("/");
-    }, 3000);
-
-    return () => {
-      clearTimeout(teamTimer);
-      clearTimeout(autoNavigateTimer);
-      clearInterval(progressInterval);
-    };
+    }
   }, [navigate]);
 
   const handleSkip = () => {
@@ -65,7 +53,7 @@ const SplashScreen = () => {
         onClick={handleSkip}
         className="absolute top-4 right-4 px-6 py-3 bg-white/20 backdrop-blur-md rounded-full text-sm hover:bg-white/30 transition-colors z-10 border border-white/30 font-semibold"
       >
-        ข้าม (3s)
+        ข้าม
       </motion.button>
 
       {/* Quick access button */}

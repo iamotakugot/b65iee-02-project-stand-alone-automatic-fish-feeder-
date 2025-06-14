@@ -166,7 +166,7 @@ const Settings = () => {
     try {
       // Use Firebase to check system status
       const { firebaseClient } = await import('../config/firebase');
-      const success = await firebaseClient.sendArduinoCommand("PING");
+      const success = await firebaseClient.sendArduinoCommand("S:HEALTH");
       
       setSystemStatus({
         arduino_connected: success,
@@ -178,7 +178,7 @@ const Settings = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error("Status check failed:", error);
+      console.error("Status check failed:", error);
       }
       setSystemStatus({
         arduino_connected: false,
@@ -206,12 +206,13 @@ const Settings = () => {
         }
       });
       
-      // Clean up listener after getting initial data
-      setTimeout(() => unsubscribe(), 1000);
+      // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
+      // Cleanup happens when component unmounts or effect re-runs
+      return () => unsubscribe();
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error("Weight monitoring failed:", error);
+      console.error("Weight monitoring failed:", error);
       }
     }
   };
@@ -307,7 +308,7 @@ const Settings = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error("Tare failed:", error);
+      console.error("Tare failed:", error);
       }
       setCalibrationMessage("❌ การปรับเทียร์ล้มเหลว กรุณาลองใหม่");
       showMessage("error", "❌ การปรับเทียร์ล้มเหลว");

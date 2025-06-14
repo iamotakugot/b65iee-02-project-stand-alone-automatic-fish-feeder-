@@ -148,8 +148,11 @@ export const API_CONFIG = {
     REAL_DATA_ONLY: true
   },
 
-  // Firebase-only mode configuration - ใช้ Firebase Database เท่านั้นใน production
-  FIREBASE_ONLY_MODE: typeof window !== 'undefined' && window.location.hostname.includes('.web.app'), // 🔥 Firebase-only ใน production
+  // 🔥 FIREBASE-ONLY MODE - แก้ไข CORS Issue
+  FIREBASE_ONLY_MODE: typeof window !== 'undefined' && 
+                      (window.location.hostname.includes('.web.app') || 
+                       window.location.hostname.includes('firebaseapp.com') ||
+                       window.location.protocol === 'https:'), // Force Firebase-only in production and HTTPS
 
   // Refresh intervals optimized for performance
   REFRESH_INTERVALS: {
@@ -670,6 +673,62 @@ export class FishFeederApiClient {
     this.corsIssue = checkCorsIssue().hasCorsIssue;
   }
 
+  private getMockResponse(endpoint: string): any {
+    // Return mock data for different endpoints when in Firebase-only mode
+    const timestamp = new Date().toISOString();
+    
+    if (endpoint.includes('/sensors')) {
+      return {
+        status: 'offline',
+        message: 'Firebase-only mode - Backend server required for real data',
+        data: {
+          DHT22_SYSTEM: {
+            sensor_name: 'DHT22_SYSTEM',
+            timestamp,
+            values: [
+              { type: 'temperature', value: 25.0, unit: '°C' },
+              { type: 'humidity', value: 60.0, unit: '%' }
+            ]
+          },
+          HX711_FEEDER: {
+            sensor_name: 'HX711_FEEDER',
+            timestamp,
+            values: [
+              { type: 'weight', value: 0, unit: 'g' }
+            ]
+          }
+        },
+        timestamp,
+        source: 'mock'
+      };
+    }
+    
+    if (endpoint.includes('/health')) {
+      return {
+        status: 'offline',
+        message: 'Backend server not running - Start Pi server for full functionality',
+        server_info: { version: 'mock', uptime: 0 },
+        serial_connected: false,
+        sensors_available: [],
+        timestamp
+      };
+    }
+    
+    if (endpoint.includes('/control')) {
+      return {
+        status: 'offline',
+        message: 'Firebase-only mode - Use Firebase controls for real device control',
+        timestamp
+      };
+    }
+    
+    return {
+      status: 'offline',
+      message: 'Firebase-only mode active',
+      timestamp
+    };
+  }
+
   /**
    * Enhanced fetch with caching, retries, and proper error handling
    */
@@ -679,6 +738,11 @@ export class FishFeederApiClient {
     useCache: boolean = true,
     timeout: number = API_CONFIG.TIMEOUT,
   ): Promise<any> {
+    // Check if we should use Firebase-only mode
+    if (API_CONFIG.FIREBASE_ONLY_MODE && !this.baseURL.includes('ngrok')) {
+      console.log('🔥 Firebase-only mode active - returning mock data');
+      return this.getMockResponse(endpoint);
+    }
     // ตรวจสอบปัญหา CORS ก่อน
     if (this.corsIssue) {
       console.warn(`🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`);

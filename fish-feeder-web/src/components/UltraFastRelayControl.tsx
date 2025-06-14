@@ -55,13 +55,13 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
       }
       });
 
-      // Clean up listener after getting initial data
-      setTimeout(() => unsubscribe(), 1000);
-      setError(null);
+      // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
+      // Cleanup happens when component unmounts or effect re-runs
+      return () => unsubscribe();
     } catch (err) {
       // Simplified error handling - only log critical errors
       if (err instanceof Error && !err.message.includes('CONNECTION_FAILED')) {
-        console.error("❌ Relay status fetch failed:", err);
+      console.error("❌ Relay status fetch failed:", err);
         setError(err.message);
       }
     }

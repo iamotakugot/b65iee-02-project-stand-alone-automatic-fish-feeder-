@@ -186,8 +186,8 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
       startStreaming();
     }
     
-    // Check status periodically
-    const statusInterval = setInterval(checkCameraStatus, 10000);
+    // ⚡ EVENT-DRIVEN CAMERA STATUS - No setInterval polling!
+    // Status checks are now triggered by streaming events
     
     // Handle fullscreen changes
     const handleFullscreenChange = () => {
@@ -197,7 +197,6 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     
     return () => {
-      clearInterval(statusInterval);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       if (lastSnapshot) {
         URL.revokeObjectURL(lastSnapshot);
@@ -311,7 +310,7 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
               startContent={<IoMdRefresh />}
               onPress={() => {
                 stopStreaming();
-                setTimeout(startStreaming, 500);
+                startStreaming();
               }}
               isLoading={isLoading}
               size="sm"

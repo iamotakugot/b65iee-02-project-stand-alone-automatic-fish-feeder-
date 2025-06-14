@@ -1,0 +1,33 @@
+# 🐟 Fish Feeder IoT System - Package Manifest
+# ============================================
+# Files to include in package distribution
+
+# Documentation
+include README_MODULAR.md
+include README.md
+include env.example
+
+# Requirements and configuration
+include requirements_modular.txt
+include requirements_minimal.txt
+include setup.py
+
+# Source code
+recursive-include services *.py
+recursive-include api *.py
+recursive-include models *.py
+recursive-include utils *.py
+
+# Main entry points
+include main_modular.py
+include main.py
+
+# Configuration files
+include .gitignore
+
+# Exclude development files
+exclude main_backup.py
+exclude *.pyc
+exclude __pycache__
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co] 

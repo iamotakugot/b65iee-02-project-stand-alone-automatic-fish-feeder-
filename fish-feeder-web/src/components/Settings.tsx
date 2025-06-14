@@ -353,7 +353,7 @@ const Settings: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'weight' | 'system' | 'network'>('weight');
 
-  const handleApiTest = async (endpoint: string, method: string = 'GET') => {
+  const handleSystemCheck = async (endpoint: string, method: string = 'GET') => {
     setLoading(endpoint);
     setMessage(null);
     try {
@@ -395,7 +395,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const TestButton = ({ 
+  const HealthCheckButton = ({ 
     children, 
     onClick, 
     isLoading = false,

@@ -126,13 +126,12 @@ const FeedControl = () => {
     
     initializeData();
 
-    // Event-driven updates - no intervals
+    // ⚡ EVENT-DRIVEN UPDATES - No setTimeout loops!
     const scheduleWeightUpdate = () => {
       if (isMounted) {
         fetchCurrentWeight().finally(() => {
-          if (isMounted) {
-            setTimeout(scheduleWeightUpdate, 3000);
-          }
+          // Weight updates are now triggered by user actions
+          // No automatic polling - event-driven only
         });
       }
     };
@@ -140,9 +139,8 @@ const FeedControl = () => {
     const scheduleHistoryUpdate = () => {
       if (isMounted) {
         fetchFeedHistory().finally(() => {
-          if (isMounted) {
-            setTimeout(scheduleHistoryUpdate, 30000);
-          }
+          // History updates when feed operations complete
+          // No automatic polling - event-driven only
         });
       }
     };
@@ -150,14 +148,13 @@ const FeedControl = () => {
     const scheduleStatsUpdate = () => {
       if (isMounted) {
         fetchFeedStatistics().finally(() => {
-          if (isMounted) {
-            setTimeout(scheduleStatsUpdate, 60000);
-          }
+          // Stats update when history changes
+          // No automatic polling - event-driven only
         });
       }
     };
     
-    // Start event-driven updates
+    // ⚡ IMMEDIATE INITIAL LOAD - No setTimeout delays!
     scheduleWeightUpdate();
     scheduleHistoryUpdate();
     scheduleStatsUpdate();
@@ -293,12 +290,10 @@ const FeedControl = () => {
       if (success) {
         setLastFeedTime(new Date().toLocaleString());
 
-        // Refresh data after feeding
-        setTimeout(() => {
-          fetchCurrentWeight();
-          fetchFeedHistory();
-          fetchFeedStatistics();
-        }, 2000);
+        // ⚡ IMMEDIATE DATA REFRESH - No setTimeout delays!
+        fetchCurrentWeight();
+        fetchFeedHistory();
+        fetchFeedStatistics();
       } else {
         alert("Feed command failed. Please check Pi server connection.");
       }

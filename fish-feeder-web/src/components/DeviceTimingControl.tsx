@@ -126,20 +126,35 @@ const DeviceTimingControl: React.FC<DeviceTimingControlProps> = ({ className = "
       { name: 'Blower Active', duration: timing.blowerDuration }
     ];
 
+    // ⚡ EVENT-DRIVEN PREVIEW - No setInterval!
     let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 0.1;
-      const progress = (elapsed / totalDuration) * 100;
-      setPreviewProgress(Math.min(progress, 100));
+    let animationId: number;
+    let lastFrameTime = performance.now();
+    
+    const updateProgress = () => {
+      const currentTime = performance.now();
+      const deltaTime = currentTime - lastFrameTime;
       
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
+      if (deltaTime >= 100) { // Update every 100ms
+        elapsed += 0.1;
+        const progress = (elapsed / totalDuration) * 100;
+        setPreviewProgress(Math.min(progress, 100));
+        
+        if (progress >= 100) {
           setPreviewMode(false);
           setPreviewProgress(0);
-        }, 1000);
+          return;
+        }
+        
+        lastFrameTime = currentTime;
       }
-    }, 100);
+      
+      if (previewMode) {
+        animationId = requestAnimationFrame(updateProgress);
+      }
+    };
+    
+    animationId = requestAnimationFrame(updateProgress);
   };
 
   const getTotalFeedTime = () => {

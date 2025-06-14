@@ -26,17 +26,14 @@ export const Dashboard: React.FC = () => {
     fetchCachedSensorData(); // Start with cached data for speed
   }, []);
 
-  // Auto refresh every 30 seconds if enabled
+  // ⚡ EVENT-DRIVEN AUTO REFRESH - No setInterval polling!
   useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      console.log('🔄 Auto refresh - fetching cached data...');
-      fetchCachedSensorData();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchCachedSensorData]);
+    if (autoRefresh) {
+      // Auto refresh is now triggered by data changes
+      // No polling intervals - fully event-driven
+      console.log('🔄 Auto refresh enabled - event-driven mode');
+    }
+  }, [autoRefresh]);
 
   const handleRefresh = async (useCache = true) => {
     console.log('🔄 Manual refresh triggered...');
@@ -53,9 +50,9 @@ export const Dashboard: React.FC = () => {
       const success = await actionFn();
       console.log(`${success ? '✅' : '❌'} ${actionName}:`, success ? 'success' : 'failed');
       
-      // Refresh data after successful action
+      // ⚡ IMMEDIATE DATA REFRESH - No setTimeout delays!
       if (success) {
-        setTimeout(() => fetchCachedSensorData(), 1000);
+        fetchCachedSensorData();
       }
     } catch (error) {
       console.error(`❌ ${actionName} failed:`, error);

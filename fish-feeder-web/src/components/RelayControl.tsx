@@ -50,15 +50,12 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
                 fan: data.control?.fan === "on" || false
               }
             });
-            unsubscribe();
           }
         });
         
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          unsubscribe();
-          resolve({ status: "timeout" });
-        }, 5000);
+        // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
+        // Cleanup happens when component unmounts or effect re-runs
+        return () => unsubscribe();
       });
 
       if (response?.status === "success" && response.relay_status) {
@@ -120,8 +117,8 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
           setLastUpdate(Date.now());
           console.log(`✅ ${type.toUpperCase()} ${action} successful`);
 
-          // Fetch fresh status after a short delay
-          setTimeout(fetchRelayStatus, 100);
+          // ⚡ IMMEDIATE STATUS REFRESH - No setTimeout delays!
+          fetchRelayStatus();
         } else {
           throw new Error(`Failed to control ${type}`);
         }
@@ -187,39 +184,26 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
     [controlRelay],
   );
 
-  // Initialize and cleanup
+  // ⚡ EVENT-DRIVEN RELAY STATUS - No setInterval polling!
   useEffect(() => {
-    fetchRelayStatus(); // Initial fetch
+    fetchRelayStatus(); // Initial fetch only
 
-    // Start polling
-    intervalRef.current = setInterval(
-      fetchRelayStatus,
-      API_CONFIG.REFRESH_INTERVALS.STATUS,
-    );
+    // Relay status is now updated by Firebase events
+    // No polling intervals - fully event-driven
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
   }, [fetchRelayStatus]);
 
-  // Pause polling when page is not visible (Performance optimization)
+  // ⚡ VISIBILITY-BASED REFRESH - No setInterval polling!
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-      } else {
-        fetchRelayStatus();
-        intervalRef.current = setInterval(
-          fetchRelayStatus,
-          API_CONFIG.REFRESH_INTERVALS.STATUS,
-        );
+      if (!document.hidden) {
+        fetchRelayStatus(); // Refresh when page becomes visible
+        // No setInterval - single refresh only
       }
     };
 

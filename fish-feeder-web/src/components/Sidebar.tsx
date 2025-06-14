@@ -73,12 +73,6 @@ const Sidebar = () => {
       shortLabel: "Debug",
       icon: <HiCodeBracket className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
-    {
-      path: "/system-test",
-      label: "System Test & QA",
-      shortLabel: "Test",
-      icon: <MdBugReport className="w-5 h-5 sm:w-6 sm:h-6" />,
-    },
     { 
       path: "/settings", 
       label: "Settings", 

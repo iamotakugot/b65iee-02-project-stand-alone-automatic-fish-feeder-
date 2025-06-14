@@ -35,7 +35,7 @@ class Logger {
     } catch (error) {
       // Only log if it's not a storage quota error
       if (!(error instanceof Error) || !error.toString().includes('QuotaExceededError')) {
-        console.warn('Failed to load stored logs:', error);
+      console.warn('Failed to load stored logs:', error);
       }
     }
   }
@@ -43,13 +43,7 @@ class Logger {
   private startAutoSaveSystem() {
     // 🎯 DISABLED AUTO-DOWNLOAD: Only save to localStorage, no file downloads
     // Auto-save to localStorage every 30 seconds if there are unsaved logs
-    this.autoSaveTimer = setInterval(() => {
-      if (this.unsavedLogs > 0) {
-        this.saveLogs(); // Save to localStorage only
-        this.unsavedLogs = 0; // Reset counter
-        console.log('🐟 Auto-saved logs to localStorage');
-      }
-    }, 30000);
+    this.autoSaveTimer = null; // ⚡ EVENT-DRIVEN SAVE - No setInterval polling!
 
     // Save to localStorage on page unload (no file download)
     window.addEventListener('beforeunload', () => {
@@ -75,7 +69,7 @@ class Logger {
     } catch (error) {
       // Only log if it's not a storage quota error
       if (!(error instanceof Error) || !error.toString().includes('QuotaExceededError')) {
-        console.warn('Failed to save logs:', error);
+      console.warn('Failed to save logs:', error);
       }
     }
   }
@@ -238,7 +232,6 @@ class Logger {
   // Cleanup on destruction
   destroy() {
     if (this.autoSaveTimer) {
-      clearInterval(this.autoSaveTimer);
       this.autoSaveTimer = null;
     }
     

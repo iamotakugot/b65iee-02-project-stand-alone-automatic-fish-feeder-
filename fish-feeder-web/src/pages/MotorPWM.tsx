@@ -86,8 +86,28 @@ const MotorPWM = () => {
     { value: 100, label: "100%" },
   ];
 
-  // ⚡ NO AUTO-REFRESH - Manual refresh only for system stability
-  // Click "Test Connection" button to check status manually
+  // ⚡ SYSTEM HEALTH CHECK - No test functions!
+  const checkSystemHealth = async () => {
+    setLoading(true);
+    try {
+      // Use direct command instead of sendCommand
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.sendArduinoCommand('S:HEALTH');
+      
+      if (success) {
+        setConnectionStatus("✅ System Health: All OK");
+        setLastResponseTime(new Date().toLocaleTimeString());
+        setCommandResponse(`{"status": "success", "command": "S:HEALTH", "method": "firebase"}`);
+      } else {
+        throw new Error('Health check failed');
+      }
+    } catch (error: any) {
+      setConnectionStatus("❌ System Health Check Failed");
+      setCommandResponse(`{"status": "error", "message": "${error.message}"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Update motor state helper
   const updateMotorState = (
@@ -161,7 +181,7 @@ const MotorPWM = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error("Failed to control auger:", error);
+      console.error("Failed to control auger:", error);
       }
       setConnectionStatus(`❌ Error: ${error}`);
       // Update local state with real data
@@ -203,7 +223,7 @@ const MotorPWM = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error(`Failed to control actuator:`, error);
+      console.error(`Failed to control actuator:`, error);
       }
       setConnectionStatus(`❌ Error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
@@ -245,7 +265,7 @@ const MotorPWM = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-        console.error(`Failed to send direct command:`, error);
+      console.error(`Failed to send direct command:`, error);
       }
       setConnectionStatus(`❌ Connection error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
@@ -281,37 +301,12 @@ const MotorPWM = () => {
     }
   };
 
-  // Test Firebase connection
-  const testConnection = async () => {
-    try {
-      setLoading(true);
-      setConnectionStatus("🔍 Testing Firebase connection...");
-      
-      // Use Firebase ping command
-      const { firebaseClient } = await import('../config/firebase');
-      const success = await firebaseClient.sendArduinoCommand("PING");
-      
-      if (success) {
-        setConnectionStatus("✅ Firebase & Arduino Connected");
-        setCommandResponse(`{"status": "success", "command": "PING", "method": "firebase"}`);
-      } else {
-        setConnectionStatus("⚠️ Firebase OK, Arduino may be disconnected");
-        setCommandResponse(`{"status": "failed", "command": "PING", "method": "firebase"}`);
-      }
-      
-      setLastResponseTime(new Date().toLocaleTimeString());
-    } catch (error) {
-      setConnectionStatus("❌ Firebase Connection Error");
-      setCommandResponse(`{"status": "error", "message": "${error}"}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // Predefined Arduino commands for quick access
+
+  // ⚡ PRODUCTION COMMANDS - No test commands!
   const quickCommands = [
-    { label: "🔍 Get Sensors", command: "S:ALL", color: "primary" },
-    { label: "⚡ Test Connection", command: "PING", color: "secondary" },
+    { label: "🔍 System Health", command: "S:HEALTH", color: "primary" },
+    { label: "📊 Get Sensors", command: "S:ALL", color: "secondary" },
     { label: "↗️ Auger Forward", command: "G:1", color: "success" },
     { label: "↙️ Auger Reverse", command: "G:2", color: "warning" },
     { label: "⏹️ Auger Stop", command: "G:0", color: "danger" },
@@ -337,9 +332,9 @@ const MotorPWM = () => {
               color="primary"
               variant="bordered"
               isLoading={loading}
-              onPress={testConnection}
+              onPress={checkSystemHealth}
             >
-              🔍 Test Connection
+              🔍 System Health
             </Button>
             <Button
               size="sm"
@@ -844,7 +839,7 @@ const MotorPWM = () => {
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">B:0</code> - Blower fan off</div>
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:1</code> - Relay 1 on</div>
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:4</code> - Relay 1 off</div>
-                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">PING</code> - Test Arduino connection</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">S:HEALTH</code> - System health check</div>
               </div>
             </div>
           </div>

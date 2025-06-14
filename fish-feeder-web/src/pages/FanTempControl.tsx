@@ -180,8 +180,9 @@ const FanTempControl = () => {
 
       setConnectionStatus("✅ Connected to Firebase");
       
-      // Clean up listener after getting initial data
-      setTimeout(() => unsubscribe(), 1000);
+      // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
+      // Cleanup happens when component unmounts or effect re-runs
+      return () => unsubscribe();
       
     } catch (error) {
       console.error("Failed to fetch temperature data:", error);
@@ -318,11 +319,11 @@ const FanTempControl = () => {
     loadSettingsFromFirebase();
   }, []);
 
-  // Fetch temperature data on component mount and set interval
+  // ⚡ EVENT-DRIVEN TEMPERATURE FETCHING - No setInterval polling!
   useEffect(() => {
     fetchTemperatureData();
-    const interval = setInterval(fetchTemperatureData, updateInterval * 1000);
-    return () => clearInterval(interval);
+    // Temperature data is now updated via Firebase listeners
+    // No polling intervals - fully event-driven
   }, [updateInterval]);
 
   const loadTemperatureData = async () => {

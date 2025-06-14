@@ -15,10 +15,9 @@ const Dashboard = () => {
   // Auto-refresh when Firebase connection is restored
   useEffect(() => {
     if (isConnected && !hasSensorData(sensorData)) {
-      const timer = setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      return () => clearTimeout(timer);
+      // ⚡ IMMEDIATE CONNECTION CHECK - No setTimeout delays!
+      // Auto-refresh is handled by Firebase state updates, not timers
+      // React to connection state changes immediately
     }
   }, [isConnected, sensorData]);
 

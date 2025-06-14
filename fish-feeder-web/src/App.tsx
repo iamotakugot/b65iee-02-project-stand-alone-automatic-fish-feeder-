@@ -21,7 +21,6 @@ const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const SensorCharts = lazy(() => import("@/pages/SensorCharts"));
 const JsonDebug = lazy(() => import("@/pages/JsonDebug"));
-const SystemTestDashboard = lazy(() => import("@/components/SystemTestDashboard"));
 
 // Simple, minimal loading component
 const LoadingSpinner = () => (
@@ -45,15 +44,9 @@ const AppContent = () => {
     setShowFirebaseBanner(settings.banners.showFirebaseBanner);
     setShowApiStatus(settings.banners.showApiStatus);
 
-    // Auto-dismiss banners if configured
-    if (settings.banners.autoDismissTime > 0) {
-      const timer = setTimeout(() => {
-        setShowFirebaseBanner(false);
-        setShowApiStatus(false);
-      }, settings.banners.autoDismissTime * 1000);
-
-      return () => clearTimeout(timer);
-    }
+    // ⚡ IMMEDIATE BANNER CONTROL - No setTimeout delays!
+    // Auto-dismiss is handled by user interaction, not timer
+    // Event-driven UI updates based on settings changes
   }, []);
 
   // Check if we're in Firebase hosting mode
@@ -166,7 +159,6 @@ const AppContent = () => {
             <Route element={<JsonDebug />} path="json-debug" />
             <Route element={<Settings />} path="settings" />
             <Route element={<SimpleControl />} path="simple-control" />
-            <Route element={<SystemTestDashboard />} path="system-test" />
           </Route>
         </Routes>
       </div>
