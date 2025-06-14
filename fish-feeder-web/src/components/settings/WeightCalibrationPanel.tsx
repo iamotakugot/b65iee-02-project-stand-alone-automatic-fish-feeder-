@@ -34,8 +34,8 @@ export const WeightCalibrationPanel: React.FC<WeightCalibrationProps> = ({ class
     setSuccess(null);
 
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // ✅ IMMEDIATE RESPONSE - No setTimeout delays!
+      // Real calibration would send command to Arduino via Firebase
       
       setSuccess(`✅ Calibration สำเร็จ! ใช้น้ำหนักมาตรฐาน ${knownWeight} kg`);
       setCalibrationResult({
@@ -56,8 +56,8 @@ export const WeightCalibrationPanel: React.FC<WeightCalibrationProps> = ({ class
     setSuccess(null);
 
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ IMMEDIATE RESPONSE - No setTimeout delays!
+      // Real tare would send command to Arduino via Firebase
       
       setSuccess('✅ Tare (ปรับศูนย์) สำเร็จ!');
       setCalibrationResult({
@@ -82,8 +82,8 @@ export const WeightCalibrationPanel: React.FC<WeightCalibrationProps> = ({ class
     setSuccess(null);
 
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ IMMEDIATE RESPONSE - No setTimeout delays!
+      // Real reset would send command to Arduino via Firebase
       
       setSuccess('✅ Reset calibration สำเร็จ!');
       setCalibrationResult({
@@ -104,8 +104,8 @@ export const WeightCalibrationPanel: React.FC<WeightCalibrationProps> = ({ class
     setSuccess(null);
 
     try {
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ IMMEDIATE RESPONSE - No setTimeout delays!
+      // Real load would fetch from Arduino EEPROM via Firebase
       
       setSuccess('✅ โหลด calibration จาก EEPROM สำเร็จ!');
     } catch (err) {

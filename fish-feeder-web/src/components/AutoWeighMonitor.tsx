@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Scale, Clock, Activity } from 'lucide-react';
-import { 
-  IoMdPlay, 
-  IoMdPause, 
-  IoMdRefresh,
-  IoMdSettings,
-  IoMdTrendingUp,
-  IoMdAlert
-} from "react-icons/io";
-import { FaWeight, FaClock, FaChartLine } from "react-icons/fa";
-import { MdScale, MdAutoDelete, MdSpeed } from "react-icons/md";
-import { FishFeederApiClient } from "../config/api";
+import { Button } from "@heroui/button";
+import { MdScale } from "react-icons/md";
+import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 
 interface AutoWeighMonitorProps {
   className?: string;
@@ -21,21 +9,14 @@ interface AutoWeighMonitorProps {
   onLowWeightAlert?: (weight: number) => void;
 }
 
-interface WeightReading {
-  value: number;
-  timestamp: Date;
-  status: 'normal' | 'low' | 'critical';
-}
-
 const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
   className = "",
   onWeightChange,
   onLowWeightAlert,
 }) => {
-  const [apiClient] = useState(new FishFeederApiClient());
+  const { sensorData } = useFirebaseSensorData();
   
   const [currentWeight, setCurrentWeight] = useState<number>(0);
-  const [weightHistory, setWeightHistory] = useState<WeightReading[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [lastAlert, setLastAlert] = useState<Date | null>(null);
   const [thresholds] = useState({
@@ -43,283 +24,92 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
     critical: 50  // 50g
   });
   
-  // UI state
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('');
-  const [changeDetected, setChangeDetected] = useState(false);
-  const [detectionData, setDetectionData] = useState<any>(null);
-  
-  // Load weight data
-  const loadWeightData = async () => {
-    try {
-      const response = await apiClient.getWeightMonitor();
-      
-      if (response.status === 'success' && response.weight_data) {
-        const data = response.weight_data;
-        setCurrentWeight(data.current);
-        setLastUpdate(new Date().toLocaleTimeString());
-        
-        // Add to history
-        setWeightHistory(prev => {
-          const newEntry: WeightReading = {
-            value: data.current,
-            timestamp: new Date(data.timestamp),
-            status: data.status === 'active' ? 'normal' : data.status === 'low' ? 'low' : 'critical'
-          };
-          
-          // Keep only last 50 readings
-          const updated = [...prev, newEntry].slice(-50);
-          return updated;
-        });
-        
-        // Trigger callback
-        if (onWeightChange) {
-          onWeightChange(data.current);
-        }
-        
-        setError(null);
-      }
-    } catch (error) {
-      console.error('Weight data load failed:', error);
-      setError('❌ Weight data unavailable');
-    }
-  };
 
-  // ⚡ EVENT-DRIVEN WEIGHT MONITORING - No setInterval!
+  // ⚡ EVENT-DRIVEN WEIGHT MONITORING - Firebase listener only!
   useEffect(() => {
-    if (!isMonitoring) return;
+    if (!isMonitoring || !sensorData) return;
 
-    let animationId: number;
-    let lastReadingTime = 0;
-    const READING_INTERVAL = 2000; // 2 seconds
+    // ⚡ FIREBASE-DRIVEN WEIGHT UPDATES - No animation loops!
+    const weightValue = sensorData.WEIGHT;
+    const realWeight = typeof weightValue === 'object' ? weightValue.weight?.value || 0 : weightValue || 0;
+    
+    const status = realWeight < thresholds.critical ? 'critical' :
+                  realWeight < thresholds.low ? 'low' : 'normal';
 
-    const readWeight = async () => {
-      const currentTime = performance.now();
-      
-      if (currentTime - lastReadingTime >= READING_INTERVAL) {
-        try {
-          // Simulate weight reading - replace with actual API call
-          const mockWeight = Math.max(0, 
-            200 - (Date.now() / 1000000) % 200 + 
-            (Math.random() - 0.5) * 10
-          );
-          
-          const status = mockWeight < thresholds.critical ? 'critical' :
-                        mockWeight < thresholds.low ? 'low' : 'normal';
-          
-          const reading: WeightReading = {
-            value: mockWeight,
-            timestamp: new Date(),
-            status
-          };
+    setCurrentWeight(realWeight);
 
-          setCurrentWeight(mockWeight);
-          setWeightHistory(prev => {
-            const updated = [...prev, reading];
-            return updated.slice(-50); // Keep last 50 readings
-          });
-
-          if (status === 'critical' || status === 'low') {
-            const now = new Date();
-            if (!lastAlert || (now.getTime() - lastAlert.getTime()) > 300000) { // 5 minutes
-              setLastAlert(now);
-              onLowWeightAlert?.(mockWeight);
-            }
-          }
-
-          lastReadingTime = currentTime;
-        } catch (error) {
-          console.error('Error reading weight:', error);
-        }
+    if (status === 'critical' || status === 'low') {
+      const now = new Date();
+      if (!lastAlert || (now.getTime() - lastAlert.getTime()) > 300000) { // 5 minutes
+        setLastAlert(now);
+        onLowWeightAlert?.(realWeight);
       }
-      
-      if (isMonitoring) {
-        animationId = requestAnimationFrame(readWeight);
-      }
-    };
+    }
 
-    animationId = requestAnimationFrame(readWeight);
-
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-    };
-  }, [isMonitoring, thresholds, lastAlert, onWeightChange, onLowWeightAlert]);
+    // Trigger callback for weight changes
+    onWeightChange?.(realWeight);
+    setLastUpdate(new Date().toLocaleTimeString());
+    
+  }, [isMonitoring, sensorData, thresholds, lastAlert, onWeightChange, onLowWeightAlert]);
 
   const toggleMonitoring = () => {
     setIsMonitoring(!isMonitoring);
   };
 
-  const clearHistory = () => {
-    setWeightHistory([]);
-    setLastAlert(null);
-  };
-
   const getWeightStatus = (weight: number) => {
-    if (weight < thresholds.critical) return { level: 'critical', variant: 'destructive' as const };
-    if (weight < thresholds.low) return { level: 'low', variant: 'secondary' as const };
-    return { level: 'normal', variant: 'default' as const };
-  };
-
-  const getAverageWeight = () => {
-    if (weightHistory.length === 0) return 0;
-    const sum = weightHistory.reduce((acc, reading) => acc + reading.value, 0);
-    return sum / weightHistory.length;
-  };
-
-  const getTrend = () => {
-    if (weightHistory.length < 5) return 'stable';
-    
-    const recent = weightHistory.slice(-5);
-    const oldest = recent[0].value;
-    const newest = recent[recent.length - 1].value;
-    const diff = newest - oldest;
-    
-    if (Math.abs(diff) < 5) return 'stable';
-    return diff > 0 ? 'increasing' : 'decreasing';
+    if (weight < thresholds.critical) return { level: 'critical', color: 'text-red-600' };
+    if (weight < thresholds.low) return { level: 'low', color: 'text-yellow-600' };
+    return { level: 'normal', color: 'text-green-600' };
   };
 
   const status = getWeightStatus(currentWeight);
-  const avgWeight = getAverageWeight();
-  const trend = getTrend();
 
   return (
-    <Card className={`w-full max-w-2xl mx-auto ${className}`}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Scale className="h-5 w-5" />
-          Auto Weight Monitor
+    <div className={`w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <MdScale className="h-6 w-6 text-blue-500" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Auto Weight Monitor
+          </h2>
           {isMonitoring && (
-            <Badge variant="default" className="animate-pulse">
-              <Activity className="h-3 w-3 mr-1" />
+            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full animate-pulse">
               LIVE
-            </Badge>
+            </span>
           )}
-        </CardTitle>
-        <CardDescription>
-          Automatic weight monitoring with low-weight alerts
-        </CardDescription>
-      </CardHeader>
+        </div>
+      </div>
       
-      <CardContent className="space-y-6">
+      <div className="space-y-6">
         {/* Current Weight Display */}
-        <div className="text-center p-6 bg-gray-50 rounded-lg">
-          <div className="text-3xl font-bold text-blue-600 mb-2">
+        <div className="text-center p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
             {currentWeight.toFixed(1)}g
           </div>
-          <Badge variant={status.variant}>
-            {status.level.toUpperCase()}
-          </Badge>
-          
-          {status.level !== 'normal' && (
-            <div className="flex items-center justify-center gap-2 mt-2 text-amber-600">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                {status.level === 'critical' ? 'Critical Low Weight!' : 'Low Weight Warning'}
-              </span>
+          <div className={`text-sm font-medium ${status.color}`}>
+            Status: {status.level.toUpperCase()}
+          </div>
+          {lastUpdate && (
+            <div className="text-xs text-gray-500 mt-1">
+              Last update: {lastUpdate}
             </div>
           )}
         </div>
 
-        {/* Weight Statistics */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-3 bg-white border rounded-lg">
-            <div className="text-sm text-gray-600 mb-1">Average</div>
-            <div className="font-semibold">{avgWeight.toFixed(1)}g</div>
-          </div>
-          
-          <div className="text-center p-3 bg-white border rounded-lg">
-            <div className="text-sm text-gray-600 mb-1">Trend</div>
-            <div className={`font-semibold ${
-              trend === 'decreasing' ? 'text-red-600' :
-              trend === 'increasing' ? 'text-green-600' : 'text-gray-600'
-            }`}>
-              {trend === 'decreasing' ? '↓ Decreasing' :
-               trend === 'increasing' ? '↑ Increasing' : '→ Stable'}
-            </div>
-          </div>
-          
-          <div className="text-center p-3 bg-white border rounded-lg">
-            <div className="text-sm text-gray-600 mb-1">Readings</div>
-            <div className="font-semibold">{weightHistory.length}</div>
-          </div>
-        </div>
-
-        {/* Recent Readings */}
-        {weightHistory.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="font-semibold text-sm text-gray-700">Recent Readings</h3>
-            <div className="max-h-32 overflow-y-auto space-y-1">
-              {weightHistory.slice(-10).reverse().map((reading, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded"
-                >
-                  <span className="flex items-center gap-2">
-                    <Clock className="h-3 w-3" />
-                    {reading.timestamp.toLocaleTimeString()}
-                  </span>
-                  <span className="font-mono">{reading.value.toFixed(1)}g</span>
-                  <Badge
-                    variant={getWeightStatus(reading.value).variant}
-                    className="text-xs"
-                  >
-                    {reading.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Alert Information */}
-        {lastAlert && (
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-            <div className="flex items-center gap-2 text-amber-800">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">Last Alert</span>
-            </div>
-            <p className="text-sm text-amber-700 mt-1">
-              {lastAlert.toLocaleString()}
-            </p>
-          </div>
-        )}
-
         {/* Control Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-3 justify-center">
           <Button
-            onClick={toggleMonitoring}
-            variant={isMonitoring ? "destructive" : "default"}
-            className="flex-1"
+            color={isMonitoring ? "danger" : "primary"}
+            onPress={toggleMonitoring}
+            className="flex items-center gap-2"
           >
-            {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={clearHistory}
-            disabled={weightHistory.length === 0}
-          >
-            Clear History
+            <MdScale className="h-4 w-4" />
+            {isMonitoring ? "Stop Monitoring" : "Start Monitoring"}
           </Button>
         </div>
-
-        {/* Thresholds Info */}
-        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-          <h4 className="font-medium text-blue-800 mb-2">Alert Thresholds</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-blue-700">
-              Low Weight: <span className="font-mono">{thresholds.low}g</span>
-            </div>
-            <div className="text-blue-700">
-              Critical: <span className="font-mono">{thresholds.critical}g</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

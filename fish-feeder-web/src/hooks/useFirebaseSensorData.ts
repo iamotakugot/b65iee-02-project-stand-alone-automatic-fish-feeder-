@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { firebaseClient, FirebaseData, ArduinoSensorData } from "../config/firebase";
 
 interface UseFirebaseSensorDataReturn {
@@ -27,6 +27,10 @@ export const useFirebaseSensorData = (): UseFirebaseSensorDataReturn => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState("");
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Use ref to prevent infinite listener creation
+  const listenerRef = useRef<(() => void) | null>(null);
+  const isInitializedRef = useRef(false);
 
   const handleDataUpdate = useCallback((firebaseData: FirebaseData | null) => {
     if (firebaseData) {
@@ -166,15 +170,28 @@ export const useFirebaseSensorData = (): UseFirebaseSensorDataReturn => {
     }
   }, []);
 
+  // ⚡ FIXED: Prevent infinite listener creation
   useEffect(() => {
+    // Only create listener once
+    if (isInitializedRef.current) {
+      return;
+    }
+
     console.log("🔥 Starting Firebase listener...");
+    isInitializedRef.current = true;
+    
     const unsubscribe = firebaseClient.getSensorData(handleDataUpdate);
+    listenerRef.current = unsubscribe;
 
     return () => {
       console.log("🔥 Stopping Firebase listener...");
-      unsubscribe();
+      if (listenerRef.current) {
+        listenerRef.current();
+        listenerRef.current = null;
+      }
+      isInitializedRef.current = false;
     };
-  }, [handleDataUpdate]);
+  }, []); // Empty dependency array - only run once
 
   const sensorData = data?.sensors || null;
 

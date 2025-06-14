@@ -72,43 +72,20 @@ export class CompleteErrorHandler {
   ): Promise<CommandResult> {
     const { onSuccess, onError, showToast = true, retryOnFailure = true, timeout = 10000 } = options;
     const startTime = performance.now();
-    
     this.totalCommands++;
-    let lastError: any;
-    let retryCount = 0;
 
-    while (retryCount <= this.maxRetries) {
+    // ⚡ SIMPLE RECURSIVE RETRY - Back to setTimeout for stability
+    const executeWithRetry = async (retryCount: number = 0): Promise<CommandResult> => {
       try {
-        // ⚡ EVENT-DRIVEN TIMEOUT - No setTimeout()!
-        const result = await Promise.race([
-          apiCall(),
-          new Promise((_, reject) => {
-            // Use AbortController for immediate timeout control
-            const controller = new AbortController();
-            const timeoutId = performance.now() + timeout;
-            
-            const checkTimeout = () => {
-              if (performance.now() >= timeoutId) {
-                controller.abort();
-                reject(new Error('Request timeout'));
-              } else {
-                // Use requestAnimationFrame for non-blocking timeout check
-                requestAnimationFrame(checkTimeout);
-              }
-            };
-            
-            requestAnimationFrame(checkTimeout);
-            return controller;
-          })
-        ]);
+        // ⚡ SIMPLE TIMEOUT - Back to setTimeout for stability
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Command timeout after ${timeout}ms`));
+          }, timeout);
+        });
 
+        const result = await Promise.race([apiCall(), timeoutPromise]);
         const responseTime = performance.now() - startTime;
-        this.responseTimeHistory.push(responseTime);
-
-        // Keep only last 100 response times
-        if (this.responseTimeHistory.length > 100) {
-          this.responseTimeHistory = this.responseTimeHistory.slice(-100);
-        }
 
         if (result?.status === 'success' || result?.success === true) {
           this.successfulCommands++;
@@ -131,31 +108,19 @@ export class CompleteErrorHandler {
           throw new Error(result?.message || result?.error || 'Command failed');
         }
       } catch (error: any) {
-        lastError = error;
-        retryCount++;
-        
-        // ⚡ EVENT-DRIVEN RETRY - No setTimeout delays!
-        if (retryCount <= this.maxRetries && retryOnFailure) {
-          // Use event-driven delay with Promise and immediate scheduling
+        // ⚡ SIMPLE RETRY - Back to setTimeout for stability
+        if (retryCount < this.maxRetries && retryOnFailure) {
           await new Promise(resolve => {
-            const delayTime = performance.now() + (1000 * retryCount);
-            
-            const checkDelay = () => {
-              if (performance.now() >= delayTime) {
-                resolve(undefined);
-              } else {
-                requestAnimationFrame(checkDelay);
-              }
-            };
-            
-            requestAnimationFrame(checkDelay);
+            setTimeout(resolve, 1000 * (retryCount + 1));
           });
-          continue;
+          
+          // Recursive retry instead of while loop
+          return executeWithRetry(retryCount + 1);
         }
         
         // Final failure
         const responseTime = performance.now() - startTime;
-        this.logError(commandName, error, responseTime, retryCount - 1);
+        this.logError(commandName, error, responseTime, retryCount);
         
         if (showToast) {
           this.showErrorToast(commandName, error.message, responseTime);
@@ -171,14 +136,9 @@ export class CompleteErrorHandler {
           responseTime
         };
       }
-    }
-
-    // Should never reach here, but just in case
-    return {
-      success: false,
-      error: lastError?.message || 'Unknown error',
-      responseTime: performance.now() - startTime
     };
+
+    return executeWithRetry();
   }
 
   /**

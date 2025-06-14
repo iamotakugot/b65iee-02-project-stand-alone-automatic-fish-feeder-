@@ -55,24 +55,14 @@ const Sidebar = () => {
       shortLabel: "Temp",
       icon: <MdThermostat className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
-    {
-      path: "/motor-pwm",
-      label: "Motor & PWM Settings",
-      shortLabel: "Motor",
-      icon: <MdTune className="w-5 h-5 sm:w-6 sm:h-6" />,
-    },
+
     {
       path: "/sensor-charts",
       label: "Sensor Analytics",
       shortLabel: "Charts",
       icon: <FiBarChart className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
-    {
-      path: "/json-debug",
-      label: "JSON Debug",
-      shortLabel: "Debug",
-      icon: <HiCodeBracket className="w-5 h-5 sm:w-6 sm:h-6" />,
-    },
+
     { 
       path: "/settings", 
       label: "Settings", 

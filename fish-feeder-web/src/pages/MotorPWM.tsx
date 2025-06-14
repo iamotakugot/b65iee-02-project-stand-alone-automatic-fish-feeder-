@@ -8,13 +8,7 @@ import { RiBlazeFill } from "react-icons/ri";
 import { MdRotateRight, MdRotateLeft } from "react-icons/md";
 import { IoSpeedometer } from "react-icons/io5";
 
-import {
-  API_CONFIG,
-  FishFeederApiClient,
-  ActuatorControlRequest,
-  DirectControlRequest,
-  BlowerControlRequest,
-} from "../config/api";
+import { useApi } from "../contexts/ApiContext";
 
 // Define the SliderStepMark type based on HeroUI docs
 type SliderStepMark = {
@@ -38,6 +32,15 @@ interface MotorControlRequest {
 }
 
 const MotorPWM = () => {
+  // Use Firebase API Context
+  const { 
+    controlAuger, 
+    controlBlower, 
+    controlActuator, 
+    setMotorPWM,
+    isConnected 
+  } = useApi();
+
   // PWM control states
   const [augerPWM, setAugerPWM] = useState(50);
   const [blowerPWM, setBlowerPWM] = useState(70);
@@ -64,10 +67,11 @@ const MotorPWM = () => {
     "up" | "down" | "extend" | "retract" | null
   >(null);
 
-  // Pi server states
+  // Loading states
   const [loading, setLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState("🔌 Ready to connect");
-  const [apiClient] = useState(new FishFeederApiClient());
+  const [connectionStatus, setConnectionStatus] = useState(
+    isConnected ? "🔌 Connected to Firebase" : "❌ Disconnected"
+  );
 
   // Direct command states
   const [customCommand, setCustomCommand] = useState("");
@@ -148,83 +152,56 @@ const MotorPWM = () => {
       setLoading(true);
       setConnectionStatus("🔄 Sending motor command...");
 
-      let command = "";
       switch (action.action) {
         case "speed":
-          command = `SPD:${action.speed || Math.round(augerPWM * 2.55)}`;
+          const speed = action.speed || Math.round(augerPWM * 2.55);
+          await setMotorPWM('auger', speed);
+          updateMotorState("auger", `SPD:${speed}`, speed);
+          setConnectionStatus(`✅ Auger speed: ${speed} via Firebase`);
           break;
         case "forward":
-          command = "G:1";
+          await controlAuger('forward');
+          updateMotorState("auger", "G:1");
+          setConnectionStatus(`✅ Auger forward via Firebase`);
           break;
         case "reverse":
-          command = "G:2";
+          await controlAuger('reverse');
+          updateMotorState("auger", "G:2");
+          setConnectionStatus(`✅ Auger reverse via Firebase`);
           break;
         case "stop":
-          command = "G:0";
+          await controlAuger('stop');
+          updateMotorState("auger", "G:0");
+          setConnectionStatus(`✅ Auger stop via Firebase`);
           break;
       }
 
-      // Use Firebase direct command
-      const { firebaseClient } = await import('../config/firebase');
-      const success = await firebaseClient.sendMotorCommand(command);
-
-      if (success) {
-        setConnectionStatus(`✅ Auger: ${command} executed via Firebase`);
-        updateMotorState("auger", command, action.speed);
-        setLastResponseTime(new Date().toLocaleTimeString());
-        setCommandResponse(`{"status": "success", "command": "${command}", "method": "firebase"}`);
-      } else {
-        setConnectionStatus(`❌ Auger command failed: ${command}`);
-        setCommandResponse(`{"status": "failed", "command": "${command}", "method": "firebase"}`);
-      }
+      setLastResponseTime(new Date().toLocaleTimeString());
+      setCommandResponse(`{"status": "success", "action": "${action.action}", "method": "firebase"}`);
 
     } catch (error) {
-      // Only log non-connection errors
-      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
       console.error("Failed to control auger:", error);
-      }
       setConnectionStatus(`❌ Error: ${error}`);
-      // Update local state with real data
-      updateMotorState("auger", action.action === "stop" ? "G:0" : "G:1");
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle actuator control via Pi Server API
-  const handleActuatorControl = async (
-    action: ActuatorControlRequest["action"],
-  ) => {
+  // Handle actuator control via Firebase
+  const handleActuatorControl = async (action: "up" | "down" | "stop") => {
     try {
       setLoading(true);
       setConnectionStatus("🔄 Moving actuator...");
 
-      // Use Pi Server API directly
-      const apiAction = action === 'up' ? 'up' : action === 'down' ? 'down' : 'stop';
-      const response = await fetch(`http://localhost:5000/api/control/actuator/${apiAction}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      await controlActuator(action);
+      setConnectionStatus(`✅ Actuator ${action} via Firebase`);
+      setActuatorMoving(action === "stop" ? null : action);
+      setLastResponseTime(new Date().toLocaleTimeString());
+      setCommandResponse(`{"status": "success", "action": "${action}", "method": "firebase"}`);
 
-      const result = await response.json();
-      console.log(`Actuator ${action} response:`, result);
-
-      if (result.success) {
-        setConnectionStatus(`✅ Actuator ${action} successful via Pi Server`);
-        setActuatorMoving(action === "stop" ? null : action);
-        setCommandResponse(`{"status": "success", "action": "${action}", "method": "pi_server", "command": "${result.command}"}`);
-      } else {
-        setConnectionStatus(`❌ Actuator ${action} failed`);
-        setCommandResponse(`{"status": "failed", "action": "${action}", "method": "pi_server"}`);
-      }
     } catch (error) {
-      // Only log non-connection errors
-      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
       console.error(`Failed to control actuator:`, error);
-      }
       setConnectionStatus(`❌ Error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
     } finally {
@@ -347,9 +324,9 @@ const MotorPWM = () => {
           </div>
         </div>
         <div className="text-sm text-gray-600 dark:text-gray-300">
-          Control motors via <strong>Web → Pi Server → Arduino Serial</strong> | 
-          API: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
-            {API_CONFIG.BASE_URL}
+          Control motors via <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | 
+          Status: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
+            {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
           </code>
         </div>
       </div>
@@ -582,15 +559,10 @@ const MotorPWM = () => {
                 try {
                   setLoading(true);
                   const speed = Math.round(blowerPWM * 2.55);
-                  const response = await fetch('http://localhost:5000/api/control/blower/on', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ speed })
-                  });
-                  const result = await response.json();
-                  console.log('Blower Speed result:', result);
-                  setConnectionStatus(`✅ Blower speed ${speed} via Pi Server API`);
-                  updateMotorState("blower", `B:1:${speed}`, speed);
+                  await setMotorPWM('blower', speed);
+                  setConnectionStatus(`✅ Blower speed ${speed} via Firebase`);
+                  updateMotorState("blower", `B:SPD:${speed}`, speed);
+                  setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
                   console.error('Blower Speed failed:', error);
                   setConnectionStatus(`❌ Blower speed failed: ${error}`);
@@ -599,7 +571,7 @@ const MotorPWM = () => {
                 }
               }}
             >
-              Set Blower Speed (API)
+              Set Blower Speed
             </Button>
             <Button
               className="h-12"
@@ -609,15 +581,10 @@ const MotorPWM = () => {
               onPress={async () => {
                 try {
                   setLoading(true);
-                  const response = await fetch('http://localhost:5000/api/control/blower/on', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ speed: 255 })
-                  });
-                  const result = await response.json();
-                  console.log('Blower ON result:', result);
-                  setConnectionStatus(`✅ Blower ON via Pi Server API`);
+                  await controlBlower('on');
+                  setConnectionStatus(`✅ Blower ON via Firebase`);
                   updateMotorState("blower", "B:1", 255);
+                  setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
                   console.error('Blower ON failed:', error);
                   setConnectionStatus(`❌ Blower ON failed: ${error}`);
@@ -637,13 +604,10 @@ const MotorPWM = () => {
               onPress={async () => {
                 try {
                   setLoading(true);
-                  const response = await fetch('http://localhost:5000/api/control/blower/off', {
-                    method: 'POST'
-                  });
-                  const result = await response.json();
-                  console.log('Blower OFF result:', result);
-                  setConnectionStatus(`✅ Blower OFF via Pi Server API`);
+                  await controlBlower('off');
+                  setConnectionStatus(`✅ Blower OFF via Firebase`);
                   updateMotorState("blower", "B:0", 0);
+                  setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
                   console.error('Blower OFF failed:', error);
                   setConnectionStatus(`❌ Blower OFF failed: ${error}`);
@@ -668,9 +632,9 @@ const MotorPWM = () => {
         </div>
 
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          Control the linear actuator using Pi server API endpoints. Commands sent via: 
+          Control the linear actuator using Firebase commands. Commands sent via: 
           <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded ml-1">
-            POST {API_CONFIG.BASE_URL}/api/control/actuator
+            Firebase → Pi Server → Arduino Serial
           </code>
         </div>
 

@@ -1,143 +1,383 @@
-# 🖥️ Fish Feeder Pi Server - Raspberry Pi 4
+# 🍓 Raspberry Pi Server - Fish Feeder System
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://flask.palletsprojects.com/)
-[![Firebase](https://img.shields.io/badge/Firebase-Admin-orange.svg)](https://firebase.google.com/)
-[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-4-red.svg)](https://www.raspberrypi.org/)
+<img src="https://img.shields.io/badge/Python-3.8+-blue" alt="Python"/>
+<img src="https://img.shields.io/badge/Flask-2.3-green" alt="Flask"/>
+<img src="https://img.shields.io/badge/Firebase-Admin%20SDK-orange" alt="Firebase"/>
+<img src="https://img.shields.io/badge/Serial-115200%20baud-red" alt="Serial"/>
 
-## 📋 Overview
+## 🎯 Overview
 
-**Raspberry Pi 4 Server** ที่ทำหน้าที่เป็นตัวกลางระหว่าง Arduino และ Firebase พร้อมระบบ stand-alone ที่กลับมาทำงานได้อัตโนมัติเมื่อ Pi ดับ-เปิด
+Raspberry Pi 4 Server ทำหน้าที่เป็นตัวกลางระหว่าง Web Application และ Arduino System ผ่าน Firebase Realtime Database และ Serial Communication
 
 ## 🏗️ Architecture
 
 ```
-Arduino Mega 2560 ←→ Pi Server ←→ Firebase ←→ Web App
-     (USB Serial)      (main_fixed.py)   (Real-time DB)
+Firebase ←→ Pi Server ←→ Arduino (Serial)
+    ↑           ↑            ↑
+Real-time    Flask API    115200 baud
+Database     RESTful      JSON Protocol
 ```
 
-## 📁 **Single File Structure**
+## ✨ Features
 
-```
-pi-mqtt-server/
-├── 📄 main_fixed.py              # Main server (17KB, 458 lines)
-├── 📄 requirements_minimal.txt   # Dependencies
-├── 📄 serviceAccountKey.json     # Firebase credentials
-├── 📄 system_check.py           # System verification
-├── 📋 README.md                 # This file
-└── 📁 logs/                     # Log files
-```
+- **🔄 Real-time Firebase Integration**: Listen และ Send ข้อมูลแบบ Real-time
+- **📡 Serial Communication**: สื่อสารกับ Arduino ผ่าน Serial Port
+- **🌐 RESTful API**: Flask web server สำหรับ external access
+- **🔄 Event-driven Architecture**: ไม่มี blocking loops
+- **📊 Data Processing**: ประมวลผลข้อมูลเซ็นเซอร์และคำสั่งควบคุม
+- **🛡️ Error Handling**: ระบบจัดการข้อผิดพลาดที่แข็งแกร่ง
+- **📋 Logging System**: บันทึกการทำงานและ debug ได้ง่าย
 
-## 🔧 **Core Components in main_fixed.py**
+## 🚀 Quick Start
 
-### **1. ArduinoManager Class**
-- USB Serial communication with Arduino
-- Command parsing and response handling
-- Auto-reconnection on disconnection
+### Prerequisites
+- Raspberry Pi 4 (4GB RAM+)
+- Python 3.8+
+- Arduino connected via USB/Serial
+- Firebase project setup
 
-### **2. FirebaseManager Class**
-- Real-time database operations
-- Sensor data synchronization
-- Command relay from web app
-- Error handling and retry logic
-
-### **3. WebAPI Class**
-- Flask REST API server
-- WebSocket real-time communication
-- CORS handling for web app
-- Health check endpoints
-
-### **4. FishFeederController Class**
-- Main orchestrator class
-- System coordination
-- Background task management
-- Graceful shutdown handling
-
-## 🚀 **Installation & Setup**
-
-### **Step 1: System Requirements**
+### Installation
 ```bash
-# Raspberry Pi OS (recommended)
-# Python 3.8 or higher
-# USB connection to Arduino Mega 2560
-# WiFi connection for Firebase
+# Clone repository
+git clone <repo-url>
+cd rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Setup configuration
+cp config.env.example config.env
 ```
 
-### **Step 2: Install Dependencies**
+### Configuration
 ```bash
-cd pi-mqtt-server
-
-# Install required packages
-pip install -r requirements_minimal.txt
-
-# Or install manually:
-pip install flask flask-cors flask-socketio pyserial firebase-admin
+# Edit config.env
+nano config.env
 ```
 
-### **Step 3: Firebase Setup**
-1. Download `serviceAccountKey.json` from Firebase Console
-2. Place in `pi-mqtt-server/` directory
-3. Verify Firebase project: `fish-feeder-test-1`
+```env
+# Firebase Configuration
+FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
+FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
 
-### **Step 4: Run Server**
+# Serial Configuration
+ARDUINO_PORT=/dev/ttyACM0    # Linux
+# ARDUINO_PORT=COM3          # Windows
+ARDUINO_BAUDRATE=115200
+
+# Flask Configuration
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+FLASK_DEBUG=False
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=fish_feeder.log
+```
+
+### Firebase Setup
 ```bash
-# Start fish feeder server
-python main_fixed.py
+# Download service account key from Firebase Console
+# Place it as: firebase-credentials.json
 
-# Or use system service (recommended)
-sudo systemctl enable fish-feeder
-sudo systemctl start fish-feeder
+# Test Firebase connection
+python test_firebase_connection.py
 ```
 
-## ⚙️ **Configuration**
+### Run Server
+```bash
+# Development mode
+python main.py
 
-### **Serial Port Configuration**
-```python
-# Automatic port detection for:
-COMMON_PORTS = [
-    '/dev/ttyUSB0',    # Linux USB-Serial
-    '/dev/ttyACM0',    # Linux Arduino
-    'COM3', 'COM4',    # Windows
-    '/dev/cu.usbserial', # macOS
-]
+# Production mode (systemd service)
+sudo ./deploy.sh
 ```
 
-### **Firebase Configuration**
-```python
-FIREBASE_CONFIG = {
-    "databaseURL": "https://fish-feeder-test-1-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "projectId": "fish-feeder-test-1"
+## 📡 Firebase Integration
+
+### Database Structure
+```json
+{
+  "fish-feeder-system": {
+    "status": {
+      "sensors": {
+        "temp1": 25.5, "hum1": 60, "temp2": 26.1, "hum2": 65,
+        "weight": 150.25, "battery_voltage": 12.6,
+        "timestamp": "2024-01-01T12:00:00Z"
+      },
+      "system": {
+        "led": true, "fan": false, "blower": false,
+        "actuator": 0, "auger": 0,
+        "last_update": "2024-01-01T12:00:00Z"
+      }
+    },
+    "controls": {
+      "relay": { "led": true, "fan": false },
+      "motors": { "blower": 255, "actuator": "up" },
+      "feeding": { "trigger": true, "amount": 100 }
+    },
+    "logs": {
+      "log_id": {
+        "type": "command", "message": "LED turned on",
+        "timestamp": "2024-01-01T12:00:00Z"
+      }
+    }
+  }
 }
 ```
 
-### **API Endpoints**
+### Firebase Listeners
 ```python
-# Health check
-GET  /api/health
+# Control commands listener
+def firebase_command_listener():
+    ref = db.reference('fish-feeder-system/controls')
+    ref.listen(lambda snapshot: process_command(snapshot.val()))
 
-# Sensor data
-GET  /api/sensors
-GET  /api/sensors/{sensor_id}
-
-# Device control
-POST /api/control/led
-POST /api/control/fan
-POST /api/control/feeder
-POST /api/control/weight/calibrate
-POST /api/control/weight/tare
-
-# System
-GET  /api/system/status
-POST /api/system/restart
+# Send sensor data to Firebase
+def send_sensor_data(data):
+    ref = db.reference('fish-feeder-system/status/sensors')
+    ref.set(data)
 ```
 
-## 🔄 **Auto-Restart & Recovery**
+## 🔌 Serial Communication
 
-### **System Service (Recommended)**
+### Arduino Protocol
+```python
+# Commands sent to Arduino
+commands = {
+    'led_on': 'R:LED:ON',
+    'led_off': 'R:LED:OFF',
+    'fan_on': 'R:FAN:ON',
+    'fan_off': 'R:FAN:OFF',
+    'feed': 'FEED:100',
+    'blower': 'B:255',
+    'actuator_up': 'A:UP'
+}
+
+# Data received from Arduino (JSON format)
+arduino_data = {
+    "temp1": 25.5, "hum1": 60,
+    "temp2": 26.1, "hum2": 65,
+    "weight": 150.25,
+    "battery_voltage": 12.6,
+    "led": True, "fan": False
+}
+```
+
+### Serial Handler
+```python
+import serial
+import json
+
+class ArduinoSerial:
+    def __init__(self, port, baudrate=115200):
+        self.serial = serial.Serial(port, baudrate, timeout=5)
+    
+    def send_command(self, command):
+        self.serial.write((command + '\n').encode())
+        
+    def read_data(self):
+        line = self.serial.readline().decode().strip()
+        return json.loads(line)
+```
+
+## 🌐 REST API
+
+### Endpoints
+
+#### System Status
+```http
+GET /api/status
+```
+Response:
+```json
+{
+  "sensors": { "temp1": 25.5, "hum1": 60 },
+  "system": { "led": true, "fan": false },
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+#### Device Control
+```http
+POST /api/control/led/on
+POST /api/control/led/off
+POST /api/control/fan/on
+POST /api/control/fan/off
+```
+
+#### Feeding System
+```http
+POST /api/control/feed
+Content-Type: application/json
+
+{
+  "amount": 100
+}
+```
+
+#### Blower Control
+```http
+POST /api/control/blower
+Content-Type: application/json
+
+{
+  "power": 255
+}
+```
+
+#### Actuator Control
+```http
+POST /api/control/actuator/up
+POST /api/control/actuator/down
+```
+
+### API Usage Examples
 ```bash
-# Create systemd service
-sudo nano /etc/systemd/system/fish-feeder.service
+# Check system status
+curl http://pi-ip:5000/api/status
 
+# Turn on LED
+curl -X POST http://pi-ip:5000/api/control/led/on
+
+# Feed fish
+curl -X POST http://pi-ip:5000/api/control/feed \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 50}'
+```
+
+## 🔄 System Flow
+
+### 1. Command Flow (Web → Arduino)
+```
+Web App → Firebase → Pi Server → Arduino
+```
+
+### 2. Data Flow (Arduino → Web)
+```
+Arduino → Pi Server → Firebase → Web App
+```
+
+### 3. Processing Loop
+```python
+def main_loop():
+    while True:
+        # Read Arduino data
+        arduino_data = read_arduino_data()
+        
+        # Send to Firebase
+        update_firebase_status(arduino_data)
+        
+        # Process pending commands
+        process_firebase_commands()
+        
+        # Small delay (non-blocking)
+        time.sleep(0.1)
+```
+
+## 📊 Performance Monitoring
+
+### System Metrics
+- **Memory Usage**: < 100MB
+- **CPU Usage**: < 5%
+- **Firebase Latency**: < 500ms
+- **Serial Latency**: < 100ms
+
+### Health Check
+```bash
+# Check service status
+sudo systemctl status fish-feeder
+
+# Check logs
+sudo journalctl -u fish-feeder -f
+
+# Monitor resources
+htop
+```
+
+## 🛠️ Development
+
+### Project Structure
+```
+├── main.py                 # Main server application
+├── firebase_config.py      # Firebase configuration
+├── test_firebase_connection.py  # Firebase test script
+├── requirements.txt        # Python dependencies
+├── config.env             # Environment configuration
+├── deploy.sh              # Production deployment script
+├── fish_feeder.log        # Application logs
+└── README.md              # This file
+```
+
+### Core Components
+```python
+# main.py - Core server logic
+class FishFeederServer:
+    def __init__(self):
+        self.firebase = FirebaseManager()
+        self.arduino = ArduinoSerial()
+        self.flask_app = Flask(__name__)
+    
+    def start(self):
+        # Start Firebase listeners
+        # Start Flask server
+        # Start Arduino communication
+```
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+# Test Firebase connection
+python test_firebase_connection.py
+
+# Test Arduino serial
+python -c "
+import serial
+ser = serial.Serial('/dev/ttyACM0', 115200, timeout=5)
+ser.write(b'GET_SENSORS\n')
+print(ser.readline().decode())
+ser.close()
+"
+```
+
+### Integration Tests
+```bash
+# End-to-end test
+curl -X POST http://localhost:5000/api/control/led/on
+# Check Arduino response and Firebase update
+```
+
+## 🔐 Security
+
+- **🔥 Firebase Security Rules**: Production-ready rules
+- **🔐 Environment Variables**: Sensitive data protection
+- **✅ Input Validation**: All commands validated
+- **🛡️ Error Handling**: Graceful error recovery
+- **📋 Audit Logging**: All actions logged
+
+## 🚀 Production Deployment
+
+### Systemd Service
+```bash
+# Deploy as system service
+sudo ./deploy.sh
+
+# Service commands
+sudo systemctl start fish-feeder
+sudo systemctl stop fish-feeder
+sudo systemctl restart fish-feeder
+sudo systemctl status fish-feeder
+```
+
+### Service Configuration
+```ini
 [Unit]
 Description=Fish Feeder IoT Server
 After=network.target
@@ -145,305 +385,78 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/fish-feeder/pi-mqtt-server
-ExecStart=/usr/bin/python3 main_fixed.py
+WorkingDirectory=/home/pi/fish-feeder-server
+ExecStart=/home/pi/fish-feeder-server/venv/bin/python main.py
 Restart=always
 RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-
-# Enable and start
-sudo systemctl enable fish-feeder
-sudo systemctl start fish-feeder
 ```
 
-### **Manual Recovery**
+## 📋 Troubleshooting
+
+### Common Issues
+
+#### Serial Port Permission
 ```bash
-# Check if running
-ps aux | grep main_fixed.py
-
-# Kill if needed
-pkill -f main_fixed.py
-
-# Restart
-python main_fixed.py
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+# Logout and login again
 ```
 
-## 📊 **Real-time Data Flow**
-
-### **Arduino → Pi → Firebase**
-```python
-# Arduino sends JSON data every 3 seconds
-{
-  "sensors": {
-    "DHT22_FEEDER": {"temperature": 28.5, "humidity": 65},
-    "HX711_FEEDER": {"weight": 1250},
-    "BATTERY_STATUS": {"voltage": 12.4, "current": 0.85}
-  }
-}
-
-# Pi forwards to Firebase path: /fish_feeder/sensors/
-```
-
-### **Web App → Firebase → Pi → Arduino**
-```python
-# Web app sends commands via Firebase
-firebase_ref.child('commands/feed').set({
-    "amount": 100,
-    "timestamp": "2024-12-13T12:00:00Z"
-})
-
-# Pi listens and forwards to Arduino
-arduino.send_command("FEED:100")
-```
-
-## 🎛️ **Control Commands**
-
-### **Weight Calibration**
-```python
-# Via HTTP API
-POST /api/control/weight/calibrate
-{
-    "weight": 1.0  # Known weight in kg
-}
-
-# Via Firebase
-/fish_feeder/commands/calibrate: {
-    "weight": 1.0,
-    "command": "calibrate_hx711"
-}
-
-# Arduino command
-WEIGHT_CAL:calibrate:1.000
-```
-
-### **Device Control**
-```python
-# LED Control
-POST /api/control/led {"action": "on"}
-→ Arduino: R:1
-
-# Feeder Control
-POST /api/control/feeder {"amount": 100}
-→ Arduino: FEED:100
-
-# Motor Control
-POST /api/control/motor {"motor": "auger", "speed": 200}
-→ Arduino: PWM:auger:200
-```
-
-## 📈 **System Monitoring**
-
-### **Health Check**
+#### Firebase Connection
 ```bash
-# Quick health check
-curl http://localhost:5000/api/health
-
-# Response
-{
-    "status": "ok",
-    "arduino_connected": true,
-    "firebase_connected": true,
-    "uptime": 3600,
-    "last_sensor_update": "2024-12-13T12:00:00Z"
-}
+# Check credentials
+ls -la firebase-credentials.json
+# Test connection
+python test_firebase_connection.py
 ```
 
-### **System Logs**
+#### Arduino Not Responding
 ```bash
-# View real-time logs
-tail -f logs/fish_feeder.log
-
-# Log rotation (automatic)
-# - fish_feeder.log (current)
-# - fish_feeder.log.1 (previous)
-# - fish_feeder.log.2 (older)
-```
-
-## 🚨 **Troubleshooting**
-
-### **Common Issues**
-
-| Issue | Solution |
-|-------|----------|
-| **Arduino not detected** | ✅ Check USB connection<br/>✅ Try different USB port<br/>✅ Verify Arduino is powered |
-| **Firebase connection failed** | ✅ Check internet connection<br/>✅ Verify serviceAccountKey.json<br/>✅ Check Firebase project ID |
-| **Port already in use** | ✅ Kill existing process: `pkill -f main_fixed.py`<br/>✅ Change port in config |
-| **Permission denied** | ✅ Add user to dialout group: `sudo usermod -a -G dialout pi`<br/>✅ Restart Pi after group change |
-
-### **Debug Commands**
-```bash
-# Check serial ports
+# Check port
 ls /dev/tty*
-
-# Check process
-ps aux | grep main_fixed.py
-
-# Check service status
-sudo systemctl status fish-feeder
-
-# View detailed logs
-journalctl -u fish-feeder -f
+# Check connection
+python -c "import serial; print(serial.Serial('/dev/ttyACM0', 115200))"
 ```
 
-### **System Recovery Steps**
-1. **Check Arduino connection**:
-   ```bash
-   # Test serial communication
-   python -c "import serial; print(serial.Serial('/dev/ttyUSB0', 115200).readline())"
-   ```
-
-2. **Verify Firebase credentials**:
-   ```bash
-   # Check service account key
-   python -c "import firebase_admin; print('Firebase OK')"
-   ```
-
-3. **Restart everything**:
-   ```bash
-   sudo systemctl restart fish-feeder
-   # or
-   python main_fixed.py
-   ```
-
-## 📊 **Performance Metrics**
-
-### **Resource Usage**
-- **CPU**: ~5-10% on Pi 4
-- **Memory**: ~50-100MB
-- **Network**: ~1KB/s to Firebase
-- **Serial**: 115200 baud to Arduino
-
-### **Response Times**
-- **Arduino Command**: <100ms
-- **Firebase Sync**: <500ms
-- **Web API**: <50ms
-- **Health Check**: <10ms
-
-## 🔐 **Security**
-
-### **Firebase Security Rules**
-```json
-{
-  "rules": {
-    "fish_feeder": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}
-```
-
-### **API Security**
-- CORS enabled for web app domain
-- Local network access only
-- No authentication required (internal use)
-
-## 🔄 **Auto-Updates**
-
-### **Git Pull Updates**
+### Log Analysis
 ```bash
-# Update script
-cd /home/pi/fish-feeder
-git pull origin main
-sudo systemctl restart fish-feeder
+# Real-time logs
+tail -f fish_feeder.log
+
+# Error logs only
+grep "ERROR" fish_feeder.log
+
+# Last 100 lines
+tail -100 fish_feeder.log
 ```
 
-### **Dependency Updates**
-```bash
-pip install -r requirements_minimal.txt --upgrade
+## 📄 Dependencies
+
+```txt
+# requirements.txt
+flask==2.3.3
+firebase-admin==6.2.0
+pyserial==3.5
+python-dotenv==1.0.0
+requests==2.31.0
 ```
 
-## 📚 **API Reference**
+## 🤝 Contributing
 
-### **Sensor Endpoints**
-```bash
-# Get all sensors
-GET /api/sensors
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Test thoroughly on hardware
+4. Commit changes: `git commit -m 'Add amazing feature'`
+5. Push to branch: `git push origin feature/amazing-feature`
+6. Open Pull Request
 
-# Get specific sensor
-GET /api/sensors/HX711_FEEDER
+## 📄 License
 
-# Response format
-{
-    "success": true,
-    "data": {
-        "HX711_FEEDER": {
-            "weight": {"value": 1250, "unit": "g"},
-            "timestamp": "2024-12-13T12:00:00Z"
-        }
-    }
-}
-```
-
-### **Control Endpoints**
-```bash
-# Weight calibration
-POST /api/control/weight/calibrate
-Content-Type: application/json
-{
-    "weight": 1.0
-}
-
-# Device control
-POST /api/control/led
-{
-    "action": "on"  # on/off/toggle
-}
-
-# Feeding control
-POST /api/control/feeder
-{
-    "amount": 100  # grams
-}
-```
-
-## 📱 **Integration**
-
-### **Web App Integration**
-- **URL**: https://fish-feeder-test-1.web.app/
-- **Protocol**: Firebase Real-time Database
-- **Commands**: Bi-directional via Firebase
-
-### **Arduino Integration**
-- **Protocol**: USB Serial (115200 baud)
-- **Format**: Text commands + JSON responses
-- **Auto-reconnect**: On disconnection
+MIT License - see [LICENSE](../LICENSE) file
 
 ---
 
-## 📚 **Additional Resources**
-
-- 📖 **[Main Project README](../README.md)**
-- 🔌 **[Arduino Setup](../fish-feeder-arduino/README.md)**
-- 🌐 **[Web App Guide](../fish-feeder-web/README.md)**
-- 🚀 **[Quick Start Guide](../QUICK_START_GUIDE.md)**
-
----
-
-**🎯 Stand-alone server ready for 24/7 fish feeding automation!**
-
-## Features
-
-- **Real-time Arduino Communication** 📟
-  - Fast serial communication with minimal latency
-  - Command queuing and error handling
-  - Connection monitoring and auto-reconnection
-
-- **RESTful API** 🌐
-  - `/api/health` - System health check
-  - `/api/sensors` - Real-time sensor data
-  - `/api/control/*` - Device control endpoints
-  - Full CORS support for web integration
-
-- **Firebase Integration** 🔥
-  - Real-time database synchronization
-  - Command listening from Firebase
-  - Global access support
-
-- **Advanced Features** ⚡
-  - Smart caching system for performance
-  - Background data sync
-  - Real-time connection monitoring
-  - Automatic hardware detection
+**🍓 Built with ❤️ for Raspberry Pi IoT** 

@@ -116,24 +116,22 @@ const FeedControlModular = () => {
 
   const fetchFeedHistory = async () => {
     try {
-      const mockHistory = [
-        { amount: 100, type: "breakfast", timestamp: new Date().toISOString() }
-      ];
-      setFeedHistory(mockHistory);
+      // 🔥 NO MOCK DATA - Must fetch from Firebase
+      setFeedHistory([]);
     } catch (error) {
-      console.error("Failed to fetch feed history:", error);
+      console.error("Failed to fetch feed history from Firebase:", error);
     }
   };
 
   const fetchFeedStatistics = async () => {
     try {
-      const mockStats = {
-        today_total: 250,
-        weekly_average: 300
-      };
-      setFeedStatistics(mockStats);
+      // 🔥 NO MOCK DATA - Must fetch from Firebase
+      setFeedStatistics({
+        today_total: 0,
+        weekly_average: 0
+      });
     } catch (error) {
-      console.error("Failed to fetch feed statistics:", error);
+      console.error("Failed to fetch feed statistics from Firebase:", error);
     }
   };
 
@@ -154,11 +152,10 @@ const FeedControlModular = () => {
       
       setLastFeedTime(new Date().toLocaleString());
       
-      setTimeout(() => {
-        fetchCurrentWeight();
-        fetchFeedHistory();
-        fetchFeedStatistics();
-      }, 2000);
+      // ✅ IMMEDIATE DATA REFRESH - No setTimeout delays!
+      fetchCurrentWeight();
+      fetchFeedHistory();
+      fetchFeedStatistics();
 
     } catch (error) {
       console.error("Feed operation failed:", error);

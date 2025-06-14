@@ -15,12 +15,12 @@ const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
 const SimpleControl = lazy(() => import("@/pages/SimpleControl"));
 const FeedControl = lazy(() => import("@/pages/FeedControlPanel"));
 const FanTempControl = lazy(() => import("@/pages/FanTempControl"));
-const MotorPWM = lazy(() => import("@/pages/MotorPWM"));
+
 const Settings = lazy(() => import("@/pages/Settings"));
 const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const SensorCharts = lazy(() => import("@/pages/SensorCharts"));
-const JsonDebug = lazy(() => import("@/pages/JsonDebug"));
+
 
 // Simple, minimal loading component
 const LoadingSpinner = () => (
@@ -153,10 +153,10 @@ const AppContent = () => {
             <Route element={<FirebaseDashboard />} path="firebase-dashboard" />
             <Route element={<FeedControl />} path="feed-control" />
             <Route element={<FanTempControl />} path="fan-temp-control" />
-            <Route element={<MotorPWM />} path="motor-pwm" />
+    
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
-            <Route element={<JsonDebug />} path="json-debug" />
+    
             <Route element={<Settings />} path="settings" />
             <Route element={<SimpleControl />} path="simple-control" />
           </Route>

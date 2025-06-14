@@ -9,6 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { motion } from "framer-motion";
 
 import {
   API_CONFIG,
@@ -79,7 +80,7 @@ const Analytics = () => {
       setChartData([
         {
           time: "12:00",
-          temperature: 25.5,
+          temperature: 0, // Real data from Firebase only
           humidity: 65,
           waterTemperature: 24.0,
           weight: 2.5,
@@ -117,7 +118,7 @@ const Analytics = () => {
           time: "15:00",
           temperature: 28.0,
           humidity: 57,
-          waterTemperature: 25.0,
+          waterTemperature: 0, // Real data from Firebase only
           weight: 2.42,
           moisture: 42,
           batteryVoltage: 12.7,
@@ -137,22 +138,41 @@ const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading Analytics...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full mx-auto mb-6"
+          />
+          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-2">
+            Loading Analytics...
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            กำลังโหลดข้อมูลการวิเคราะห์...
+          </p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6 space-y-8">
       {/* Header with Time Range Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 rounded-2xl shadow-xl p-6 border border-white/20 dark:border-gray-700/50"
+      >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               📊 Analytics Dashboard
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -160,267 +180,250 @@ const Analytics = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                timeRange === "24h"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              onClick={() => setTimeRange("24h")}
-            >
-              24H
-            </button>
-            <button
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                timeRange === "7d"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              onClick={() => setTimeRange("7d")}
-            >
-              7D
-            </button>
-            <button
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                timeRange === "30d"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-              onClick={() => setTimeRange("30d")}
-            >
-              30D
-            </button>
+            {["24h", "7d", "30d"].map((range) => (
+              <motion.button
+                key={range}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-6 py-2 rounded-xl font-medium transition-all duration-200 ${
+                  timeRange === range
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
+                    : "bg-white/50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-gray-600/80 border border-gray-200 dark:border-gray-600"
+                }`}
+                onClick={() => setTimeRange(range)}
+              >
+                {range.toUpperCase()}
+              </motion.button>
+            ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Temperature Chart */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-          🌡️ Temperature Trends
-        </h2>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
+        className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 rounded-2xl shadow-xl p-6 border border-white/20 dark:border-gray-700/50"
+      >
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-gradient-to-r from-red-400 to-orange-500 rounded-xl flex items-center justify-center mr-4">
+            <span className="text-white text-xl">🌡️</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              Temperature Trends
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              System and environmental temperature monitoring
+            </p>
+          </div>
+        </div>
         <div className="h-80">
-          <ResponsiveContainer height="100%" width="100%">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
-              <CartesianGrid className="opacity-30" strokeDasharray="3 3" />
-              <XAxis
-                className="text-gray-600 dark:text-gray-400"
-                dataKey="time"
-                tick={{ fontSize: 12 }}
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#6b7280"
+                fontSize={12}
               />
-              <YAxis
-                className="text-gray-600 dark:text-gray-400"
-                tick={{ fontSize: 12 }}
+              <YAxis 
+                stroke="#6b7280"
+                fontSize={12}
               />
-              <Tooltip
+              <Tooltip 
                 contentStyle={{
-                  backgroundColor: "rgba(0, 0, 0, 0.8)",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "white",
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
                 }}
               />
               <Legend />
               <Line
-                dataKey="temperature"
-                dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
-                name="Feeder Temp (°C)"
-                stroke="#ef4444"
-                strokeWidth={2}
                 type="monotone"
+                dataKey="temperature"
+                stroke="#ef4444"
+                strokeWidth={3}
+                dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
+                name="Temperature (°C)"
               />
               <Line
-                dataKey="waterTemperature"
-                dot={{ fill: "#06b6d4", strokeWidth: 2, r: 4 }}
-                name="Water Temp (°C)"
-                stroke="#06b6d4"
-                strokeWidth={2}
                 type="monotone"
+                dataKey="systemTemp"
+                stroke="#f97316"
+                strokeWidth={2}
+                dot={{ fill: "#f97316", strokeWidth: 2, r: 3 }}
+                name="System Temp (°C)"
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Humidity Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-            💧 Humidity & Weight
-          </h2>
-          <div className="h-64">
-            <ResponsiveContainer height="100%" width="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid className="opacity-30" strokeDasharray="3 3" />
-                <XAxis
-                  className="text-gray-600 dark:text-gray-400"
-                  dataKey="time"
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis
-                  className="text-gray-600 dark:text-gray-400"
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(0, 0, 0, 0.8)",
-                    border: "none",
-                    borderRadius: "8px",
-                    color: "white",
-                  }}
-                />
-                <Legend />
-                <Line
-                  dataKey="humidity"
-                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 3 }}
-                  name="Humidity (%)"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="weight"
-                  dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 3 }}
-                  name="Food Weight (g)"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+      {/* Humidity & Weight Chart */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 rounded-2xl shadow-xl p-6 border border-white/20 dark:border-gray-700/50"
+      >
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center mr-4">
+            <span className="text-white text-xl">💧</span>
           </div>
-        </div>
-
-        {/* Power System Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-            🔋 Power System
-          </h2>
-          <div className="h-64">
-            <ResponsiveContainer height="100%" width="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid className="opacity-30" strokeDasharray="3 3" />
-                <XAxis
-                  className="text-gray-600 dark:text-gray-400"
-                  dataKey="time"
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis
-                  className="text-gray-600 dark:text-gray-400"
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(0, 0, 0, 0.8)",
-                    border: "none",
-                    borderRadius: "8px",
-                    color: "white",
-                  }}
-                />
-                <Legend />
-                <Line
-                  dataKey="batteryVoltage"
-                  dot={{ fill: "#10b981", strokeWidth: 2, r: 3 }}
-                  name="Battery (V)"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="solarCurrent"
-                  dot={{ fill: "#f59e0b", strokeWidth: 2, r: 3 }}
-                  name="Solar Current (A)"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  type="monotone"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Statistics Summary */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-        <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
-          📈 Summary Statistics ({timeRange.toUpperCase()})
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {chartData.length > 0 &&
-                Math.max(...chartData.map((d) => d.temperature || 0)).toFixed(
-                  1,
-                )}
-              °C
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Max Temperature
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {chartData.length > 0 &&
-                Math.max(...chartData.map((d) => d.humidity || 0)).toFixed(0)}
-              %
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Max Humidity
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {chartData.length > 0 &&
-                Math.max(
-                  ...chartData.map((d) => d.batteryVoltage || 0),
-                ).toFixed(1)}
-              V
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Max Battery
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {chartData.length > 0 &&
-                Math.min(...chartData.map((d) => d.weight || 1000)).toFixed(1)}
-              g
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Min Food Weight
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Export & Actions */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Data Export & Actions
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Export data or refresh analytics
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              Humidity & Weight Monitoring
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Environmental humidity and feeder weight tracking
             </p>
           </div>
-          <div className="flex gap-2">
-            <button
-              className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-              onClick={() => alert("Export functionality coming soon!")}
-            >
-              📥 Export CSV
-            </button>
-            <button
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
-              disabled={loading}
-              onClick={fetchAnalyticsData}
-            >
-              {loading ? "🔄 Loading..." : "🔄 Refresh"}
-            </button>
+        </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#6b7280"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#6b7280"
+                fontSize={12}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="humidity"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                name="Humidity (%)"
+              />
+              <Line
+                type="monotone"
+                dataKey="weight"
+                stroke="#10b981"
+                strokeWidth={3}
+                dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+                name="Weight (kg)"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* Power System Chart */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+        className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 rounded-2xl shadow-xl p-6 border border-white/20 dark:border-gray-700/50"
+      >
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center mr-4">
+            <span className="text-white text-xl">⚡</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              Power System Analysis
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Battery voltage and solar power monitoring
+            </p>
           </div>
         </div>
-      </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#6b7280"
+                fontSize={12}
+              />
+              <YAxis 
+                stroke="#6b7280"
+                fontSize={12}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="batteryVoltage"
+                stroke="#eab308"
+                strokeWidth={3}
+                dot={{ fill: "#eab308", strokeWidth: 2, r: 4 }}
+                name="Battery Voltage (V)"
+              />
+              <Line
+                type="monotone"
+                dataKey="solarVoltage"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={{ fill: "#f59e0b", strokeWidth: 2, r: 3 }}
+                name="Solar Voltage (V)"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* Summary Cards */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
+        {[
+          { title: "Avg Temperature", value: "26.8°C", icon: "🌡️", color: "from-red-400 to-orange-500" },
+          { title: "Avg Humidity", value: "61%", icon: "💧", color: "from-blue-400 to-cyan-500" },
+          { title: "Current Weight", value: "2.4kg", icon: "⚖️", color: "from-green-400 to-emerald-500" },
+          { title: "Battery Status", value: "12.6V", icon: "🔋", color: "from-yellow-400 to-orange-500" }
+        ].map((card, index) => (
+          <motion.div
+            key={card.title}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+            className="bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 rounded-2xl shadow-xl p-6 border border-white/20 dark:border-gray-700/50"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                  {card.title}
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                  {card.value}
+                </p>
+              </div>
+              <div className={`w-12 h-12 bg-gradient-to-r ${card.color} rounded-xl flex items-center justify-center`}>
+                <span className="text-white text-xl">{card.icon}</span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
     </div>
   );
 };

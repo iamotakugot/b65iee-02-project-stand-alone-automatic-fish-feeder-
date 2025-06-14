@@ -165,7 +165,7 @@ void showSystemStatus();
 // ===== SETUP =====
 void setup() {
   Serial.begin(115200);
-  while (!Serial) delay(10);
+  // Serial will be ready when first command is received
   
   initializeHardware();
   loadConfiguration();
@@ -182,7 +182,6 @@ void setup() {
   Serial.println(F("🚀 Fish Feeder Arduino Ready - 100% Reference Compatible"));
   Serial.println(F("📋 Type 'MENU' for menu system"));
   Serial.println(F("🔥 Firebase commands: R:1, R:2, R:3, R:4, FEED:50, B:1:255, A:1, A:2"));
-  delay(1000);
 }
 
 // ===== MAIN LOOP =====

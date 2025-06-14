@@ -1,5 +1,5 @@
 // Firebase configuration and client
-import { initializeApp, getApps, FirebaseApp } from "firebase/app";
+import { initializeApp, FirebaseApp } from "firebase/app";
 import {
   getDatabase,
   Database,
@@ -14,7 +14,7 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyClORmzLSHy9Zj38RlJudEb4sUNStVX2zc",
   authDomain: "b65iee-02-fishfeederstandalone.firebaseapp.com",
-  databaseURL: "https://b65iee-02-fishfeederstandalone-default-rtdb.firebaseio.com/",
+  databaseURL: "https://b65iee-02-fishfeederstandalone-default-rtdb.asia-southeast1.firebasedatabase.app/",
   projectId: "b65iee-02-fishfeederstandalone",
   storageBucket: "b65iee-02-fishfeederstandalone.firebasestorage.app",
   messagingSenderId: "823036841241",
@@ -132,70 +132,123 @@ export interface FirebaseData {
   };
 }
 
-// Firebase client class
-class FirebaseClient {
-  private app: FirebaseApp;
+// ⚡ GLOBAL SINGLETON FIREBASE LISTENER MANAGER
+class GlobalFirebaseListenerManager {
+  private static instance: GlobalFirebaseListenerManager | null = null;
+  private activeListener: (() => void) | null = null;
+  private listenerCallbacks: Set<(data: FirebaseData | null) => void> = new Set();
   private database: Database;
+  private lastData: FirebaseData | null = null;
 
-  constructor() {
-    // Initialize Firebase app only if it doesn't exist
-    if (getApps().length === 0) {
-      this.app = initializeApp(firebaseConfig);
-    } else {
-      this.app = getApps()[0];
-    }
-    this.database = getDatabase(this.app);
+  private constructor(database: Database) {
+    this.database = database;
   }
 
-  // Get real-time sensor data updates
-  getSensorData(callback: (data: FirebaseData | null) => void): () => void {
-    const sensorsRef = ref(this.database, "sensors");
+  static getInstance(database: Database): GlobalFirebaseListenerManager {
+    if (!GlobalFirebaseListenerManager.instance) {
+      GlobalFirebaseListenerManager.instance = new GlobalFirebaseListenerManager(database);
+    }
+    return GlobalFirebaseListenerManager.instance;
+  }
+
+  addCallback(callback: (data: FirebaseData | null) => void): () => void {
+    console.log("🔥 Adding Firebase callback to global manager");
+    this.listenerCallbacks.add(callback);
+
+    // Send last known data immediately if available
+    if (this.lastData) {
+      try {
+        callback(this.lastData);
+      } catch (error) {
+        console.error("❌ Immediate callback error:", error);
+      }
+    }
+
+    // Create listener if none exists
+    if (!this.activeListener) {
+      this.createListener();
+    }
+
+    // Return cleanup function
+    return () => {
+      this.listenerCallbacks.delete(callback);
+      if (this.listenerCallbacks.size === 0 && this.activeListener) {
+        this.activeListener();
+        this.activeListener = null;
+        console.log("🔥 Global Firebase listener stopped - no more callbacks");
+      }
+    };
+  }
+
+  private createListener(): void {
+    console.log("🔥 Creating global Firebase listener");
+    const fishFeederRef = ref(this.database, "fish_feeder");
+    let isActive = true;
 
     const unsubscribe = onValue(
-      sensorsRef,
+      fishFeederRef,
       (snapshot) => {
-        const data = snapshot.val();
-        console.log("🔥 Firebase raw data received:", data);
+        if (!isActive) return;
+        
+        try {
+          const rawData = snapshot.val();
+          console.log("🔥 Global Firebase raw data received:", rawData);
 
-        if (data) {
-          // ✅ แก้ไข: รองรับหลายรูปแบบข้อมูล
-          const firebaseData: FirebaseData = {
-            timestamp: data.timestamp || new Date().toISOString(),
-            sensors: data.sensors || {}, // รองรับกรณีไม่มี sensors
-            status: {
-              online: data.status?.online ?? true,
-              last_updated: data.timestamp || new Date().toISOString(),
-              arduino_connected: data.status?.arduino_connected ?? false
-            },
-            control: data.control || data.controls // รองรับทั้ง control และ controls
-          };
-          
-          console.log("📡 Firebase processed data:", {
-            timestamp: firebaseData.timestamp,
-            hasSensors: !!firebaseData.sensors && Object.keys(firebaseData.sensors).length > 0,
-            status: firebaseData.status,
-            hasControl: !!firebaseData.control
-          });
-          
-          callback(firebaseData);
-        } else {
-          console.log("❌ No Firebase data received");
-          // ส่งข้อมูลว่างแทนที่จะส่ง null
-          const emptyData: FirebaseData = {
-            timestamp: new Date().toISOString(),
-            sensors: {},
-            status: {
-              online: false,
-              last_updated: new Date().toISOString(),
-              arduino_connected: false
+          // ⚡ SIMPLE DATA PROCESSING - No complex variable declarations
+          let processedData: FirebaseData;
+
+          if (rawData) {
+            processedData = {
+              timestamp: rawData.timestamp || new Date().toISOString(),
+              sensors: rawData.sensors || {},
+              status: {
+                online: rawData.status?.online ?? true,
+                last_updated: rawData.timestamp || new Date().toISOString(),
+                arduino_connected: rawData.status?.arduino_connected ?? false
+              },
+              control: rawData.control || rawData.controls
+            };
+          } else {
+            processedData = {
+              timestamp: new Date().toISOString(),
+              sensors: {},
+              status: {
+                online: false,
+                last_updated: new Date().toISOString(),
+                arduino_connected: false
+              }
+            };
+          }
+
+          // Store last data
+          this.lastData = processedData;
+
+          // ⚡ SAFE CALLBACK EXECUTION
+          const callbacks = Array.from(this.listenerCallbacks);
+          callbacks.forEach(callback => {
+            try {
+              callback(processedData);
+            } catch (error) {
+              console.error("❌ Global callback error:", error);
             }
-          };
-          callback(emptyData);
+          });
+
+        } catch (error) {
+          console.error("❌ Global Firebase data processing error:", error);
+          const callbacks = Array.from(this.listenerCallbacks);
+          callbacks.forEach(callback => {
+            try {
+              callback(null);
+            } catch (error) {
+              console.error("❌ Global callback error:", error);
+            }
+          });
         }
       },
       (error) => {
-        console.error("🔥 Firebase sensor data listener error:", error);
-        // ส่งข้อมูลว่างในกรณีเกิดข้อผิดพลาด
+        if (!isActive) return;
+        console.error("❌ Global Firebase error:", error);
+        
         const errorData: FirebaseData = {
           timestamp: new Date().toISOString(),
           sensors: {},
@@ -205,11 +258,45 @@ class FirebaseClient {
             arduino_connected: false
           }
         };
-        callback(errorData);
-      },
+
+        const callbacks = Array.from(this.listenerCallbacks);
+        callbacks.forEach(callback => {
+          try {
+            callback(errorData);
+          } catch (error) {
+            console.error("❌ Global callback error:", error);
+          }
+        });
+      }
     );
 
-    return () => off(sensorsRef, "value", unsubscribe);
+    this.activeListener = () => {
+      isActive = false;
+      off(fishFeederRef, "value", unsubscribe);
+      console.log("🔥 Global Firebase listener unsubscribed");
+    };
+  }
+}
+
+// Firebase client class
+class FirebaseClient {
+  private app: FirebaseApp;
+  private database: Database;
+  
+  constructor() {
+    // Initialize Firebase app only if it doesn't exist
+    this.app = initializeApp(firebaseConfig);
+    this.database = getDatabase(this.app);
+    console.log("🔥 Firebase initialized successfully");
+  }
+
+  // Get real-time sensor data updates with proper cleanup
+  getSensorData(callback: (data: FirebaseData | null) => void): () => void {
+    console.log("🔥 Using global Firebase listener manager");
+    
+    // ⚡ USE GLOBAL SINGLETON MANAGER
+    const globalManager = GlobalFirebaseListenerManager.getInstance(this.database);
+    return globalManager.addCallback(callback);
   }
 
   // Get real-time status updates (legacy compatibility)

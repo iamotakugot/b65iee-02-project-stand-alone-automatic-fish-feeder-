@@ -26,9 +26,13 @@ import {
   FaArrowUp,
   FaArrowDown,
   FaTabletAlt,
+  FaSlidersH,
 } from "react-icons/fa";
-import { MdInfo, MdAutoDelete, MdBackup, MdScale } from "react-icons/md";
+import { MdInfo, MdAutoDelete, MdBackup, MdScale, MdTune } from "react-icons/md";
 import { FishFeederApiClient, API_CONFIG } from "../config/api";
+import { useApi } from "../contexts/ApiContext";
+import MotorPWMSettings from "../components/MotorPWMSettings";
+import JsonDebugSettings from "../components/JsonDebugSettings";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -937,6 +941,12 @@ const Settings = () => {
             </Button>
           </div>
         </div>
+
+        {/* Motor & PWM Control Settings */}
+        <MotorPWMSettings />
+
+        {/* Firebase JSON Debug Settings */}
+        <JsonDebugSettings />
 
         {/* Auto Feed Configuration */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">

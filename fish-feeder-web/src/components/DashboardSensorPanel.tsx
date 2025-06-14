@@ -60,28 +60,24 @@ const SensorCard: React.FC<SensorCardProps> = ({
   );
 };
 
-// Development example data generator (remove in production)
-function generateExampleData(): DashboardSensorValues {
-  const now = new Date();
-  const temp = 25 + Math.sin(now.getTime() / 30000) * 5; // temperature oscillation
-  const humidity = 60 + Math.sin(now.getTime() / 20000 + 1) * 15; // humidity oscillation
-  
-  return {
-    feederTemp: 25.3 + Math.random() * 3,
-    feederHumidity: 64.2 + Math.random() * 10,
-    systemTemp: 32.1 + Math.random() * 2,
-    systemHumidity: 58.5 + Math.random() * 8,
-    feederWeight: 1384.2 + Math.random() * 100,
-    weight: 1384.2 + Math.random() * 100,
-    batteryVoltage: 12.5 + Math.random() * 0.5,
-    batteryPercentage: 82 + Math.random() * 15,
-    loadVoltage: 12.1 + Math.random() * 0.3,
-    loadCurrent: 0.3 + Math.random() * 0.2,
-    solarVoltage: 0.0 + Math.random() * 0.1,
-    solarCurrent: 0.0 + Math.random() * 0.05,
-    soilMoisture: 44.2 + Math.random() * 10,
-  };
-}
+  // 🔥 NO MOCK DATA GENERATOR - All data must come from Firebase
+  function getEmptyData(): DashboardSensorValues {
+    return {
+      feederTemp: 0,
+      feederHumidity: 0,
+      systemTemp: 0,
+      systemHumidity: 0,
+      feederWeight: 0,
+      weight: 0,
+      batteryVoltage: 0,
+      batteryPercentage: 0,
+      loadVoltage: 0,
+      loadCurrent: 0,
+      solarVoltage: 0,
+      solarCurrent: 0,
+      soilMoisture: 0,
+    };
+  }
 
 // Connection Status Component
 const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
@@ -181,9 +177,10 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
   const values = convertFirebaseToSensorValues(sensorData);
   
   // Use example data if no real data available (for development)
+  // 🔥 NO MOCK DATA - Only use real Firebase data or show zeros
   const displayValues = Object.values(values).some(v => v !== null) 
     ? values 
-    : generateExampleData();
+    : getEmptyData();
 
   const hasRealData = Object.values(values).some(v => v !== null);
 

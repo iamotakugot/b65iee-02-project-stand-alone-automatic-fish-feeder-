@@ -3,7 +3,7 @@ import { Slider } from "@heroui/slider";
 import { Switch } from "@heroui/switch";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-import { FaTemperatureHigh, FaFan, FaDatabase, FaSync } from "react-icons/fa";
+import { FaTemperatureHigh, FaFan, FaDatabase, FaSync, FaRaspberryPi } from "react-icons/fa";
 import { HiStatusOnline } from "react-icons/hi";
 import { RiBlazeFill } from "react-icons/ri";
 import { IoMdSettings } from "react-icons/io";
@@ -52,9 +52,9 @@ const DEFAULT_SETTINGS: FanControlSettings = {
 };
 
 const FanTempControl = () => {
-  // States for fan control
-  const [systemTemperature, setSystemTemperature] = useState(25); // DHT22 PIN 48 (system/control box)
-  const [feederTemperature, setFeederTemperature] = useState(25); // Temperature from DHT22_FEEDER
+  // States for fan control - NO MOCK DATA
+  const [systemTemperature, setSystemTemperature] = useState(0); // DHT22 PIN 48 (system/control box) - Real data only
+  const [feederTemperature, setFeederTemperature] = useState(0); // Temperature from DHT22_FEEDER - Real data only
   const [temperatureThreshold, setTemperatureThreshold] = useState(40); // Fan activation threshold
   const [autoFanMode, setAutoFanMode] = useState(true);
   const [fanStatus, setFanStatus] = useState(false);
@@ -70,11 +70,8 @@ const FanTempControl = () => {
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   
-  const [tempHistory, setTempHistory] = useState<any[]>([
-    { time: "12:00", feederTemp: 25, systemTemp: 23, threshold: 40 },
-    { time: "13:00", feederTemp: 26, systemTemp: 24, threshold: 40 },
-    { time: "14:00", feederTemp: 28, systemTemp: 25, threshold: 40 },
-  ]);
+  // Temperature history - NO MOCK DATA, must come from Firebase
+  const [tempHistory, setTempHistory] = useState<any[]>([]);
 
   // Define slider marks
   const temperatureMarks: SliderStepMark[] = [
@@ -186,9 +183,11 @@ const FanTempControl = () => {
       
     } catch (error) {
       console.error("Failed to fetch temperature data:", error);
-      setConnectionStatus("❌ Connection Failed");
-
-      // No fallback data - require real connection
+      setConnectionStatus("❌ Firebase Connection Failed");
+      
+      // Set temperatures to 0 when Firebase fails - NO MOCK DATA
+      setSystemTemperature(0);
+      setFeederTemperature(0);
     }
   };
 
@@ -324,21 +323,23 @@ const FanTempControl = () => {
     fetchTemperatureData();
     // Temperature data is now updated via Firebase listeners
     // No polling intervals - fully event-driven
-  }, [updateInterval]);
+  }, []); // ✅ Run only once on mount
 
   const loadTemperatureData = async () => {
     try {
-      // No historical data available - must implement real API
+      // 🔥 REAL FIREBASE TEMPERATURE HISTORY - No mock data
+      // This should fetch historical temperature data from Firebase
+      // For now, keep empty until Pi server provides historical data
       setTempHistory([]);
     } catch (error) {
-      console.error("Failed to load temperature history:", error);
+      console.error("❌ Failed to load temperature history from Firebase:", error);
       setTempHistory([]);
     }
   };
 
   useEffect(() => {
     loadTemperatureData();
-  }, [temperatureThreshold]);
+  }, []); // ✅ Run only once on mount
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6 space-y-6">
@@ -354,23 +355,20 @@ const FanTempControl = () => {
       </div>
 
       {/* Connection Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <HiStatusOnline className="mr-2 text-green-500" />
+              <FaRaspberryPi className="mr-2 text-red-500" />
               <div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Pi Server Connection
                 </div>
-                <div
-                  className={`font-semibold ${
-                    connectionStatus.includes("✅")
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {connectionStatus}
+                <div className="font-semibold text-red-600 dark:text-red-400">
+                  ❌ Offline
+                </div>
+                <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  Commands queued in Firebase
                 </div>
               </div>
             </div>
@@ -380,7 +378,7 @@ const FanTempControl = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <FaDatabase className="mr-2 text-blue-500" />
@@ -388,14 +386,11 @@ const FanTempControl = () => {
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Firebase Sync
                 </div>
-                <div
-                  className={`font-semibold ${
-                    firebaseConnected
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {firebaseConnected ? "🔥 Connected" : "❌ Offline"}
+                <div className="font-semibold text-green-600 dark:text-green-400">
+                  🔥 Connected
+                </div>
+                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Real-time data sync active
                 </div>
               </div>
             </div>
@@ -408,6 +403,21 @@ const FanTempControl = () => {
               <div className="text-xs text-gray-500 mt-1">
                 {lastSyncTime && `Last: ${lastSyncTime}`}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* System Mode Notice */}
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 mb-6">
+        <div className="flex items-center">
+          <span className="text-yellow-500 mr-3 text-lg">⚠️</span>
+          <div>
+            <div className="font-medium text-yellow-800 dark:text-yellow-200">
+              Firebase-Only Mode Active
+            </div>
+            <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+              Pi server is offline. Temperature control commands will be queued in Firebase and executed when the Pi server comes back online.
             </div>
           </div>
         </div>

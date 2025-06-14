@@ -2,23 +2,24 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
-// Firebase config (replace with your actual config from Firebase Console)
+// Firebase config - Replace with your actual config from Firebase Console
 const firebaseConfig = {
   databaseURL: "https://b65iee-02-fishfeederstandalone-default-rtdb.asia-southeast1.firebasedatabase.app/",
-  // Add other config values from Firebase Console:
-  // apiKey: "your-api-key",
-  // authDomain: "your-project.firebaseapp.com", 
-  // projectId: "your-project-id",
-  // storageBucket: "your-project.appspot.com",
-  // messagingSenderId: "123456789",
-  // appId: "your-app-id"
+  // Add these from Firebase Console > Project Settings > General > Your apps
+  apiKey: "your-api-key-here",
+  authDomain: "b65iee-02-fishfeederstandalone.firebaseapp.com",
+  projectId: "b65iee-02-fishfeederstandalone",
+  storageBucket: "b65iee-02-fishfeederstandalone.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "your-app-id-here"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Realtime Database
+// Initialize Realtime Database and export
 export const database = getDatabase(app);
+export const auth = null; // For future use
 
 // Firebase paths
 export const FIREBASE_PATHS = {

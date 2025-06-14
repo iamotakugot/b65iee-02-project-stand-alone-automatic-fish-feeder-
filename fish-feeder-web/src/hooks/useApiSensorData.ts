@@ -3,13 +3,8 @@ import { useState, useCallback } from "react";
 // API Configuration
 const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-// Firebase-only mode detection
-const isFirebaseOnlyMode = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return window.location.hostname.includes('.web.app') || 
-         window.location.hostname.includes('firebaseapp.com') ||
-         window.location.protocol === 'https:' && window.location.hostname !== 'localhost';
-};
+// Import Firebase client for real-time database
+import { firebaseClient } from '../config/firebase';
 
 interface SensorData {
   feed_temperature: number;
@@ -69,17 +64,62 @@ export const useApiSensorData = (): UseApiSensorDataReturn => {
   const [lastUpdate, setLastUpdate] = useState("");
   const [isConnected, setIsConnected] = useState(false);
 
-  // Helper function for API calls with Firebase-only mode support
+  // Check if we should use Firebase Realtime Database instead of localhost API
+  const useFirebaseRealtime = (): boolean => {
+    return typeof window !== 'undefined' && 
+           (window.location.hostname.includes('.web.app') || 
+            window.location.hostname.includes('firebaseapp.com') ||
+            window.location.protocol === 'https:');
+  };
+
+  // Helper function for API calls - Use Firebase Realtime Database when appropriate
   const apiCall = async <T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T> | null> => {
-    // Check if we're in Firebase-only mode
-    if (isFirebaseOnlyMode()) {
-      console.log('🔥 Firebase-only mode active - returning mock response for:', endpoint);
-      return getMockApiResponse<T>(endpoint);
+    // If deployed on Firebase hosting, use Firebase Realtime Database
+    if (useFirebaseRealtime() && endpoint.includes('/sensors')) {
+      console.log('🔥 Using Firebase Realtime Database for sensor data');
+      try {
+        // ⚡ SIMPLE CALLBACK APPROACH - No complex Promise structures
+        return new Promise<ApiResponse<T> | null>((resolve) => {
+          let isResolved = false;
+          
+          const unsubscribe = firebaseClient.getSensorData((data) => {
+            if (isResolved) return;
+            isResolved = true;
+            unsubscribe();
+            
+            if (data) {
+              resolve({
+                status: 'success',
+                data: data.sensors as T || {} as T,
+                timestamp: data.timestamp || new Date().toISOString(),
+                source: 'firebase-realtime'
+              });
+            } else {
+              resolve(null);
+            }
+          });
+
+          // ⚡ SIMPLE TIMEOUT - No Promise.race
+          setTimeout(() => {
+            if (!isResolved) {
+              isResolved = true;
+              unsubscribe();
+              resolve(null);
+            }
+          }, 5000);
+        });
+
+      } catch (error) {
+        console.log('❌ Firebase Realtime Database error:', error);
+        setError('Firebase connection failed - Check database setup');
+        return null;
+      }
     }
 
+    // Use regular API for localhost development
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
@@ -101,44 +141,6 @@ export const useApiSensorData = (): UseApiSensorDataReturn => {
     }
   };
 
-  // Mock API response for Firebase-only mode
-  const getMockApiResponse = <T>(endpoint: string): ApiResponse<T> => {
-    const timestamp = new Date().toISOString();
-    
-    if (endpoint.includes('/sensors')) {
-      return {
-        status: 'success',
-        data: {
-          feed_temperature: 25.0,
-          feed_humidity: 60.0,
-          control_temperature: 24.0,
-          control_humidity: 58.0,
-          weight: 0,
-          battery_voltage: 12.6,
-          battery_current: 0.5,
-          solar_voltage: 18.2,
-          solar_current: 1.2,
-          soil_moisture: 45.0,
-          led_status: false,
-          fan_status: false,
-          blower_status: false,
-          actuator_state: 'stopped',
-          auger_state: 'stopped',
-          system_time: Date.now()
-        } as T,
-        timestamp,
-        source: 'firebase-mock'
-      };
-    }
-    
-    return {
-      status: 'success',
-      data: {} as T,
-      timestamp,
-      source: 'firebase-mock'
-    };
-  };
-
   // Fetch real-time sensor data from Arduino
   const fetchSensorData = useCallback(async (): Promise<boolean> => {
     setLoading(true);
@@ -148,18 +150,10 @@ export const useApiSensorData = (): UseApiSensorDataReturn => {
     
     if (response && response.status === 'success' && response.data) {
       setSensorData(response.data);
-      setIsConnected(response.source !== 'firebase-mock');
+      // Firebase realtime = connected, localhost API = connected, no response = disconnected
+      setIsConnected(true);
       setLastUpdate(new Date().toLocaleTimeString());
       console.log(`✅ Sensor data fetched (${response.source}):`, response.data);
-      setLoading(false);
-      return true;
-    } else if (response && response.source === 'firebase-mock') {
-      // Handle Firebase-only mode with mock data
-      setSensorData(response.data as SensorData);
-      setIsConnected(false); // Show as offline since it's mock data
-      setLastUpdate(new Date().toLocaleTimeString());
-      setError('Firebase-only mode - Connect Pi server for real data');
-      console.log('🔥 Firebase-only mode - Using mock sensor data');
       setLoading(false);
       return true;
     } else {

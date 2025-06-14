@@ -16,10 +16,10 @@ const QuickAccessPanel: React.FC = () => {
 
   const quickFeed = async (amount: number, type: string) => {
     setIsFeeding(true);
-    setLastAction(`Feeding ${amount}g...`);
+    setLastAction(`🍽️ Feeding ${amount}g...`);
     
     // Log button press
-    logger.buttonPress(`QUICK_FEED_${type.toUpperCase()}`, 'QuickAccessPanel', { amount, type });
+    logger.buttonPress('QUICK_FEED', 'QuickAccessPanel', { amount, type });
     
     try {
       const feedMapping = {
@@ -29,14 +29,14 @@ const QuickAccessPanel: React.FC = () => {
       };
       
       const preset = feedMapping[type as keyof typeof feedMapping] || 'medium';
-      const response = await controlFeeder(preset as 'small' | 'medium' | 'large');
+      const success = await controlFeeder(preset as 'small' | 'medium' | 'large');
       
-      if (response.status === 'success' || response.status === 'offline') {
+      if (success) {
         setLastAction(`✅ Fed ${amount}g successfully`);
-        logger.info('FEED', 'QUICK_FEED_SUCCESS', { amount, type, response });
+        logger.info('FEED', 'QUICK_FEED_SUCCESS', { amount, type, success });
       } else {
         setLastAction(`❌ Feed failed`);
-        logger.error('FEED', 'QUICK_FEED_FAILED', { amount, type, response });
+        logger.error('FEED', 'QUICK_FEED_FAILED', { amount, type, success });
       }
     } catch (error) {
       setLastAction(`❌ Feed error`);

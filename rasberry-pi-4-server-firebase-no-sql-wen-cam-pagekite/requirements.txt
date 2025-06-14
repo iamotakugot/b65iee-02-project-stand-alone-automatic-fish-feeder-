@@ -1,0 +1,17 @@
+# Fish Feeder Pi Server Requirements
+# Core dependencies
+flask==2.3.3
+flask-cors==4.0.0
+pyserial==3.5
+requests==2.31.0
+
+# Firebase dependencies
+firebase-admin==6.2.0
+
+# Optional dependencies for enhanced functionality
+python-dotenv==1.0.0
+schedule==1.2.0
+
+# Development dependencies (optional)
+pytest==7.4.2
+pytest-cov==4.1.0 

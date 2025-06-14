@@ -1,5 +1,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useApiSensorData } from '../hooks/useApiSensorData';
+import { firebaseClient } from '../config/firebase';
+import { generateCommandId, type FirebaseControlCommands } from '../types/json-protocol';
 
 interface ApiContextType {
   sensorData: any;
@@ -34,19 +36,19 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined);
 export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const apiHook = useApiSensorData();
 
-  // Enhanced auger control
+  // 🔥 REAL FIREBASE CONTROLS - Using JSON Protocol
   const controlAuger = async (action: 'on' | 'off' | 'forward' | 'reverse' | 'stop') => {
-    switch (action) {
-      case 'forward':
-      case 'on':
-        return await apiHook.sendCommand('G:1');
-      case 'reverse':
-        return await apiHook.sendCommand('G:2');
-      case 'stop':
-      case 'off':
-        return await apiHook.sendCommand('G:0');
-      default:
-        return false;
+    const augerAction = action === 'on' ? 'forward' : action === 'off' ? 'stop' : action;
+    
+    console.log(`🌀 Sending Auger command via Firebase: ${augerAction}`);
+    
+    try {
+      const success = await firebaseClient.controlAuger(augerAction as 'forward' | 'reverse' | 'stop');
+      console.log(`✅ Auger ${augerAction} command:`, success ? 'Success' : 'Failed');
+      return success;
+    } catch (error) {
+      console.error('❌ Auger control error:', error);
+      return false;
     }
   };
 
@@ -85,6 +87,66 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   };
 
+  // 🔥 FIREBASE REALTIME CONTROLS - Using Firebase directly instead of localhost API
+  const controlLED = async (action: 'on' | 'off' | 'toggle') => {
+    console.log(`💡 Sending LED command via Firebase: ${action}`);
+    return await firebaseClient.controlLED(action);
+  };
+
+  const controlFan = async (action: 'on' | 'off' | 'toggle') => {
+    console.log(`🌀 Sending Fan command via Firebase: ${action}`);
+    return await firebaseClient.controlFan(action);
+  };
+
+  const controlFeeder = async (action: 'small' | 'medium' | 'large' | number) => {
+    console.log(`🐟 Sending Feeder command via Firebase: ${action}`);
+    if (typeof action === 'number') {
+      // Custom amount feeding
+      return await firebaseClient.controlFeeder('auto');
+    }
+    return await firebaseClient.controlFeeder(action);
+  };
+
+  const controlBlower = async (action: 'on' | 'off' | 'toggle') => {
+    console.log(`💨 Sending Blower command via Firebase: ${action}`);
+    return await firebaseClient.controlBlower(action);
+  };
+
+  const controlActuator = async (action: 'up' | 'down' | 'stop') => {
+    console.log(`📏 Sending Actuator command via Firebase: ${action}`);
+    return await firebaseClient.controlActuator(action);
+  };
+
+  const setMotorPWM = async (motorId: string, speed: number) => {
+    console.log(`⚙️ Setting Motor PWM via Firebase: ${motorId} = ${speed}`);
+    return await firebaseClient.setMotorPWM(motorId, speed);
+  };
+
+  const setDeviceTiming = async (timings: { actuatorUp: number; actuatorDown: number; augerDuration: number; blowerDuration: number; }) => {
+    console.log(`⏱️ Setting Device Timing via Firebase:`, timings);
+    return await firebaseClient.setDeviceTiming(timings);
+  };
+
+  const calibrateWeight = async (knownWeight: number) => {
+    console.log(`⚖️ Calibrating Weight via Firebase: ${knownWeight}kg`);
+    return await firebaseClient.calibrateWeight(knownWeight);
+  };
+
+  const tareWeight = async () => {
+    console.log(`⚖️ Taring Weight via Firebase`);
+    return await firebaseClient.tareWeight();
+  };
+
+  const turnOffAll = async () => {
+    console.log(`🔴 Turning off all devices via Firebase`);
+    return await firebaseClient.turnOffAll();
+  };
+
+  const sendCommand = async (command: string) => {
+    console.log(`📤 Sending direct command via Firebase: ${command}`);
+    return await firebaseClient.sendArduinoCommand(command);
+  };
+
   const contextValue: ApiContextType = {
     sensorData: apiHook.sensorData,
     loading: apiHook.loading,
@@ -96,18 +158,19 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     syncToFirebase: apiHook.syncToFirebase,
     getSensors,
     getHealth,
-    controlLED: apiHook.controlLED,
-    controlFan: apiHook.controlFan,
-    controlFeeder: apiHook.controlFeeder,
-    controlBlower: apiHook.controlBlower,
-    controlActuator: apiHook.controlActuator,
+    // 🔥 ALL CONTROLS NOW USE FIREBASE REALTIME DATABASE
+    controlLED,
+    controlFan,
+    controlFeeder,
+    controlBlower,
+    controlActuator,
     controlAuger,
-    setMotorPWM: apiHook.setMotorPWM,
-    setDeviceTiming: apiHook.setDeviceTiming,
-    calibrateWeight: apiHook.calibrateWeight,
-    tareWeight: apiHook.tareWeight,
-    turnOffAll: apiHook.turnOffAll,
-    sendCommand: apiHook.sendCommand,
+    setMotorPWM,
+    setDeviceTiming,
+    calibrateWeight,
+    tareWeight,
+    turnOffAll,
+    sendCommand,
   };
 
   return (

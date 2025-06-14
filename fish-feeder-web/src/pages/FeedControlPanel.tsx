@@ -18,7 +18,7 @@ const FeedControlPanel = () => {
     controlAuger,
     getSensors,
     getHealth,
-    connected
+    isConnected
   } = useApi();
 
   const [connectionStatus, setConnectionStatus] = useState(
@@ -284,18 +284,18 @@ const FeedControlPanel = () => {
     setWeightBeforeFeed(currentWeight);
     
     try {
-      // Map feed type to API preset
-      const presetMapping: { [key: string]: 'small' | 'medium' | 'large' | 'xl' } = {
+      // Map feed type to API preset (only small, medium, large supported)
+      const presetMapping: { [key: string]: 'small' | 'medium' | 'large' } = {
         'small': 'small',
         'medium': 'medium',
         'large': 'large',
-        'xl': 'xl'
+        'xl': 'large' // Map xl to large since xl not supported
       };
       
       const preset = presetMapping[feedType] || 'medium';
-      const result = await controlFeeder(preset);
+      const success = await controlFeeder(preset);
       
-      if (result.status === 'success' || result.status === 'offline') {
+      if (success) {
         setLastFeedTime(new Date().toLocaleString());
         
         // Add to feed history
@@ -314,7 +314,7 @@ const FeedControlPanel = () => {
         
         console.log(`✅ Feed completed: ${feedAmount}g (${feedType})`);
       } else {
-        console.error("❌ Feed failed:", result);
+        console.error("❌ Feed failed:", success);
       }
     } catch (error) {
       console.error("❌ Feed error:", error);
@@ -445,7 +445,7 @@ const FeedControlPanel = () => {
               {connectionStatus}
             </div>
             <div className="text-gray-500 dark:text-gray-400">
-              API: {connected ? "Connected" : "Disconnected"}
+              API: {isConnected ? "Connected" : "Disconnected"}
             </div>
           </div>
         </div>
