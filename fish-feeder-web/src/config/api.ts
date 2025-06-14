@@ -700,103 +700,109 @@ export class FishFeederApiClient {
     useCache: boolean = true,
     timeout: number = API_CONFIG.TIMEOUT,
   ): Promise<any> {
-    // ตรวจสอบปัญหา CORS ก่อน
-    if (this.corsIssue) {
-      console.warn(`🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`);
+    // 🔥 SKIP ALL HTTP REQUESTS IN FIREBASE-ONLY MODE
+    if (API_CONFIG.FIREBASE_ONLY_MODE || this.baseURL === 'FIREBASE_ONLY_MODE') {
+      console.log('🔥 Firebase-only mode - Skipping HTTP request:', endpoint);
+      // Return a Firebase-only response
       return {
-        status: 'offline',
-        message: `CORS/Mixed Content: HTTPS site cannot access HTTP localhost. Open http://localhost:3000 or setup ngrok.`,
-        timestamp: new Date().toISOString(),
-        corsIssue: true
+        status: 'firebase_only',
+        message: 'Using Firebase-only mode - no HTTP requests',
+        firebase_mode: true,
+        timestamp: new Date().toISOString()
       };
     }
 
-    // Handle Firebase-only mode
-    if (API_CONFIG.FIREBASE_ONLY_MODE) {
-      console.log(`🔄 API Firebase-only Mode: Skipping ${endpoint}`);
-      throw new ApiError("Firebase-only mode - API not available", 503, endpoint);
+    // 🚫 EARLY DETECTION: Skip ถ้า URL ไม่ถูกต้อง
+    if (shouldSkipRequest(this.baseURL)) {
+      console.log('🚫 Skipping request due to invalid URL:', this.baseURL);
+      throw new ApiError(
+        `Request skipped - invalid URL: ${this.baseURL}`,
+        0,
+        endpoint
+      );
     }
-    const baseURL = this.baseURL || API_CONFIG.BASE_URL;
+
+    // Cache check
+    const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
+    if (useCache && (options.method === 'GET' || !options.method)) {
+      const cachedData = apiCache.get(cacheKey);
+      if (cachedData) {
+        console.log('📦 Cache hit:', endpoint);
+        return cachedData;
+      }
+    }
+
+    const url = `${this.baseURL}${endpoint}`;
     
-    // Get final URL - use ngrok if available, fallback to base URL
-    const secureBaseURL = baseURL;
-    const url = `${secureBaseURL}${endpoint}`;
-    const cacheKey = `${options.method || "GET"}:${url}`;
-
-    // Check cache for GET requests
-    if (options.method !== "POST" && useCache && apiCache.has(cacheKey)) {
-      return apiCache.get(cacheKey);
-    }
-
-    // Cancel previous request if exists
+    // Cancel previous request
     if (this.abortController) {
       this.abortController.abort();
     }
-
     this.abortController = new AbortController();
 
-    const fetchOptions: RequestInit = {
+    const requestOptions: RequestInit = {
       ...options,
       signal: this.abortController.signal,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         ...options.headers,
       },
     };
 
     try {
       const response = await withTimeout(
-        withRetry(() => silentFetch(url, fetchOptions)),
-        timeout,
+        silentFetch(url, requestOptions),
+        timeout
       );
 
       if (!response.ok) {
+        updateConnectionState(false);
         throw new ApiError(
           `HTTP ${response.status}: ${response.statusText}`,
           response.status,
-          endpoint,
+          endpoint
         );
       }
 
+      updateConnectionState(true);
       const data = await response.json();
 
-      // Cache successful GET responses
-      if (options.method !== "POST" && useCache && data.status === "success") {
+      // Cache successful GET requests
+      if (useCache && (options.method === 'GET' || !options.method)) {
         apiCache.set(cacheKey, data);
       }
 
       return data;
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.name === "AbortError") {
-          throw new ApiError("Request was cancelled", 0, endpoint);
-        }
-        
-        // Handle connection errors gracefully in production
-        if (error.message.includes('CONNECTION_FAILED') ||
-            error.message.includes('CONNECTION_FAILED_CACHED') ||
-            error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
-            error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
-            error.message.includes('CONNECTION_FAILED_OFFLINE') ||
-            error.message.includes('ERR_CONNECTION_REFUSED') || 
-            error.message.includes('Request timeout') ||
-            error.message.includes('Failed to fetch') ||
-            error.message.includes('fetch is not defined')) {
-          // Only log once per connection state change to reduce noise
-          if (error.message.includes('CONNECTION_FAILED_CACHED') || 
-              error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
-              error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
-              error.message.includes('CONNECTION_FAILED_OFFLINE')) {
-            // Don't log for cached/aggressive/intercepted failures - completely silent
-          } else {
-            console.log(`🔄 API connection failed for ${endpoint}, returning offline response`);
-          }
-          throw new ApiError("Connection failed - no offline fallback", 503, endpoint);
-        }
-        
-        throw new ApiError(error.message, 0, endpoint);
+      updateConnectionState(false);
+
+      if (error instanceof ApiError) {
+        throw error;
       }
-      throw error;
+
+      // Handle specific error types
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError('Request was cancelled', 0, endpoint);
+      }
+
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        this.corsIssue = true;
+        const corsCheck = checkCorsIssue();
+        if (corsCheck.hasCorsIssue) {
+          console.warn('🔐 CORS/Mixed Content Issue:', corsCheck.solution);
+          throw new ApiError(
+            `Connection failed: ${corsCheck.solution}`,
+            0,
+            endpoint
+          );
+        }
+      }
+
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Unknown error',
+        0,
+        endpoint
+      );
     }
   }
 

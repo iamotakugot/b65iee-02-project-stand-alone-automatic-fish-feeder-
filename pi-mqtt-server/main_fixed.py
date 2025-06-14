@@ -83,7 +83,7 @@ logger = setup_minimal_logging()
 class Config:
     # Arduino
     ARDUINO_PORT = 'COM3'
-    ARDUINO_BAUD = 115200
+    ARDUINO_BAUD = 115200  # ✅ ใช้ 115200 ทั้งหมด
     ARDUINO_TIMEOUT = 5  # เพิ่มเป็น 5 วินาที
     
     # Firebase
@@ -139,13 +139,20 @@ class ArduinoManager:
         self.connected = False
         
     def connect(self) -> bool:
-        """เชื่อมต่อ Arduino แบบ immediate - No delays!"""
+        """เชื่อมต่อ Arduino แบบ robust connection"""
         try:
             if not SERIAL_AVAILABLE:
                 logger.error("Serial not available")
                 return False
                 
-            logger.info(f"Connecting to Arduino on {Config.ARDUINO_PORT}...")
+            logger.info(f"Connecting to Arduino on {Config.ARDUINO_PORT} at {Config.ARDUINO_BAUD} baud...")
+            
+            # ปิด connection เก่าก่อน (ถ้ามี)
+            if self.serial_conn:
+                try:
+                    self.serial_conn.close()
+                except:
+                    pass
             
             self.serial_conn = serial.Serial(
                 Config.ARDUINO_PORT, 
@@ -153,12 +160,35 @@ class ArduinoManager:
                 timeout=Config.ARDUINO_TIMEOUT
             )
             
-            # ⚡ IMMEDIATE CONNECTION - No time.sleep delays!
+            # ให้เวลา Arduino initialize
+            import time
+            time.sleep(2)
+            
+            # Clear buffers
             self.serial_conn.flushInput()
             self.serial_conn.flushOutput()
             
+            # Test connection ด้วยการส่ง STATUS command
+            self.serial_conn.write(b'STATUS\n')
+            self.serial_conn.flush()
+            time.sleep(1.0)
+            
+            # อ่าน response
+            response_received = False
+            for _ in range(3):  # ลอง 3 ครั้ง
+                if self.serial_conn.in_waiting > 0:
+                    response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+                    if response:
+                        logger.info(f"Arduino response: {response}")
+                        response_received = True
+                        break
+                time.sleep(0.5)
+            
             self.connected = True
-            logger.info("✅ Arduino connected immediately")
+            if response_received:
+                logger.info("✅ Arduino connected and responding")
+            else:
+                logger.info("✅ Arduino connected (no initial response)")
             return True
                 
         except Exception as e:
@@ -178,45 +208,60 @@ class ArduinoManager:
             return {"arduino_connected": False}
             
         try:
+            # Clear input buffer ก่อน
+            self.serial_conn.flushInput()
+            
             # ✅ ส่งคำสั่ง STATUS เพื่อขอข้อมูล sensor ตาม Arduino protocol
             self.serial_conn.write(b'STATUS\n')
+            self.serial_conn.flush()
+            
+            import time
+            time.sleep(0.5)  # รอ Arduino ประมวลผล
             
             # Read response with timeout
-            for _ in range(5):  # Max 5 attempts
+            sensor_data_found = False
+            for attempt in range(10):  # เพิ่มเป็น 10 attempts
                 try:
-                    response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
-                    
-                    if response.startswith('[DATA]'):
-                        # Parse Arduino sensor data
-                        data_str = response[7:]  # Remove [DATA] prefix
-                        arduino_data = self._parse_simple_data(data_str)
-                        firebase_data = self._convert_to_firebase(arduino_data)
+                    if self.serial_conn.in_waiting > 0:
+                        response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
                         
-                        # Cache the result
-                        data_cache.set("sensors", firebase_data)
+                        if response:
+                            logger.debug(f"Arduino raw response: {response}")
+                            
+                            if response.startswith('[DATA]'):
+                                # Parse Arduino sensor data
+                                data_str = response[7:]  # Remove [DATA] prefix
+                                arduino_data = self._parse_simple_data(data_str)
+                                firebase_data = self._convert_to_firebase(arduino_data)
+                                
+                                # Cache the result
+                                data_cache.set("sensors", firebase_data)
+                                
+                                # 🔥 ส่งข้อมูลไป Firebase ทันที
+                                firebase_data["arduino_connected"] = True
+                                logger.info(f"📡 Arduino data: {len(arduino_data)} sensors")
+                                sensor_data_found = True
+                                return firebase_data
+                            
+                            # อาจจะมี response อื่นๆ ที่ไม่ใช่ [DATA]
+                            elif "ready" in response.lower() or "system" in response.lower():
+                                logger.info(f"Arduino status: {response}")
                         
-                        # 🔥 ส่งข้อมูลไป Firebase ทันที
-                        firebase_data["arduino_connected"] = True
-                        logger.info(f"📡 Arduino data: {len(arduino_data)} sensors")
-                        return firebase_data
-                        
-                    elif response and not response.startswith('['):
-                        # Handle other Arduino responses
-                        logger.debug(f"Arduino response: {response}")
-                        
-                except serial.SerialTimeoutException:
-                    logger.warning("Arduino read timeout")
-                    break
                 except Exception as e:
-                    logger.error(f"Arduino read error: {e}")
-                    break
+                    logger.error(f"Error reading Arduino response: {e}")
+                    continue
+                
+                time.sleep(0.1)  # รอเล็กน้อยก่อนลองใหม่
             
-            # Return empty data if no valid response
-            logger.warning("No valid Arduino data received")
-            return {"arduino_connected": False}
+            # ถ้าไม่ได้ข้อมูล sensor แต่ Arduino ยังเชื่อมต่ออยู่
+            if not sensor_data_found:
+                logger.warning("No sensor data from Arduino, but connection OK")
+                return {"arduino_connected": True, "sensors": {}}
             
         except Exception as e:
-            logger.error(f"Arduino sensor read failed: {e}")
+            logger.error(f"Arduino sensor read error: {e}")
+            # ลองเชื่อมต่อใหม่
+            self.connected = False
             return {"arduino_connected": False}
     
     def send_command(self, command: str) -> bool:
@@ -227,17 +272,38 @@ class ArduinoManager:
             
         try:
             logger.info(f"🔧 Sending Arduino command: {command}")
+            
+            # Clear buffers ก่อนส่งคำสั่ง
+            self.serial_conn.flushInput()
+            self.serial_conn.flushOutput()
+            
+            # ส่งคำสั่ง
             self.serial_conn.write(f"{command}\n".encode())
+            self.serial_conn.flush()
             
-            # รอ response
-            response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+            import time
+            time.sleep(0.3)  # รอ Arduino ประมวลผล
             
-            if response:
-                logger.info(f"✅ Arduino response: {response}")
+            # รอ response หลายครั้ง
+            response_received = False
+            for attempt in range(5):
+                try:
+                    if self.serial_conn.in_waiting > 0:
+                        response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+                        if response:
+                            logger.info(f"✅ Arduino response: {response}")
+                            response_received = True
+                            break
+                except:
+                    pass
+                time.sleep(0.1)
+            
+            if not response_received:
+                logger.warning(f"No Arduino response for command: {command}")
+                # แต่ยังถือว่าส่งสำเร็จ เพราะ Arduino อาจไม่ตอบกลับทุกคำสั่ง
                 return True
-            else:
-                logger.warning("No Arduino response")
-                return False
+            
+            return True
                 
         except Exception as e:
             logger.error(f"Arduino command failed: {e}")
@@ -561,69 +627,69 @@ class FirebaseCommandListener:
     def _setup_control_listeners(self):
         """Setup control listeners สำหรับ Web app commands"""
         try:
-            # ✅ LED Control Listener
+            # ✅ LED Control Listener (ตาม relay_control.ino)
             def led_callback(event):
                 try:
                     if event.data is not None:
                         value = event.data
                         if isinstance(value, bool):
-                            command = "R:3" if value else "R:4"  # LED ON/OFF
+                            command = "1" if value else "0"  # ✅ ตาม relay_control.ino: 1=LED ON, 0=ALL OFF
                             self.arduino_mgr.send_command(command)
                             logger.info(f"🔵 LED command sent: {command} (from Firebase: {value})")
                 except Exception as e:
                     logger.error(f"LED listener error: {e}")
             
-            # ✅ Fan Control Listener
+            # ✅ Fan Control Listener (ตาม relay_control.ino)
             def fan_callback(event):
                 try:
                     if event.data is not None:
                         value = event.data
                         if isinstance(value, bool):
-                            command = "R:1" if value else "R:2"  # FAN ON/OFF
+                            command = "2" if value else "0"  # ✅ ตาม relay_control.ino: 2=FAN ON, 0=ALL OFF
                             self.arduino_mgr.send_command(command)
                             logger.info(f"🌀 Fan command sent: {command} (from Firebase: {value})")
                 except Exception as e:
                     logger.error(f"Fan listener error: {e}")
             
-            # ✅ Feeder Control Listener
+            # ✅ Feeder Control Listener (ใช้ Arduino protocol)
             def feeder_callback(event):
                 try:
                     if event.data is not None:
                         value = str(event.data).lower()
                         if value in ['small', 'medium', 'large']:
-                            command = f"FEED:{value}"
+                            command = f"FEED:{value}"  # ✅ ใช้ Arduino protocol FEED:small/medium/large
                             self.arduino_mgr.send_command(command)
                             logger.info(f"🍚 Feed command sent: {command} (from Firebase: {value})")
                         elif value == 'stop':
-                            command = "R:0"  # ALL OFF
+                            command = "0"  # ✅ STOP command
                             self.arduino_mgr.send_command(command)
                             logger.info(f"⏹️ Stop command sent: {command}")
                 except Exception as e:
                     logger.error(f"Feeder listener error: {e}")
             
-            # ✅ Blower Control Listener
+            # ✅ Blower Control Listener (ตาม blower_control.ino)
             def blower_callback(event):
                 try:
                     if event.data is not None:
                         value = event.data
                         if isinstance(value, bool):
-                            command = "B:1" if value else "B:0"  # BLOWER ON/OFF
+                            command = "1" if value else "2"  # ✅ ตาม blower_control.ino: 1=ON, 2=OFF
                             self.arduino_mgr.send_command(command)
                             logger.info(f"💨 Blower command sent: {command} (from Firebase: {value})")
                 except Exception as e:
                     logger.error(f"Blower listener error: {e}")
             
-            # ✅ Actuator Control Listener
+            # ✅ Actuator Control Listener (ตาม actuator_control.ino)
             def actuator_callback(event):
                 try:
                     if event.data is not None:
                         value = str(event.data).lower()
                         if value == 'up':
-                            command = "A:1"  # ACTUATOR UP
+                            command = "1"  # ✅ ตาม actuator_control.ino: 1=EXTEND
                         elif value == 'down':
-                            command = "A:2"  # ACTUATOR DOWN
+                            command = "2"  # ✅ ตาม actuator_control.ino: 2=RETRACT
                         elif value == 'stop':
-                            command = "A:0"  # ACTUATOR STOP
+                            command = "0"  # ✅ ตาม actuator_control.ino: 0=STOP
                         else:
                             return
                         
@@ -632,17 +698,17 @@ class FirebaseCommandListener:
                 except Exception as e:
                     logger.error(f"Actuator listener error: {e}")
             
-            # ✅ Auger Control Listener
+            # ✅ Auger Control Listener (ตาม auger_control.ino)
             def auger_callback(event):
                 try:
                     if event.data is not None:
                         value = str(event.data).lower()
                         if value in ['forward', 'on']:
-                            command = "G:1"  # AUGER FORWARD
+                            command = "1"  # ✅ ตาม auger_control.ino: 1=FORWARD
                         elif value == 'reverse':
-                            command = "G:2"  # AUGER REVERSE
+                            command = "2"  # ✅ ตาม auger_control.ino: 2=REVERSE
                         elif value in ['stop', 'off']:
-                            command = "G:0"  # AUGER STOP
+                            command = "0"  # ✅ ตาม auger_control.ino: 0=STOP
                         else:
                             return
                         
@@ -1109,7 +1175,7 @@ class FishFeederController:
             self.shutdown()
     
     def start_firebase_sync_task(self):
-        """เริ่ม background task สำหรับ sync ข้อมูลไป Firebase ทุก 30 วินาที"""
+        """เริ่ม background task สำหรับ sync ข้อมูลไป Firebase ทุก 1 วินาที"""
         def sync_task():
             while self.firebase_sync_running:
                 try:
@@ -1117,22 +1183,19 @@ class FishFeederController:
                     sensor_data = self.arduino_mgr.read_sensors()
                     if sensor_data:
                         self.firebase_mgr.sync_sensor_data(sensor_data)
-                        logger.info("📡 Background Firebase sync completed")
+                        logger.info("📡 Firebase sync (1s)")
                     
-                    # รอ 30 วินาที
-                    for _ in range(30):
-                        if not self.firebase_sync_running:
-                            break
-                        time.sleep(1)
+                    # รอ 1 วินาที
+                    time.sleep(1)
                         
                 except Exception as e:
                     logger.error(f"Background sync error: {e}")
-                    time.sleep(5)  # รอ 5 วินาทีก่อน retry
+                    time.sleep(1)  # รอ 1 วินาทีก่อน retry
         
         self.firebase_sync_running = True
         self.firebase_sync_thread = threading.Thread(target=sync_task, daemon=True)
         self.firebase_sync_thread.start()
-        logger.info("📡 Firebase background sync started (every 30s)")
+        logger.info("📡 Firebase background sync started (every 1s)")
     
     def shutdown(self):
         """ปิดระบบอย่างสมบูรณ์"""
