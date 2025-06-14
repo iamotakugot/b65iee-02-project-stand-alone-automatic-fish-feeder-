@@ -156,33 +156,55 @@ class FirebaseClient {
         const data = snapshot.val();
         console.log("🔥 Firebase raw data received:", data);
 
-        if (data && data.sensors) {
+        if (data) {
+          // ✅ แก้ไข: รองรับหลายรูปแบบข้อมูล
           const firebaseData: FirebaseData = {
             timestamp: data.timestamp || new Date().toISOString(),
-            sensors: data.sensors,
-            status: data.status || {
-              online: true,
+            sensors: data.sensors || {}, // รองรับกรณีไม่มี sensors
+            status: {
+              online: data.status?.online ?? true,
               last_updated: data.timestamp || new Date().toISOString(),
-              arduino_connected: data.status?.arduino_connected || true
+              arduino_connected: data.status?.arduino_connected ?? false
             },
-            control: data.control
+            control: data.control || data.controls // รองรับทั้ง control และ controls
           };
           
-          console.log("📡 Firebase data structure:", {
+          console.log("📡 Firebase processed data:", {
             timestamp: firebaseData.timestamp,
-            sensors: firebaseData.sensors,
+            hasSensors: !!firebaseData.sensors && Object.keys(firebaseData.sensors).length > 0,
             status: firebaseData.status,
-            control: firebaseData.control
+            hasControl: !!firebaseData.control
           });
+          
           callback(firebaseData);
         } else {
-          console.log("❌ Firebase returned null data or missing sensors");
-          callback(null);
+          console.log("❌ No Firebase data received");
+          // ส่งข้อมูลว่างแทนที่จะส่ง null
+          const emptyData: FirebaseData = {
+            timestamp: new Date().toISOString(),
+            sensors: {},
+            status: {
+              online: false,
+              last_updated: new Date().toISOString(),
+              arduino_connected: false
+            }
+          };
+          callback(emptyData);
         }
       },
       (error) => {
-        console.error("Firebase sensor data listener error:", error);
-        callback(null);
+        console.error("🔥 Firebase sensor data listener error:", error);
+        // ส่งข้อมูลว่างในกรณีเกิดข้อผิดพลาด
+        const errorData: FirebaseData = {
+          timestamp: new Date().toISOString(),
+          sensors: {},
+          status: {
+            online: false,
+            last_updated: new Date().toISOString(),
+            arduino_connected: false
+          }
+        };
+        callback(errorData);
       },
     );
 
@@ -213,108 +235,140 @@ class FirebaseClient {
     return () => off(statusRef, "value", unsubscribe);
   }
 
-  // Control LED
+  // Control LED - ✅ แก้ไขให้ส่งข้อมูลที่ Pi แปลงเป็น Arduino Protocol ได้
   async controlLED(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
       console.log(`🔵 Sending LED command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/led");
 
-      await set(controlRef, action === "on");
-      console.log(`✅ LED command sent successfully: ${action}`);
-
+      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:3 (ON) หรือ R:4 (OFF)
+      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus());
+      await set(controlRef, value);
+      
+      console.log(`✅ LED command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {
       console.error("❌ LED control error:", error);
-
       return false;
     }
   }
 
-  // Control Fan
+  // Control Fan - ✅ แก้ไขให้ส่งข้อมูลที่ Pi แปลงเป็น Arduino Protocol ได้
   async controlFan(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
       console.log(`🌀 Sending Fan command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/fan");
 
-      await set(controlRef, action === "on");
-      console.log(`✅ Fan command sent successfully: ${action}`);
-
+      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:1 (ON) หรือ R:2 (OFF)
+      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus());
+      await set(controlRef, value);
+      
+      console.log(`✅ Fan command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {
       console.error("❌ Fan control error:", error);
-
       return false;
     }
   }
 
-  // Control Feeder Auger
-  async controlFeeder(action: "on" | "off" | "small" | "medium" | "large" | "auto"): Promise<boolean> {
+  // Control Feeder - ✅ ส่งข้อมูลที่ Pi แปลงเป็น FEED:small/medium/large ได้
+  async controlFeeder(action: "on" | "off" | "small" | "medium" | "large" | "auto" | "stop"): Promise<boolean> {
     try {
       console.log(`🍚 Sending Feeder command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/feeder");
 
-      await set(controlRef, action);
-      console.log(`✅ Feeder command sent successfully: ${action}`);
-
+      // ✅ ส่งคำสั่งที่ Pi จะแปลงเป็น FEED:small/medium/large หรือ R:0
+      let value = action;
+      if (action === "on") value = "medium";  // Default to medium
+      if (action === "off") value = "stop";
+      
+      await set(controlRef, value);
+      console.log(`✅ Feeder command sent successfully: ${value}`);
       return true;
     } catch (error) {
       console.error("❌ Feeder control error:", error);
-
       return false;
     }
   }
 
-  // Control Blower
+  // Control Blower - ✅ ส่งข้อมูลที่ Pi แปลงเป็น B:1/B:0 ได้
   async controlBlower(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
       console.log(`💨 Sending Blower command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/blower");
 
-      await set(controlRef, action === "on" || action === "toggle");
-      console.log(`✅ Blower command sent successfully: ${action}`);
-
+      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น B:1 (ON) หรือ B:0 (OFF)
+      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentBlowerStatus());
+      await set(controlRef, value);
+      
+      console.log(`✅ Blower command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {
       console.error("❌ Blower control error:", error);
-
       return false;
     }
   }
 
-  // Control Actuator
+  // Control Actuator - ✅ ส่งข้อมูลที่ Pi แปลงเป็น A:1/A:2/A:0 ได้
   async controlActuator(action: "up" | "down" | "stop"): Promise<boolean> {
     try {
       console.log(`🔧 Sending Actuator command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/actuator");
 
+      // ✅ ส่งคำสั่งที่ Pi จะแปลงเป็น A:1 (UP), A:2 (DOWN), A:0 (STOP)
       await set(controlRef, action);
       console.log(`✅ Actuator command sent successfully: ${action}`);
-
       return true;
     } catch (error) {
       console.error("❌ Actuator control error:", error);
-
       return false;
     }
   }
 
-  // Control Auger
+  // Control Auger - ✅ ส่งข้อมูลที่ Pi แปลงเป็น G:1/G:2/G:0 ได้
   async controlAuger(action: "on" | "off" | "forward" | "reverse" | "stop"): Promise<boolean> {
     try {
       console.log(`🌀 Sending Auger command: ${action}`);
       const controlRef = ref(this.database, "fish_feeder/control/auger");
 
+      // ✅ แปลง action เป็นคำสั่งที่ Pi เข้าใจ
       let augerAction = action;
       if (action === "on") augerAction = "forward";
       if (action === "off") augerAction = "stop";
 
       await set(controlRef, augerAction);
       console.log(`✅ Auger command sent successfully: ${augerAction}`);
-
       return true;
     } catch (error) {
       console.error("❌ Auger control error:", error);
+      return false;
+    }
+  }
 
+  // Helper methods to get current status for toggle
+  private async getCurrentLEDStatus(): Promise<boolean> {
+    try {
+      const snapshot = await get(ref(this.database, "fish_feeder/control/led"));
+      return snapshot.val() || false;
+    } catch {
+      return false;
+    }
+  }
+
+  private async getCurrentFanStatus(): Promise<boolean> {
+    try {
+      const snapshot = await get(ref(this.database, "fish_feeder/control/fan"));
+      return snapshot.val() || false;
+    } catch {
+      return false;
+    }
+  }
+
+  private async getCurrentBlowerStatus(): Promise<boolean> {
+    try {
+      const snapshot = await get(ref(this.database, "fish_feeder/control/blower"));
+      return snapshot.val() || false;
+    } catch {
       return false;
     }
   }

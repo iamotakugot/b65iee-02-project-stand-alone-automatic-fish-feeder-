@@ -97,7 +97,8 @@ class FirebaseCommandListener:
             if not self.running:
                 return
             try:
-                command = "R:3" if event.data else "R:4"  # ✅ ถูกต้องแล้ว: LED ON/OFF
+                # ✅ แก้ไขตาม Arduino protocol จริง: R:3=LED_ON, R:4=LED_OFF
+                command = "R:3" if event.data else "R:4"  # LED ON/OFF
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"LED {action}", "led")
             except Exception as e:
@@ -108,7 +109,8 @@ class FirebaseCommandListener:
             if not self.running:
                 return
             try:
-                command = "R:1" if event.data else "R:2"  # ✅ ถูกต้องแล้ว: Fan ON/OFF
+                # ✅ แก้ไขตาม Arduino protocol จริง: R:1=FAN_ON, R:2=FAN_OFF
+                command = "R:1" if event.data else "R:2"  # FAN ON/OFF
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"Fan {action}", "fan")
             except Exception as e:
@@ -120,14 +122,13 @@ class FirebaseCommandListener:
                 return
             try:
                 preset = str(event.data).lower()
-                amount_map = {
-                    "small": 50,
-                    "medium": 100, 
-                    "large": 200
-                }
-                amount = amount_map.get(preset, 100)
-                command = f"FEED:{amount}"
-                self._execute_command(command, f"Feed {preset} ({amount}g)", "feeder")
+                # ✅ ใช้คำสั่ง FEED ตาม Arduino protocol
+                if preset in ["small", "medium", "large"]:
+                    command = f"FEED:{preset}"
+                    self._execute_command(command, f"Feed {preset}", "feeder")
+                elif preset == "stop":
+                    command = "R:0"  # All relays off
+                    self._execute_command(command, "Stop feeding", "feeder")
             except Exception as e:
                 self.logger.error(f"Feeder command error: {e}")
         
@@ -136,7 +137,8 @@ class FirebaseCommandListener:
             if not self.running:
                 return
             try:
-                command = "B:1" if event.data else "B:0"  # on:off (แก้ไขให้ตรงกับ Arduino)
+                # ✅ แก้ไขตาม Arduino protocol จริง: B:1=ON, B:0=OFF
+                command = "B:1" if event.data else "B:0"
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"Blower {action}", "blower")
             except Exception as e:
@@ -148,10 +150,13 @@ class FirebaseCommandListener:
                 return
             try:
                 action = str(event.data).lower()
+                # ✅ แก้ไขตาม Arduino protocol จริง: A:1=UP, A:2=DOWN, A:0=STOP
                 command_map = {
                     "up": "A:1",
                     "down": "A:2", 
-                    "stop": "A:0"
+                    "stop": "A:0",
+                    "open": "A:1",    # Alias for up
+                    "close": "A:2"    # Alias for down
                 }
                 command = command_map.get(action, "A:0")
                 self._execute_command(command, f"Actuator {action}", "actuator")

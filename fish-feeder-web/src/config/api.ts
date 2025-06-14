@@ -6,47 +6,38 @@
 
 // ===== ENVIRONMENT & DEPLOYMENT CONFIGURATION =====
 const getApiBaseUrl = (): string => {
-  // Priority order for API URL resolution:
-  // 1. Runtime environment variable (from Firebase hosting)
-  // 2. Build-time environment variable (from .env.production)
-  // 3. ngrok URL (from localStorage or detection)
-  // 4. Development localhost
-  // 5. Production fallback
-
-  // Check runtime environment (Firebase hosting)
+  // 🔥 FORCE FIREBASE-ONLY MODE - No Pi server connections
+  // ปิดการเชื่อมต่อ Pi server ทั้งหมด เพื่อแก้ปัญหา CORS
+  
   if (typeof window !== 'undefined') {
-    // Check if we have stored ngrok URL
-    const storedNgrokUrl = localStorage.getItem('NGROK_API_URL');
-    if (storedNgrokUrl && storedNgrokUrl.includes('ngrok')) {
-      console.log('🌐 Using stored ngrok URL:', storedNgrokUrl);
-      return storedNgrokUrl;
-    }
-    
-    // Check if we're on Firebase hosting
+    // ตรวจสอบว่าเรากำลังใช้ Firebase hosting หรือไม่
     if (window.location.hostname.includes('web.app') || 
-        window.location.hostname.includes('firebaseapp.com')) {
-      console.log('🔥 Running on Firebase hosting');
-      
-      // Try to get ngrok URL from build-time env
-      const buildTimeUrl = process.env.REACT_APP_API_BASE_URL;
-      if (buildTimeUrl && buildTimeUrl.includes('ngrok')) {
-        console.log('🌐 Using build-time ngrok URL:', buildTimeUrl);
-        return buildTimeUrl;
-      }
+        window.location.hostname.includes('firebaseapp.com') ||
+        window.location.hostname.includes('firebase')) {
+      console.log('🔥 Firebase hosting detected - Using Firebase-only mode');
+      return 'FIREBASE_ONLY_MODE'; // ใช้ค่าพิเศษเพื่อบอกว่าไม่ต้องเรียก Pi server
     }
   }
 
-  // Development mode
+  // Development mode - ยังคงใช้ localhost ได้
   if (process.env.NODE_ENV === 'development') {
     return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
   }
 
-  // Production fallback
-  return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+  // Production fallback to Firebase-only
+  return 'FIREBASE_ONLY_MODE';
 };
 
 // Auto-detect and store ngrok URL if available
 const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
+  // 🔥 DISABLE ngrok detection in Firebase hosting
+  if (typeof window !== 'undefined' && 
+      (window.location.hostname.includes('web.app') || 
+       window.location.hostname.includes('firebaseapp.com'))) {
+    console.log('🔥 Firebase hosting - Skipping ngrok detection');
+    return null;
+  }
+  
   try {
     // List of potential ngrok URLs to try
     const potentialUrls = [
@@ -90,15 +81,21 @@ const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
 // Get base URL for configuration
 const BASE_API_URL = getApiBaseUrl();
 
-// 🎯 แก้ไข: บังคับใช้ localhost เมื่อไม่มี ngrok URL
-const FORCE_LOCALHOST = typeof window !== 'undefined' && 
-                       window.location.hostname.includes('.web.app') &&
-                       !localStorage.getItem('NGROK_API_URL');
+// 🔥 FORCE FIREBASE-ONLY MODE
+const IS_FIREBASE_HOSTING = typeof window !== 'undefined' && 
+                           (window.location.hostname.includes('web.app') ||
+                            window.location.hostname.includes('firebaseapp.com') ||
+                            window.location.hostname.includes('firebase'));
 
-const FINAL_API_URL = FORCE_LOCALHOST ? 'http://localhost:5000' : BASE_API_URL;
+const FINAL_API_URL = IS_FIREBASE_HOSTING ? 'FIREBASE_ONLY_MODE' : BASE_API_URL;
 
-// 🛡️ ตรวจสอบปัญหา CORS/Mixed Content
+// 🛡️ ปิดการตรวจสอบ CORS เพราะไม่ใช้ Pi server แล้ว
 const checkCorsIssue = (): { hasCorsIssue: boolean; solution: string } => {
+  if (IS_FIREBASE_HOSTING) {
+    console.log('🔥 Firebase-only mode - No CORS issues');
+    return { hasCorsIssue: false, solution: '' };
+  }
+  
   if (typeof window === 'undefined') return { hasCorsIssue: false, solution: '' };
   
   const isHttps = window.location.protocol === 'https:';
@@ -121,35 +118,32 @@ if (corsCheck.hasCorsIssue) {
   console.warn('⚠️ CORS Issue Detected:', corsCheck.solution);
 }
 
-// Enhanced API Configuration with ngrok support
+// Enhanced API Configuration with Firebase-only support
 export const API_CONFIG = {
-  BASE_URL: FINAL_API_URL, // 🎯 ใช้ FINAL_API_URL แทน BASE_API_URL
+  BASE_URL: FINAL_API_URL, // 🔥 จะเป็น 'FIREBASE_ONLY_MODE' ใน production
   TIMEOUT: 10000,
   FAST_TIMEOUT: 1000,
   RETRY_DELAY: 1000,
   MAX_RETRIES: 3,
   CACHE_DURATION: 30000,
 
-  // ngrok specific configuration
+  // ngrok specific configuration - ปิดใน Firebase hosting
   NGROK_CONFIG: {
-    AUTO_DETECT: true,
+    AUTO_DETECT: !IS_FIREBASE_HOSTING,
     DETECTION_INTERVAL: 60000,
     STORE_IN_LOCALSTORAGE: true,
-    FALLBACK_TO_LOCALHOST: true
+    FALLBACK_TO_LOCALHOST: !IS_FIREBASE_HOSTING
   },
 
   // Firebase hosting configuration
   FIREBASE_CONFIG: {
-    ENABLE_OFFLINE_MODE: process.env.REACT_APP_ENABLE_OFFLINE_MODE === 'true' || 
-                        (typeof window !== 'undefined' && 
-                         (window.location.hostname.includes('.web.app') || 
-                          window.location.hostname.includes('firebase'))),
+    ENABLE_OFFLINE_MODE: IS_FIREBASE_HOSTING,
     CACHE_API_RESPONSES: true,
     MOCK_WHEN_OFFLINE: false
   },
 
-  // Firebase-only mode configuration - ใช้ Firebase Database เท่านั้นใน production
-  FIREBASE_ONLY_MODE: typeof window !== 'undefined' && window.location.hostname.includes('.web.app'), // 🔥 Firebase-only ใน production
+  // 🔥 FORCE Firebase-only mode ใน production
+  FIREBASE_ONLY_MODE: IS_FIREBASE_HOSTING || FINAL_API_URL === 'FIREBASE_ONLY_MODE',
 
   // Refresh intervals optimized for performance
   REFRESH_INTERVALS: {
