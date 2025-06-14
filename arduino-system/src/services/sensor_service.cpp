@@ -145,7 +145,9 @@ readingsCounter++;
 }
 
 void SensorService::readWaterTemperature() {
-// DS18B20 water temperature sensor removed - method kept for compatibility
+// Water temperature sensor functionality removed
+// Using ambient temperature as fallback for compatibility
+sensors.water_temp = sensors.feed_temp;
 readingsCounter++;
 }
 
@@ -190,7 +192,7 @@ void SensorService::readAllSensors() {
 // All sensors in one optimized function
 readDHTSensors();
 readAnalogSensors();
-// readWaterTemperature() removed - DS18B20 no longer used
+readWaterTemperature(); // Use fallback implementation
 readWeightSensor();
 updateErrorStatus();
 }
@@ -214,8 +216,10 @@ Serial.print("°C, ");
 Serial.print(sensors.control_humidity);
 Serial.println("%");
 
-// Water temperature
-// Water temperature sensor removed - DS18B20 no longer used
+// Water temperature (using ambient as fallback)
+Serial.print(" Water: ");
+Serial.print(sensors.water_temp);
+Serial.println("°C");
 
 // Weight
 Serial.print(" ");

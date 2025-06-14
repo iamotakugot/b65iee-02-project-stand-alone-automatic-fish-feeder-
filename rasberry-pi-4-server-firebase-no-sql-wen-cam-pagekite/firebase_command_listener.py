@@ -21,6 +21,16 @@ import threading
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
 
+# PCDA 5W1H Error Handler
+try:
+    from error_handler import (
+        handle_critical_error, handle_communication_error,
+        handle_hardware_error, handle_software_error, ErrorContext
+    )
+    ERROR_HANDLER_AVAILABLE = True
+except ImportError:
+    ERROR_HANDLER_AVAILABLE = False
+
 try:
     import firebase_admin
     from firebase_admin import credentials, db
@@ -42,7 +52,7 @@ class FirebaseCommandListener:
         """เริ่มต้น Firebase listener"""
         try:
             if not FIREBASE_AVAILABLE:
-                self.logger.error("Firebase not available")
+                self.logger.warning("Firebase not available - running in offline mode")
                 return False
                 
             # Initialize Firebase if not already done
@@ -57,13 +67,16 @@ class FirebaseCommandListener:
             return True
             
         except Exception as e:
-            self.logger.error(f"Firebase listener init failed: {e}")
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("FirebaseCommandListener", f"Firebase listener init failed: {e}", {"url": firebase_url}, e)
+            else:
+                self.logger.error(f"Firebase listener init failed: {e}")
             return False
     
     def start_listening(self):
         """เริ่มฟัง Firebase commands"""
         if not self.db_ref:
-            self.logger.error("Firebase not initialized")
+            self.logger.warning("Firebase not initialized - cannot start listeners")
             return False
             
         self.running = True
@@ -92,25 +105,23 @@ class FirebaseCommandListener:
     def _setup_control_listeners(self):
         """Setup listeners สำหรับ device control"""
         
-        # LED Control Listener
+        # LED Control Listener (Archive Protocol)
         def led_callback(event):
             if not self.running:
                 return
             try:
-                # ✅ แก้ไขตาม Arduino protocol จริง: R:3=LED_ON, R:4=LED_OFF
-                command = "R:3" if event.data else "R:4"  # LED ON/OFF
+                command = "R:1" if event.data else "R:4"  # Archive: R:1=LED ON, R:4=LED OFF
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"LED {action}", "led")
             except Exception as e:
                 self.logger.error(f"LED command error: {e}")
         
-        # Fan Control Listener
+        # Fan Control Listener (Archive Protocol)
         def fan_callback(event):
             if not self.running:
                 return
             try:
-                # ✅ แก้ไขตาม Arduino protocol จริง: R:1=FAN_ON, R:2=FAN_OFF
-                command = "R:1" if event.data else "R:2"  # FAN ON/OFF
+                command = "R:2" if event.data else "R:0"  # Archive: R:2=FAN ON, R:0=ALL OFF
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"Fan {action}", "fan")
             except Exception as e:
@@ -122,13 +133,14 @@ class FirebaseCommandListener:
                 return
             try:
                 preset = str(event.data).lower()
-                # ✅ ใช้คำสั่ง FEED ตาม Arduino protocol
-                if preset in ["small", "medium", "large"]:
-                    command = f"FEED:{preset}"
-                    self._execute_command(command, f"Feed {preset}", "feeder")
-                elif preset == "stop":
-                    command = "R:0"  # All relays off
-                    self._execute_command(command, "Stop feeding", "feeder")
+                amount_map = {
+                    "small": 50,
+                    "medium": 100, 
+                    "large": 200
+                }
+                amount = amount_map.get(preset, 100)
+                command = f"FEED:{amount}"
+                self._execute_command(command, f"Feed {preset} ({amount}g)", "feeder")
             except Exception as e:
                 self.logger.error(f"Feeder command error: {e}")
         
@@ -137,8 +149,7 @@ class FirebaseCommandListener:
             if not self.running:
                 return
             try:
-                # ✅ แก้ไขตาม Arduino protocol จริง: B:1=ON, B:0=OFF
-                command = "B:1" if event.data else "B:0"
+                command = "B:1" if event.data else "B:0"  # on:off (แก้ไขให้ตรงกับ Arduino)
                 action = "on" if event.data else "off"
                 self._execute_command(command, f"Blower {action}", "blower")
             except Exception as e:
@@ -150,13 +161,10 @@ class FirebaseCommandListener:
                 return
             try:
                 action = str(event.data).lower()
-                # ✅ แก้ไขตาม Arduino protocol จริง: A:1=UP, A:2=DOWN, A:0=STOP
                 command_map = {
                     "up": "A:1",
                     "down": "A:2", 
-                    "stop": "A:0",
-                    "open": "A:1",    # Alias for up
-                    "close": "A:2"    # Alias for down
+                    "stop": "A:0"
                 }
                 command = command_map.get(action, "A:0")
                 self._execute_command(command, f"Actuator {action}", "actuator")
@@ -363,9 +371,33 @@ def test_listener():
         
         try:
             print("🔥 Firebase listener running... (Press Ctrl+C to stop)")
-            while True:
-                listener.update_pi_status()
-                time.sleep(30)  # Update status every 30 seconds
+            
+            # Event-driven status updates - no infinite loops
+            def schedule_status_update():
+                try:
+                    listener.update_pi_status()
+                    if listener.running:
+                        import threading
+                        timer = threading.Timer(30, schedule_status_update)
+                        timer.daemon = True
+                        timer.start()
+                except Exception as e:
+                    print(f"Status update error: {e}")
+            
+            # Start event-driven updates
+            schedule_status_update()
+            
+            # Keep main thread alive for event handling
+            import signal
+            import sys
+            
+            def signal_handler(sig, frame):
+                print("\n🛑 Stopping listener...")
+                listener.stop_listening()
+                sys.exit(0)
+            
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.pause()  # Wait for signals instead of infinite loop
                 
         except KeyboardInterrupt:
             print("\n🛑 Stopping listener...")

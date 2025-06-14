@@ -33,7 +33,10 @@ class Logger {
         this.logs = JSON.parse(stored);
       }
     } catch (error) {
-      console.warn('Failed to load stored logs:', error);
+      // Only log if it's not a storage quota error
+      if (!(error instanceof Error) || !error.toString().includes('QuotaExceededError')) {
+        console.warn('Failed to load stored logs:', error);
+      }
     }
   }
 
@@ -70,7 +73,10 @@ class Logger {
       localStorage.setItem('fish_feeder_logs', JSON.stringify(recentLogs));
       this.logs = recentLogs;
     } catch (error) {
-      console.warn('Failed to save logs:', error);
+      // Only log if it's not a storage quota error
+      if (!(error instanceof Error) || !error.toString().includes('QuotaExceededError')) {
+        console.warn('Failed to save logs:', error);
+      }
     }
   }
 

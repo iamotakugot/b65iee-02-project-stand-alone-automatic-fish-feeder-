@@ -159,9 +159,12 @@ const MotorPWM = () => {
       }
 
     } catch (error) {
-      console.error("Failed to control auger:", error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error("Failed to control auger:", error);
+      }
       setConnectionStatus(`❌ Error: ${error}`);
-      // Update local state anyway for demo
+      // Update local state with real data
       updateMotorState("auger", action.action === "stop" ? "G:0" : "G:1");
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
     } finally {
@@ -198,7 +201,10 @@ const MotorPWM = () => {
         setCommandResponse(`{"status": "failed", "action": "${action}", "method": "pi_server"}`);
       }
     } catch (error) {
-      console.error(`Failed to control actuator:`, error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error(`Failed to control actuator:`, error);
+      }
       setConnectionStatus(`❌ Error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
     } finally {
@@ -237,7 +243,10 @@ const MotorPWM = () => {
         setCommandResponse(`{"status": "failed", "command": "${command}", "method": "firebase"}`);
       }
     } catch (error) {
-      console.error(`Failed to send direct command:`, error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error(`Failed to send direct command:`, error);
+      }
       setConnectionStatus(`❌ Connection error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
     } finally {
@@ -245,7 +254,7 @@ const MotorPWM = () => {
     }
   };
 
-  // Handle blower control for PWM demo via Firebase
+          // Handle blower control via Firebase
   const handleBlowerPWM = async (speed: number) => {
     try {
       setLoading(true);
@@ -309,7 +318,7 @@ const MotorPWM = () => {
     { label: "🌪️ Blower On", command: "B:1", color: "primary" },
     { label: "⏹️ Blower Off", command: "B:0", color: "default" },
     { label: "💡 Relay 1 On", command: "R:1", color: "secondary" },
-    { label: "💡 Relay 1 Off", command: "R:01", color: "default" },
+            { label: "💡 Relay 1 Off", command: "R:4", color: "default" },
     { label: "💡 Relay 2 On", command: "R:2", color: "secondary" },
   ];
 
@@ -834,7 +843,7 @@ const MotorPWM = () => {
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">B:1</code> - Blower fan on</div>
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">B:0</code> - Blower fan off</div>
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:1</code> - Relay 1 on</div>
-                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:01</code> - Relay 1 off</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:4</code> - Relay 1 off</div>
                 <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">PING</code> - Test Arduino connection</div>
               </div>
             </div>

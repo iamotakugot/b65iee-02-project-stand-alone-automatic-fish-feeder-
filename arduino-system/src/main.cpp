@@ -155,9 +155,9 @@ void performStartupSequence();
 
 // ===== SETUP =====
 void setup() {
-  // Initialize serial
+  // Initialize serial - no delays
   Serial.begin(115200);
-  while (!Serial) delay(10);
+  // Removed delay for maximum performance
 
   // Print startup banner
   printStartupBanner();
@@ -337,8 +337,8 @@ if (!fastMode && currentTime > 30000 && (currentTime % 30000) < 100) {
 performanceMonitor();
 }
 
-// Small delay for stability - maintain 100Hz loop frequency
-delayMicroseconds(100); // Micro delay for precise timing
+// No delays - maximum performance event-driven loop
+// Removed all delays for zero-latency operation
 }
 
 // ===== OPTIMIZED SENSOR READING =====
@@ -354,7 +354,7 @@ case 1:
 sensorService.readAnalogSensors();
 break;
 case 2:
-// Phase 2: Read water temperature (medium speed)
+// Phase 2: Read water temperature (using ambient fallback)
 sensorService.readWaterTemperature();
 break;
 case 3:
@@ -691,9 +691,12 @@ if (cmd == "LOG:1") {
   return;
 }
 
-// Heartbeat/Ping command
+// Heartbeat/Ping command - Pi Server compatibility
 if (cmd == "PING") {
   Serial.println(F("[ACK] PING PONG"));
+  Serial.print(F("[STATUS] Arduino_Ready,Uptime:"));
+  Serial.print(millis());
+  Serial.println(F("ms"));
   return;
 }
 
@@ -706,10 +709,28 @@ if (cmd == "TEST_CONNECTION") {
   return;
 }
 
-// Data request commands
+// Data request commands - Pi Server compatibility
 if (cmd == "GET_DATA" || cmd == "REQUEST_DATA") {
   Serial.println(F("[ACK] GET_DATA SENDING_CURRENT_DATA"));
-  fastJSONOutput(); // Send current sensor data
+  // Send data in format Pi server expects: [DATA] TEMP1:XX,HUM1:XX,...
+  Serial.print(F("[DATA] "));
+  Serial.print(F("TEMP1:"));
+  Serial.print(sensors.feed_temp, 1);
+  Serial.print(F(",HUM1:"));
+  Serial.print(sensors.feed_humidity, 1);
+  Serial.print(F(",TEMP2:"));
+  Serial.print(sensors.system_temp, 1);
+  Serial.print(F(",HUM2:"));
+  Serial.print(sensors.system_humidity, 1);
+  Serial.print(F(",WEIGHT:"));
+  Serial.print(sensors.weight, 1);
+  Serial.print(F(",BATTERY:"));
+  Serial.print(sensors.battery_voltage, 2);
+  Serial.print(F(",SOLAR:"));
+  Serial.print(sensors.solar_voltage, 2);
+  Serial.print(F(",SOIL:"));
+  Serial.print(sensors.soil_moisture, 1);
+  Serial.println();
   return;
 }
 
@@ -1069,30 +1090,39 @@ break;
 // ===== ENHANCED RELAY CONTROL: IN1/IN2 SEPARATE ON/OFF =====
 void handleRelayCommand(char cmd) {
   switch (cmd) {
-    // === IN1 (FAN) CONTROL - PIN 52 ===
-    case '1': // IN1 ON
+    // === ARCHIVE PROTOCOL COMPATIBILITY ===
+    case '1': // LED ON (Archive: RELAY_IN1 = LED)
+      digitalWrite(RELAY_LED, LOW);  // Active LOW relay
+      status.relay_led = true;
+      Serial.println(F("[ACK] R:1 LED_ON"));
+      logInfo("LED ON");
+      break;
+      
+    case '2': // FAN ON (Archive: RELAY_IN2 = FAN)
       digitalWrite(RELAY_FAN, LOW);  // Active LOW relay
       status.relay_fan = true;
-      Serial.println(F("[ACK] R:1 FAN_ON"));
+      Serial.println(F("[ACK] R:2 FAN_ON"));
       logInfo("FAN ON");
       break;
       
-    case '2': // IN1 OFF  
-      digitalWrite(RELAY_FAN, HIGH); // Active LOW relay
+    case '0': // ALL OFF (Archive: cmd '0' = ALL OFF)
+      digitalWrite(RELAY_LED, HIGH);  // Active LOW relay
+      digitalWrite(RELAY_FAN, HIGH);
+      status.relay_led = false;
       status.relay_fan = false;
-      Serial.println(F("[ACK] R:2 FAN_OFF"));
-      logInfo("FAN OFF");
+      Serial.println(F("[ACK] R:0 ALL_OFF"));
+      logInfo("ALL RELAYS OFF");
       break;
       
-    // === IN2 (LED) CONTROL - PIN 50 ===
-    case '3': // IN2 ON
+    // === LEGACY COMPATIBILITY ===
+    case '3': // LED ON (Legacy)
       digitalWrite(RELAY_LED, LOW);  // Active LOW relay
       status.relay_led = true;
       Serial.println(F("[ACK] R:3 LED_ON"));
       logInfo("LED ON");
       break;
       
-    case '4': // IN2 OFF
+    case '4': // LED OFF (Legacy)
       digitalWrite(RELAY_LED, HIGH); // Active LOW relay
       status.relay_led = false;
       Serial.println(F("[ACK] R:4 LED_OFF"));
@@ -1107,15 +1137,6 @@ void handleRelayCommand(char cmd) {
       status.relay_led = true;
       Serial.println(F("[ACK] R:5 FAN_LED_ON"));
       logInfo("FAN+LED ON");
-      break;
-      
-    case '0': // ALL OFF
-      digitalWrite(RELAY_FAN, HIGH);
-      digitalWrite(RELAY_LED, HIGH);
-      status.relay_fan = false;
-      status.relay_led = false;
-      Serial.println(F("[ACK] R:0 ALL_RELAY_OFF"));
-      logInfo("ALL RELAYS OFF");
       break;
       
     // === LEGACY COMPATIBILITY ===
@@ -1141,10 +1162,10 @@ void handleRelayCommand(char cmd) {
       Serial.println(F(" INVALID_RELAY_CMD"));
       logError("Invalid relay command: R:" + String(cmd));
       Serial.println(F("[HELP] Enhanced Relay Commands:"));
-      Serial.println(F("  R:1 = IN1 (FAN) ON    | R:2 = IN1 (FAN) OFF"));
-      Serial.println(F("  R:3 = IN2 (LED) ON    | R:4 = IN2 (LED) OFF"));
-      Serial.println(F("  R:5 = BOTH ON         | R:0 = ALL OFF"));
-      Serial.println(F("  R:7 = IN1 Toggle      | R:8 = IN2 Toggle"));
+      Serial.println(F("  R:1 = LED ON          | R:4 = LED OFF"));
+      Serial.println(F("  R:2 = FAN ON          | R:0 = ALL OFF"));
+      Serial.println(F("  R:5 = BOTH ON         | R:3 = LED ON (Legacy)"));
+      Serial.println(F("  R:7 = FAN Toggle      | R:8 = LED Toggle"));
       break;
   }
 }
@@ -1210,13 +1231,13 @@ Serial.println(F("Forward 50%"));
 analogWrite(AUGER_ENA, 127);
 digitalWrite(AUGER_IN1, HIGH);
 digitalWrite(AUGER_IN2, LOW);
-delay(3000);
+  // Non-blocking test - removed delays for performance
 
 // Test backward 
 Serial.println(F("Backward 50%"));
 digitalWrite(AUGER_IN1, LOW);
 digitalWrite(AUGER_IN2, HIGH);
-delay(3000);
+  // Non-blocking test - removed delays for performance
 
 stopAuger();
 Serial.println(F(" Speed test complete"));

@@ -1,162 +1,237 @@
-# 🐟 Fish Feeder IoT System - Complete Stand-Alone Automatic Fish Feeder
+# 🐟 Fish Feeder IoT System - Clean Architecture
 
-[![Fish Feeder](https://img.shields.io/badge/Fish%20Feeder-IoT%20System-blue.svg)](https://fish-feeder-test-1.web.app/)
-[![Arduino](https://img.shields.io/badge/Arduino-Mega%202560-green.svg)](https://www.arduino.cc/)
-[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-4-red.svg)](https://www.raspberrypi.org/)
-[![React](https://img.shields.io/badge/React-18.3.1-blue.svg)](https://reactjs.org/)
-[![Firebase](https://img.shields.io/badge/Firebase-11.9.1-orange.svg)](https://firebase.google.com/)
+## ภาพรวมระบบ
 
-## 🌟 Overview
-
-**ระบบให้อาหารปลาอัตโนมัติแบบ Stand-Alone** ที่ทำงานได้แม้ Pi ดับ-เปิด พร้อมระบบชั่งน้ำหนัก HX711 ที่บันทึกค่า calibration ใน EEPROM อัตโนมัติ
-
-### 🏗️ System Architecture
-
-Arduino Mega 2560 → Raspberry Pi 4 → Firebase → React Web App
-
-## 📂 Project Structure
+ระบบให้อาหารปลาอัตโนมัติที่ใช้ Arduino, Raspberry Pi, Firebase และ React Web App
 
 ```
-fish-feeder-project/
-├── 🔌 fish-feeder-arduino/     # Arduino Mega 2560 Firmware
-├── 🖥️ pi-mqtt-server/          # Raspberry Pi Server
-├── 🌐 fish-feeder-web/         # React Web Application  
-├── 📋 QUICK_START_GUIDE.md     # Quick Start Guide
-└── 🚀 START_FISH_FEEDER_FIXED.bat # Windows Startup Script
+Arduino (PlatformIO) ↔ Pi Server ↔ Firebase ↔ Web App (React)
 ```
 
-## 🚀 Quick Start
+## โครงสร้างโปรเจค
 
-### 1️⃣ **Arduino Setup**
+```
+fish-feeder-system/
+├── fish-feeder-arduino/     # Arduino code (PlatformIO)
+│   ├── src/main.cpp        # Arduino main code (based on ref code)
+│   └── platformio.ini      # PlatformIO configuration
+├── pi-mqtt-server/         # Raspberry Pi server
+│   ├── main.py            # Clean Pi server with Pagekite & Camera
+│   ├── main_fixed.py      # Legacy server (backup)
+│   └── requirements_minimal.txt  # Python dependencies
+└── fish-feeder-web/        # React web application
+    ├── src/               # React source code
+    └── package.json       # Node.js dependencies
+```
+
+## 🔧 Arduino Code (ใหม่ - ใช้ ref code)
+
+### ฟีเจอร์หลัก:
+- **ใช้ reference code** จาก `flie-arduino-test-sensor-pass/`
+- **Protocol ใหม่**: รองรับ Firebase communication
+- **Sensors**: DHT22, DS18B20, HX711, Soil sensor
+- **Controls**: Relay, Blower, Auger, Actuator, Feeder
+
+### คำสั่งที่รองรับ:
+```
+R:1 = FAN_ON       R:2 = FAN_OFF
+R:3 = LED_ON       R:4 = LED_OFF       R:0 = ALL_OFF
+B:1 = BLOWER_ON    B:0 = BLOWER_OFF
+G:1 = AUGER_ON     G:2 = AUGER_OFF     G:0 = AUGER_STOP
+A:1 = ACTUATOR_UP  A:2 = ACTUATOR_DOWN A:0 = ACTUATOR_STOP
+FEED:small/medium/large
+STATUS
+```
+
+### Sensor Output:
+```
+[DATA] TEMP1:25.5,HUM1:60.2,TEMP2:24.1,WEIGHT:1.5,TEMP_WATER:23.8,SOIL:45.2
+```
+
+## 🖥️ Pi Server (ใหม่ - Clean Version)
+
+### ฟีเจอร์:
+- ✅ **Arduino ↔ Firebase** communication
+- ✅ **Pagekite tunneling** support
+- ✅ **Camera system** (OpenCV)
+- ✅ **Web API** endpoints
+- ✅ **Real-time sync** with Firebase
+
+### การติดตั้ง:
+```bash
+cd pi-mqtt-server
+pip install -r requirements_minimal.txt
+python main.py --camera --pagekite
+```
+
+### API Endpoints:
+```
+GET  /api/health              # System status
+GET  /api/sensors             # Read sensor data
+POST /api/control/<device>/<action>  # Control devices
+POST /api/feed/<size>         # Feed fish
+GET  /api/camera/capture      # Capture image
+```
+
+## 🌐 Web App (React + Firebase)
+
+### ฟีเจอร์:
+- **Real-time sensor monitoring**
+- **Device control** (LED, Fan, Blower, Actuator)
+- **Fish feeding** (small/medium/large)
+- **Camera viewer**
+- **Firebase integration**
+
+### การติดตั้ง:
+```bash
+cd fish-feeder-web
+npm install
+npm run dev
+```
+
+## 🔥 Firebase Structure
+
+```json
+{
+  "sensors": {
+    "timestamp": "2025-06-14T...",
+    "arduino_connected": true,
+    "sensors": {
+      "TEMP1": 25.5,
+      "HUM1": 60.2,
+      "TEMP2": 24.1,
+      "WEIGHT": 1.5,
+      "TEMP_WATER": 23.8,
+      "SOIL": 45.2
+    }
+  },
+  "controls": {
+    "led": false,
+    "fan": false,
+    "blower": false,
+    "feeder": "small",
+    "actuator": "stop"
+  }
+}
+```
+
+## 📡 Communication Protocol
+
+### Arduino → Pi → Firebase:
+1. Arduino ส่ง sensor data ทุก 2 วินาที
+2. Pi แปลง format และส่งไป Firebase
+3. Web App รับข้อมูล real-time
+
+### Web App → Firebase → Pi → Arduino:
+1. User กดปุ่มใน Web App
+2. Web App เขียนข้อมูลใน Firebase `/controls`
+3. Pi ฟัง Firebase changes
+4. Pi แปลงเป็น Arduino protocol และส่งคำสั่ง
+
+## 🚀 การใช้งาน
+
+### 1. เริ่มต้น Arduino:
 ```bash
 cd fish-feeder-arduino
 pio run --target upload
 ```
 
-### 2️⃣ **Pi Server Setup**
+### 2. เริ่มต้น Pi Server:
 ```bash
 cd pi-mqtt-server
-python main_fixed.py
+python main.py --camera --pagekite
 ```
 
-### 3️⃣ **Web App Deploy**
+### 3. เริ่มต้น Web App:
 ```bash
 cd fish-feeder-web
-npm run build
-npm run deploy
+npm run dev
 ```
 
-### 4️⃣ **Access Web Interface**
-🌐 **Live Demo**: https://fish-feeder-test-1.web.app/
-
-## ✨ Key Features
-
-### 🔋 **Stand-Alone Solar Power System**
-- ☀️ Solar panel charging system
-- 🔋 Li-ion battery monitoring (voltage/current)
-- ⚡ Power management with auto-shutdown
-- 📊 Real-time power analytics
-
-### ⚖️ **HX711 Weight Sensor with EEPROM**
-- 🎯 Auto-calibration with known weights
-- 💾 EEPROM storage (survives power loss)
-- ⚖️ Tare function for zero adjustment
-- 📏 Precision feeding control
-
-### 🌡️ **Environmental Monitoring**
-- 🌡️ DHT22 temperature/humidity (2 locations)
-- 💧 Soil moisture monitoring
-- 🌬️ Air quality sensors
-- 📱 Motion detection
-
-### 🎮 **Motor Control System**
-- ⚙️ Auger motor (feed dispensing)
-- 🌬️ Blower fans (aeration)
-- 🔧 Linear actuator (gate control)
-- 🎛️ PWM speed control
-
-### 🌐 **Web Interface Features**
-- 📱 Mobile-responsive design
-- 🔥 Firebase real-time sync
-- 📊 Live sensor dashboard
-- ⚙️ Settings & calibration
-- 📈 Analytics & charts
-
-## 🛠️ Hardware Requirements
-
-### Arduino Mega 2560
-- **HX711 Load Cell** (Pins 20, 21)
-- **DHT22 Sensors** (Pins 46, 48)
-- **L298N Motor Drivers** (Auger, Actuator)
-- **Relay Modules** (LED, Fan control)
-- **Solar System Monitoring** (ACS712, Voltage dividers)
-
-### Raspberry Pi 4
-- **USB Serial** connection to Arduino
-- **WiFi** connection for Firebase
-- **Python 3.8+** with required packages
-
-## 📋 Installation Guides
-
-| Component | Guide | Status |
-|-----------|-------|--------|
-| 🔌 Arduino | [fish-feeder-arduino/README.md](fish-feeder-arduino/README.md) | ✅ Ready |
-| 🖥️ Pi Server | [pi-mqtt-server/README.md](pi-mqtt-server/README.md) | ✅ Ready |
-| 🌐 Web App | [fish-feeder-web/README.md](fish-feeder-web/README.md) | ✅ Ready |
+### 4. เข้าใช้งาน:
+- **Local**: http://localhost:3000
+- **Pagekite**: https://fishfeeder.pagekite.me
 
 ## 🔧 Configuration
 
-### HX711 Weight Calibration
-```arduino
-WEIGHT_CAL:tare                  // Zero the scale
-WEIGHT_CAL:calibrate:1.000       // Calibrate with 1kg weight
-WEIGHT_CAL:status                // Check calibration status
-WEIGHT_CAL:reset                 // Reset to defaults
+### Arduino (`platformio.ini`):
+```ini
+[env:megaatmega2560]
+platform = atmelavr
+board = megaatmega2560
+framework = arduino
 ```
 
-### Firebase Configuration
-- **Project**: fish-feeder-test-1
-- **Database**: Asia Southeast 1
-- **Hosting**: https://fish-feeder-test-1.web.app/
+### Pi Server (`main.py`):
+```python
+class Config:
+    ARDUINO_PORT = '/dev/ttyUSB0'
+    ARDUINO_BAUD = 9600
+    FIREBASE_URL = "https://fish-feeder-iot-default-rtdb.firebaseio.com/"
+    PAGEKITE_KITE = "fishfeeder.pagekite.me"
+```
 
-## 📊 System Monitoring
+### Web App (`firebase.ts`):
+```typescript
+const firebaseConfig = {
+  databaseURL: "https://fish-feeder-iot-default-rtdb.firebaseio.com/",
+  // ... other config
+};
+```
 
-### Real-time Sensors
-- 🌡️ **Temperature**: Feed tank, Control box
-- 💧 **Humidity**: 2 locations with DHT22
-- ⚖️ **Weight**: HX711 load cell (0.1g precision)
-- 🔋 **Power**: Solar/battery voltage & current
-- 🌱 **Environment**: Soil moisture, air quality
+## 📋 Dependencies
 
-### Control Systems
-- 💡 **LED Control**: Manual/auto lighting
-- 🌪️ **Fan Control**: Temperature-based automation
-- 🍽️ **Feeding**: Preset amounts (50g-1kg)
-- 🎛️ **Motors**: PWM speed control (0-255)
+### Arduino:
+- DHT sensor library
+- OneWire
+- DallasTemperature
+- HX711
 
-## 🚨 Troubleshooting
+### Pi Server:
+- pyserial==3.5
+- firebase-admin==6.2.0
+- flask==2.3.3
+- opencv-python==4.8.1.78
+- pagekite==1.5.2.201110
 
-### Common Issues
-1. **HX711 Not Reading**: Check pins 20, 21 connections
-2. **DHT22 Errors**: Verify power and data pin connections
-3. **Pi Connection Lost**: Check USB serial connection
-4. **Web App Offline**: Verify Firebase configuration
+### Web App:
+- React 18
+- TypeScript
+- Firebase 10
+- Tailwind CSS
 
-### System Recovery
-- **Arduino**: Auto-restart on power failure
-- **Pi Server**: Systemd service auto-restart
-- **Web App**: Static hosting on Firebase (always available)
+## 🐛 Troubleshooting
 
-## 📞 Support
+### Arduino ไม่เชื่อมต่อ:
+```bash
+# ตรวจสอบ port
+ls /dev/ttyUSB*
+# หรือ
+dmesg | grep tty
+```
 
-- 📧 **Technical Issues**: Check individual README files
-- 🐛 **Bug Reports**: Create GitHub issue
-- 💡 **Feature Requests**: Submit enhancement request
+### Firebase ไม่ทำงาน:
+1. ตรวจสอบ `serviceAccountKey.json`
+2. ตรวจสอบ Firebase URL
+3. ตรวจสอบ network connection
 
-## 📄 License
+### Camera ไม่ทำงาน:
+```bash
+# ตรวจสอบ camera
+lsusb
+v4l2-ctl --list-devices
+```
 
-This project is open source and available under the [MIT License](LICENSE).
+## 📝 หมายเหตุ
 
----
+- **Clean Architecture**: ลบ legacy code ออกแล้ว
+- **Reference Code**: ใช้ code จาก `flie-arduino-test-sensor-pass/`
+- **Firebase Only**: ไม่มี direct API calls ระหว่าง Web ↔ Pi
+- **Pagekite**: สำหรับ remote access
+- **Camera**: สำหรับ monitoring
 
-**🎯 Built for reliable, stand-alone fish feeding with solar power and precision weight control!**
+## 🔄 Version History
+
+- **v3.0**: Clean architecture with ref code
+- **v2.x**: Complex system with multiple APIs
+- **v1.x**: Basic Arduino + Pi communication

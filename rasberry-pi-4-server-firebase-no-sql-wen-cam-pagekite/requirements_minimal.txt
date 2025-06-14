@@ -16,4 +16,11 @@ firebase-admin==6.2.0
 requests==2.31.0
 
 # System
-psutil==5.9.5 
+psutil==5.9.5
+
+# Pagekite for tunneling
+pagekite==1.5.2.201110
+
+# Camera system
+opencv-python==4.8.1.78
+picamera2==0.3.12 

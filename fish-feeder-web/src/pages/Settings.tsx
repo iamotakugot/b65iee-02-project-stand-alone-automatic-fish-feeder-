@@ -176,7 +176,10 @@ const Settings = () => {
         pi_server_connected: success,
       });
     } catch (error) {
-      console.error("Status check failed:", error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error("Status check failed:", error);
+      }
       setSystemStatus({
         arduino_connected: false,
         firebase_connected: true,
@@ -206,7 +209,10 @@ const Settings = () => {
       // Clean up listener after getting initial data
       setTimeout(() => unsubscribe(), 1000);
     } catch (error) {
-      console.error("Weight monitoring failed:", error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error("Weight monitoring failed:", error);
+      }
     }
   };
 
@@ -299,7 +305,10 @@ const Settings = () => {
         throw new Error('Tare failed');
       }
     } catch (error) {
-      console.error("Tare failed:", error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error("Tare failed:", error);
+      }
       setCalibrationMessage("❌ การปรับเทียร์ล้มเหลว กรุณาลองใหม่");
       showMessage("error", "❌ การปรับเทียร์ล้มเหลว");
     } finally {

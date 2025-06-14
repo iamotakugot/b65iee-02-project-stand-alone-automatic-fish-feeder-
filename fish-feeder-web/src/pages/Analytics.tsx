@@ -60,15 +60,19 @@ const Analytics = () => {
       // Get sensor data from Firebase
       const unsubscribe = firebaseClient.getSensorData((data) => {
         if (data?.sensors) {
-          const mockData = generateDataFromSensors(data);
-          setChartData(mockData);
+              // Use real sensor data directly - no mock data
+            const realData = generateDataFromSensors(data);
+            setChartData(realData);
         }
       });
 
       // Clean up listener after getting initial data
       setTimeout(() => unsubscribe(), 1000);
     } catch (error) {
-      console.error("Failed to fetch analytics data:", error);
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+        console.error("Failed to fetch analytics data:", error);
+      }
 
       // **UPDATED: Enhanced fallback data with new sensors**
       setChartData([

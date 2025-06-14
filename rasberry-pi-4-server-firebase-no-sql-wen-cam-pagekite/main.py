@@ -66,10 +66,22 @@ except ImportError:
     FIREBASE_LISTENER_AVAILABLE = False
     print("⚠️ Warning: Firebase Command Listener not available")
 
+# PCDA 5W1H Error Handler
+try:
+    from error_handler import (
+        error_handler, handle_critical_error, handle_communication_error,
+        handle_hardware_error, handle_software_error, ErrorContext,
+        ErrorSeverity, ErrorCategory
+    )
+    ERROR_HANDLER_AVAILABLE = True
+except ImportError:
+    ERROR_HANDLER_AVAILABLE = False
+    print("⚠️ Warning: Error Handler not available")
+
 # ===== SIMPLE LOGGING SYSTEM =====
 def setup_minimal_logging():
     """Setup minimal logging system"""
-    logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)  # Only INFO and above
     
     # Console handler only
@@ -95,7 +107,7 @@ class Config:
     ARDUINO_TIMEOUT = 5  # เพิ่มเป็น 5 วินาที
     
     # Firebase
-    FIREBASE_URL = "https://fish-feeder-test-1-default-rtdb.asia-southeast1.firebasedatabase.app"
+    FIREBASE_URL = "https://fish-feeder-iot-default-rtdb.firebaseio.com/"
     
     # Web Server
     WEB_HOST = '0.0.0.0'
@@ -150,6 +162,9 @@ class ArduinoManager:
         """เชื่อมต่อ Arduino แบบ immediate - No delays!"""
         try:
             if not SERIAL_AVAILABLE:
+                if ERROR_HANDLER_AVAILABLE:
+                    handle_hardware_error("ArduinoManager", "Serial not available", {"serial_available": False})
+                else:
                 logger.error("Serial not available")
                 return False
                 
@@ -170,12 +185,15 @@ class ArduinoManager:
             return True
                 
         except Exception as e:
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("ArduinoManager", f"Arduino connection failed: {e}", {"port": Config.ARDUINO_PORT, "baud": Config.ARDUINO_BAUD}, e)
+            else:
             logger.error(f"Arduino connection failed: {e}")
             self.connected = False
             return False
     
     def read_sensors(self) -> Dict[str, Any]:
-        """อ่านข้อมูล sensor (with caching)"""
+        """อ่านข้อมูล sensor แบบใหม่ที่รองรับ Arduino Protocol"""
         # Check cache first
         cached_data = data_cache.get("sensors")
         if cached_data:
@@ -184,55 +202,185 @@ class ArduinoManager:
         if not self.connected:
             return {}
             
-        try:
-            self.serial_conn.write(b'STATUS\n')
-            
-            # Read response with timeout
-            for _ in range(3):  # Max 3 attempts
-                try:
-                    response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+        # ลองหลายคำสั่งเพื่อขอข้อมูล sensor
+        sensor_commands = ['GET_DATA', 'GET_SENSORS', 'STATUS', 'FULLDATA']
+        
+        for cmd in sensor_commands:
+            try:
+                logger.info(f"Trying sensor command: {cmd}")
+                
+                # ล้าง buffer ก่อน
+                self.serial_conn.flushInput()
+                self.serial_conn.flushOutput()
+                
+                # ส่งคำสั่ง
+                self.serial_conn.write(f'{cmd}\n'.encode())
+                self.serial_conn.flush()
+                
+                # รอ response
+                start_time = time.time()
+                all_responses = []
+                
+                # Event-driven response reading - no time-based loops
+                max_attempts = 30  # Maximum read attempts
+                attempt = 0
+                
+                while attempt < max_attempts and self.serial_conn.in_waiting >= 0:
+                if self.serial_conn.in_waiting > 0:
+                        response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+                        if response:
+                            all_responses.append(response)
+                            logger.info(f"Arduino response: {response}")
+                            
+                            # ตรวจสอบ response patterns
+                            if self._is_sensor_response(response):
+                                sensor_data = self._parse_sensor_response(response)
+                                if sensor_data:
+                                    firebase_data = self._convert_to_firebase(sensor_data)
+                                    data_cache.set("sensors", firebase_data)
+                                    logger.info(f"✅ Sensor data parsed: {firebase_data}")
+                                    return firebase_data
                     
-                    if response.startswith('[DATA]'):
-                        data_str = response[7:]
-                        arduino_data = self._parse_simple_data(data_str)
-                        firebase_data = self._convert_to_firebase(arduino_data)
-                        
-                        # Cache the result
-                        data_cache.set("sensors", firebase_data)
-                        return firebase_data
-                        
-                except Exception:
-                    continue
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        break
+                
+                if all_responses:
+                    logger.info(f"Got responses but no sensor data for {cmd}: {all_responses}")
+                
+            except Exception as e:
+                if ERROR_HANDLER_AVAILABLE:
+                    handle_hardware_error("ArduinoManager", f"Sensor read error with {cmd}: {e}", {"command": cmd}, e)
+                else:
+                    logger.error(f"Sensor read error with {cmd}: {e}")
+                continue
+        
+        logger.warning("No sensor data received from any command")
+        return {}
+    
+    def _is_sensor_response(self, response: str) -> bool:
+        """ตรวจสอบว่า response เป็นข้อมูล sensor หรือไม่"""
+        sensor_indicators = [
+            'Temp:', 'Temperature:', 'Humidity:', 'Weight:', 
+            '[DATA]', 'TEMP:', 'HUM:', 'WEIGHT:', '°C', '%'
+        ]
+        return any(indicator in response for indicator in sensor_indicators)
+    
+    def _parse_sensor_response(self, response: str) -> Dict[str, float]:
+        """แปลง response เป็นข้อมูล sensor"""
+        result = {}
+        
+        try:
+            # รูปแบบ 1: "Temp: 26.40°C, Humidity: 75.20%"
+            if 'Temp:' in response and '°C' in response:
+                parts = response.split(',')
+                for part in parts:
+                    part = part.strip()
+                    if 'Temp:' in part:
+                        temp_str = part.split('Temp:')[1].replace('°C', '').strip()
+                        result['TEMP1'] = float(temp_str)
+                    elif 'Humidity:' in part:
+                        hum_str = part.split('Humidity:')[1].replace('%', '').strip()
+                        result['HUM1'] = float(hum_str)
             
-            # No fallback data - require real Arduino connection
-            return {}
+            # รูปแบบ 2: "[DATA] TEMP1:26.4,HUM1:65.5"
+            elif '[DATA]' in response:
+                data_str = response.split('[DATA]', 1)[1].strip()
+                result.update(self._parse_simple_data(data_str))
+            
+            # รูปแบบ 3: "TEMP1:26.4,HUM1:65.5"
+            elif ':' in response and ',' in response:
+                result.update(self._parse_simple_data(response))
                 
         except Exception as e:
-            logger.error(f"Arduino read error: {e}")
-            return {}
+            if ERROR_HANDLER_AVAILABLE:
+                handle_software_error("ArduinoManager", f"Error parsing sensor response: {e}", {"response": response}, e)
+            else:
+                logger.error(f"Error parsing sensor response: {e}")
+        
+        return result
     
     def send_command(self, command: str) -> bool:
-        """ส่งคำสั่งไป Arduino และรอ response (optional)"""
+        """ส่งคำสั่งไป Arduino และรอ response แบบใหม่"""
         if not self.connected:
-            logger.error(f"Arduino not connected - command failed: {command}")
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("ArduinoManager", f"Arduino not connected - command failed: {command}", {"command": command})
+            else:
+                logger.error(f"Arduino not connected - command failed: {command}")
             return False
             
         try:
+            # แปลงคำสั่งเป็น Arduino format
+            arduino_command = self._translate_command(command)
+            logger.info(f"Sending: {command} -> {arduino_command}")
+            
+            # ล้าง buffer ก่อน
+            self.serial_conn.flushInput()
+            self.serial_conn.flushOutput()
+            
             # ส่งคำสั่ง
-            self.serial_conn.write(f"{command}\n".encode())
+            self.serial_conn.write(f"{arduino_command}\n".encode())
             self.serial_conn.flush()
-            logger.info(f"Command sent: {command}")
             
-            # ไม่รอ response เลย - ส่งแล้วจบ
-            logger.info(f"Command sent (fast mode): {command}")
+            # รอ response เพื่อยืนยัน
+            start_time = time.time()
+            while time.time() - start_time < 2:  # รอ 2 วินาที
+            if self.serial_conn.in_waiting > 0:
+                response = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+                    if response:
+                        logger.info(f"Arduino response: {response}")
+                        # ถ้าได้ [ACK] หรือ response ที่มีความหมาย ถือว่าสำเร็จ
+                        if '[ACK]' in response or response.startswith('[RECV]'):
+                            data_cache.clear("sensors")  # Clear cache after successful command
+                            return True
+                        elif '[NAK]' in response:
+                            logger.error(f"Arduino rejected command: {response}")
+                            return False
+                pass  # Removed delay for performance
             
-            # Clear sensor cache after command
+            # ถ้าไม่ได้ response ชัดเจน แต่ส่งคำสั่งได้ ก็ถือว่าสำเร็จ
+            logger.info(f"Command sent (no response): {arduino_command}")
             data_cache.clear("sensors")
             return True
             
         except Exception as e:
-            logger.error(f"Command send error: {e}")
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("ArduinoManager", f"Command send error: {e}", {"command": command}, e)
+            else:
+                logger.error(f"Command send error: {e}")
             return False
+
+    def _translate_command(self, command: str) -> str:
+        """แปลงคำสั่งเป็น Arduino protocol (Archive Compatible)"""
+        command_map = {
+            # Archive Protocol (ตรงกับ archive\unused-files\flie-arduino-test-sensor-pass)
+            'led_on': 'R:1',     # Archive: RELAY_IN1 = LED ON
+            'fan_on': 'R:2',     # Archive: RELAY_IN2 = FAN ON  
+            'all_off': 'R:0',    # Archive: cmd '0' = ALL OFF
+            
+            # Legacy compatibility
+            'led_off': 'R:4',    # Legacy: LED OFF
+            'fan_off': 'R:0',    # Fixed: FAN OFF should be ALL OFF
+            'all_on': 'R:5',     # Legacy: BOTH ON
+            
+            # Motor commands (unchanged)
+            'auger_forward': 'G:1',
+            'auger_backward': 'G:2', 
+            'auger_stop': 'G:0',
+            'blower_on': 'B:1',
+            'blower_off': 'B:0',
+            'actuator_open': 'A:1',
+            'actuator_close': 'A:2',
+            'actuator_stop': 'A:0',
+            
+            # Sensor commands
+            'get_sensors': 'GET_DATA',
+            'status': 'STATUS',
+            'ping': 'PING',
+            'test': 'TEST_CONNECTION'
+        }
+        
+        return command_map.get(command.lower(), command)
     
     def _parse_simple_data(self, data_str: str) -> Dict[str, float]:
         """Parse CSV format: TEMP1:26.4,HUM1:65.5"""
@@ -269,8 +417,6 @@ class ArduinoManager:
             }
         }
     
-
-    
     def disconnect(self):
         """ปิดการเชื่อมต่อ"""
         try:
@@ -297,9 +443,9 @@ class FirebaseManager:
             # Try to initialize Firebase
             if not firebase_admin._apps:
                 cred = credentials.Certificate("config/firebase-service-account.json")
-                firebase_admin.initialize_app(cred, {
-                    'databaseURL': Config.FIREBASE_URL
-                })
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': Config.FIREBASE_URL
+            })
             
             self.db_ref = db.reference('/')
             self.initialized = True
@@ -307,7 +453,10 @@ class FirebaseManager:
             return True
             
         except Exception as e:
-            logger.error(f"Firebase init failed: {e}")
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("FirebaseManager", f"Firebase init failed: {e}", {"url": Config.FIREBASE_URL}, e)
+            else:
+                logger.error(f"Firebase init failed: {e}")
             self.initialized = False
             return False
     
@@ -327,9 +476,12 @@ class FirebaseManager:
             return True
             
         except Exception as e:
-            logger.error(f"Firebase sync error: {e}")
+            if ERROR_HANDLER_AVAILABLE:
+                handle_communication_error("FirebaseManager", f"Firebase sync error: {e}", {"data": data}, e)
+            else:
+                logger.error(f"Firebase sync error: {e}")
             return False
-
+    
 # ===== WEB API - OPTIMIZED =====
 class WebAPI:
     def __init__(self, arduino_mgr: ArduinoManager, firebase_mgr: FirebaseManager):
@@ -432,44 +584,52 @@ class WebAPI:
         
         @self.app.route('/api/control/led/<action>', methods=['POST'])
         def control_led(action):
-            if action == 'on':
-                cmd = 'R:3'  # LED ON
-            elif action == 'off':
-                cmd = 'R:4'  # LED OFF
-            elif action == 'toggle':
-                cmd = 'R:5'  # LED TOGGLE
-            else:
-                return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+            try:
+                if action == 'on':
+                    cmd = 'R:1'  # LED ON (Archive Protocol)
+                elif action == 'off':
+                    cmd = 'R:4'  # LED OFF
+                elif action == 'toggle':
+                    cmd = 'R:5'  # LED TOGGLE
+                else:
+                    return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+                    
+                success = self.arduino_mgr.send_command(cmd)
+                return jsonify({
+                    "status": "success" if success else "error",
+                    "success": success, 
+                    "command": cmd, 
+                    "action": action,
+                    "timestamp": datetime.now().isoformat()
+                })
                 
-            success = self.arduino_mgr.send_command(cmd, wait_response=False)
-            return jsonify({
-                "status": "success" if success else "error",
-                "success": success, 
-                "command": cmd, 
-                "action": action,
-                "timestamp": datetime.now().isoformat()
-            })
+            except Exception as e:
+                return jsonify({"status": "error", "success": False, "error": str(e)}), 400
         
         @self.app.route('/api/control/fan/<action>', methods=['POST'])
         def control_fan(action):
-            # Fan control via relay or PWM
-            if action == 'on':
-                cmd = 'R:1'  # Fan ON
-            elif action == 'off':
-                cmd = 'R:2'  # Fan OFF
-            elif action == 'toggle':
-                cmd = 'R:6'  # Fan TOGGLE
-            else:
-                return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+            try:
+                # Fan control via relay or PWM
+                if action == 'on':
+                    cmd = 'R:2'  # Fan ON (Archive Protocol)
+                elif action == 'off':
+                    cmd = 'R:0'  # Fan OFF (Archive Protocol)
+                elif action == 'toggle':
+                    cmd = 'R:6'  # Fan TOGGLE
+                else:
+                    return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+                    
+                success = self.arduino_mgr.send_command(cmd)
+                return jsonify({
+                    "status": "success" if success else "error",
+                    "success": success, 
+                    "command": cmd, 
+                    "action": action,
+                    "timestamp": datetime.now().isoformat()
+                })
                 
-            success = self.arduino_mgr.send_command(cmd, wait_response=False)
-            return jsonify({
-                "status": "success" if success else "error",
-                "success": success, 
-                "command": cmd, 
-                "action": action,
-                "timestamp": datetime.now().isoformat()
-            })
+            except Exception as e:
+                return jsonify({"status": "error", "success": False, "error": str(e)}), 400
         
         @self.app.route('/api/control/feed', methods=['POST'])
         def control_feed():
@@ -493,7 +653,7 @@ class WebAPI:
                     amount = 100  # Default 100g
                 
                 cmd = f'FEED:{amount}'
-                success = self.arduino_mgr.send_command(cmd, wait_response=False)
+                success = self.arduino_mgr.send_command(cmd)
                 
                 return jsonify({
                     "status": "success" if success else "error",
@@ -508,43 +668,51 @@ class WebAPI:
         
         @self.app.route('/api/control/actuator/<action>', methods=['POST'])
         def control_actuator(action):
-            if action in ['up', 'open']:
-                cmd = 'A:1'
-            elif action in ['down', 'close']:
-                cmd = 'A:2'
-            elif action == 'stop':
-                cmd = 'A:0'
-            else:
-                return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+            try:
+                if action in ['up', 'open']:
+                    cmd = 'A:1'
+                elif action in ['down', 'close']:
+                    cmd = 'A:2'
+                elif action == 'stop':
+                    cmd = 'A:0'
+                else:
+                    return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+                    
+                success = self.arduino_mgr.send_command(cmd)
+                return jsonify({
+                    "status": "success" if success else "error",
+                    "success": success, 
+                    "command": cmd, 
+                    "action": action,
+                    "timestamp": datetime.now().isoformat()
+                })
                 
-            success = self.arduino_mgr.send_command(cmd, wait_response=False)
-            return jsonify({
-                "status": "success" if success else "error",
-                "success": success, 
-                "command": cmd, 
-                "action": action,
-                "timestamp": datetime.now().isoformat()
-            })
+            except Exception as e:
+                return jsonify({"status": "error", "success": False, "error": str(e)}), 400
         
         @self.app.route('/api/control/auger/<action>', methods=['POST'])
         def control_auger(action):
-            if action in ['forward', 'on']:
-                cmd = 'G:1'
-            elif action == 'reverse':
-                cmd = 'G:2'
-            elif action in ['stop', 'off']:
-                cmd = 'G:0'
-            else:
-                return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+            try:
+                if action in ['forward', 'on']:
+                    cmd = 'G:1'
+                elif action == 'reverse':
+                    cmd = 'G:2'
+                elif action in ['stop', 'off']:
+                    cmd = 'G:0'
+                else:
+                    return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
+                    
+                success = self.arduino_mgr.send_command(cmd)
+                return jsonify({
+                    "status": "success" if success else "error",
+                    "success": success, 
+                    "command": cmd, 
+                    "action": action,
+                    "timestamp": datetime.now().isoformat()
+                })
                 
-            success = self.arduino_mgr.send_command(cmd, wait_response=False)
-            return jsonify({
-                "status": "success" if success else "error",
-                "success": success, 
-                "command": cmd, 
-                "action": action,
-                "timestamp": datetime.now().isoformat()
-            })
+            except Exception as e:
+                return jsonify({"status": "error", "success": False, "error": str(e)}), 400
         
         @self.app.route('/api/control/blower/<action>', methods=['POST'])
         def control_blower(action):
@@ -564,7 +732,7 @@ class WebAPI:
                 else:
                     return jsonify({"status": "error", "success": False, "error": "Invalid action"}), 400
                     
-                success = self.arduino_mgr.send_command(cmd, wait_response=False)
+                success = self.arduino_mgr.send_command(cmd)
                 return jsonify({
                     "status": "success" if success else "error",
                     "success": success, 
@@ -584,7 +752,7 @@ class WebAPI:
                     return jsonify({"status": "error", "success": False, "error": "Missing command"}), 400
 
                 command = data['command']
-                success = self.arduino_mgr.send_command(command, wait_response=False)
+                success = self.arduino_mgr.send_command(command)
 
                 return jsonify({
                     "status": "success" if success else "error",
@@ -607,15 +775,15 @@ class WebAPI:
                 ("G:0", "Auger STOP"),
                 ("B:128", "Blower SPEED 128"),
                 ("B:0", "Blower OFF"),
-                ("R:3", "LED ON"),  # ✅ แก้ไข: LED commands
+                ("R:1", "LED ON"),  # ✅ แก้ไข: LED commands (Archive Protocol)
                 ("R:4", "LED OFF"),  # ✅ แก้ไข: LED commands
-                ("R:1", "Fan ON"),   # ✅ แก้ไข: Fan commands
-                ("R:2", "Fan OFF")   # ✅ แก้ไข: Fan commands
+                ("R:2", "Fan ON"),   # ✅ แก้ไข: Fan commands (Archive Protocol)
+                ("R:0", "Fan OFF")   # ✅ แก้ไข: Fan commands (Archive Protocol)
             ]
             
             results = []
             for cmd, description in test_commands:
-                success = self.arduino_mgr.send_command(cmd, wait_response=False)  # ไม่รอ response
+                success = self.arduino_mgr.send_command(cmd)  # ไม่รอ response
                 results.append({
                     "command": cmd,
                     "description": description,
@@ -641,7 +809,7 @@ class WebAPI:
                     return jsonify({"error": "Command required"}), 400
                     
                 # ส่งคำสั่งแบบไม่รอ response
-                self.arduino_mgr.send_command(command, wait_response=False)
+                self.arduino_mgr.send_command(command)
                 
                 return jsonify({
                     "success": True,
@@ -659,7 +827,7 @@ class WebAPI:
             """🔍 เช็ค Arduino connection status"""
             try:
                 # ทดสอบส่งคำสั่ง PING (ไม่รอ response)
-                ping_success = self.arduino_mgr.send_command("PING", wait_response=False)
+                ping_success = self.arduino_mgr.send_command("PING")
                 
                 return jsonify({
                     "connected": self.arduino_mgr.connected,
@@ -738,7 +906,7 @@ class FishFeederController:
             )
         except KeyboardInterrupt:
             logger.info("👋 Server interrupted")
-        except Exception as e:
+                except Exception as e:
             logger.error(f"Web server failed: {e}")
             raise
     
@@ -792,7 +960,7 @@ def main():
         )
         
         shutdown_called = False
-        def signal_handler(sig, frame):
+    def signal_handler(sig, frame):
             nonlocal shutdown_called
             if shutdown_called:
                 logger.info("⚠️ Shutdown already in progress...")
@@ -800,11 +968,11 @@ def main():
             shutdown_called = True
             logger.info("Shutdown requested")
             controller.shutdown()
-            sys.exit(0)
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
         controller.start()
         
     except KeyboardInterrupt:

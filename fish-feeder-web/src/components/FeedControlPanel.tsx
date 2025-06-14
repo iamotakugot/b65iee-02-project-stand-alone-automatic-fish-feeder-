@@ -113,20 +113,58 @@ const FeedControl = () => {
   const [feedStatistics, setFeedStatistics] = useState<any>(null);
 
   useEffect(() => {
-    checkConnection();
-    fetchCurrentWeight();
-    fetchFeedHistory();
-    fetchFeedStatistics();
+    let isMounted = true;
+    
+    const initializeData = async () => {
+      if (isMounted) {
+        await checkConnection();
+        await fetchCurrentWeight();
+        await fetchFeedHistory();
+        await fetchFeedStatistics();
+      }
+    };
+    
+    initializeData();
 
-    // Set up intervals for real-time updates
-    const weightInterval = setInterval(fetchCurrentWeight, 3000);
-    const historyInterval = setInterval(fetchFeedHistory, 30000);
-    const statsInterval = setInterval(fetchFeedStatistics, 60000);
+    // Event-driven updates - no intervals
+    const scheduleWeightUpdate = () => {
+      if (isMounted) {
+        fetchCurrentWeight().finally(() => {
+          if (isMounted) {
+            setTimeout(scheduleWeightUpdate, 3000);
+          }
+        });
+      }
+    };
+    
+    const scheduleHistoryUpdate = () => {
+      if (isMounted) {
+        fetchFeedHistory().finally(() => {
+          if (isMounted) {
+            setTimeout(scheduleHistoryUpdate, 30000);
+          }
+        });
+      }
+    };
+    
+    const scheduleStatsUpdate = () => {
+      if (isMounted) {
+        fetchFeedStatistics().finally(() => {
+          if (isMounted) {
+            setTimeout(scheduleStatsUpdate, 60000);
+          }
+        });
+      }
+    };
+    
+    // Start event-driven updates
+    scheduleWeightUpdate();
+    scheduleHistoryUpdate();
+    scheduleStatsUpdate();
 
     return () => {
-      clearInterval(weightInterval);
-      clearInterval(historyInterval);
-      clearInterval(statsInterval);
+      isMounted = false;
+      // No intervals to clear - using event-driven approach
     };
   }, []);
 

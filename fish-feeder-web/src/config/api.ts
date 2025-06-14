@@ -6,38 +6,47 @@
 
 // ===== ENVIRONMENT & DEPLOYMENT CONFIGURATION =====
 const getApiBaseUrl = (): string => {
-  // 🔥 FORCE FIREBASE-ONLY MODE - No Pi server connections
-  // ปิดการเชื่อมต่อ Pi server ทั้งหมด เพื่อแก้ปัญหา CORS
-  
+  // Priority order for API URL resolution:
+  // 1. Runtime environment variable (from Firebase hosting)
+  // 2. Build-time environment variable (from .env.production)
+  // 3. ngrok URL (from localStorage or detection)
+  // 4. Development localhost
+  // 5. Production fallback
+
+  // Check runtime environment (Firebase hosting)
   if (typeof window !== 'undefined') {
-    // ตรวจสอบว่าเรากำลังใช้ Firebase hosting หรือไม่
+    // Check if we have stored ngrok URL
+    const storedNgrokUrl = localStorage.getItem('NGROK_API_URL');
+    if (storedNgrokUrl && storedNgrokUrl.includes('ngrok')) {
+      console.log('🌐 Using stored ngrok URL:', storedNgrokUrl);
+      return storedNgrokUrl;
+    }
+    
+    // Check if we're on Firebase hosting
     if (window.location.hostname.includes('web.app') || 
-        window.location.hostname.includes('firebaseapp.com') ||
-        window.location.hostname.includes('firebase')) {
-      console.log('🔥 Firebase hosting detected - Using Firebase-only mode');
-      return 'FIREBASE_ONLY_MODE'; // ใช้ค่าพิเศษเพื่อบอกว่าไม่ต้องเรียก Pi server
+        window.location.hostname.includes('firebaseapp.com')) {
+      console.log('🔥 Running on Firebase hosting');
+      
+      // Try to get ngrok URL from build-time env
+      const buildTimeUrl = process.env.REACT_APP_API_BASE_URL;
+      if (buildTimeUrl && buildTimeUrl.includes('ngrok')) {
+        console.log('🌐 Using build-time ngrok URL:', buildTimeUrl);
+        return buildTimeUrl;
+      }
     }
   }
 
-  // Development mode - ยังคงใช้ localhost ได้
+  // Development mode
   if (process.env.NODE_ENV === 'development') {
     return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
   }
 
-  // Production fallback to Firebase-only
-  return 'FIREBASE_ONLY_MODE';
+  // Production fallback
+  return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 };
 
 // Auto-detect and store ngrok URL if available
 const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
-  // 🔥 DISABLE ngrok detection in Firebase hosting
-  if (typeof window !== 'undefined' && 
-      (window.location.hostname.includes('web.app') || 
-       window.location.hostname.includes('firebaseapp.com'))) {
-    console.log('🔥 Firebase hosting - Skipping ngrok detection');
-    return null;
-  }
-  
   try {
     // List of potential ngrok URLs to try
     const potentialUrls = [
@@ -81,21 +90,15 @@ const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
 // Get base URL for configuration
 const BASE_API_URL = getApiBaseUrl();
 
-// 🔥 FORCE FIREBASE-ONLY MODE
-const IS_FIREBASE_HOSTING = typeof window !== 'undefined' && 
-                           (window.location.hostname.includes('web.app') ||
-                            window.location.hostname.includes('firebaseapp.com') ||
-                            window.location.hostname.includes('firebase'));
+// 🎯 แก้ไข: บังคับใช้ localhost เมื่อไม่มี ngrok URL
+const FORCE_LOCALHOST = typeof window !== 'undefined' && 
+                       window.location.hostname.includes('.web.app') &&
+                       !localStorage.getItem('NGROK_API_URL');
 
-const FINAL_API_URL = IS_FIREBASE_HOSTING ? 'FIREBASE_ONLY_MODE' : BASE_API_URL;
+const FINAL_API_URL = FORCE_LOCALHOST ? 'http://localhost:5000' : BASE_API_URL;
 
-// 🛡️ ปิดการตรวจสอบ CORS เพราะไม่ใช้ Pi server แล้ว
+// 🛡️ ตรวจสอบปัญหา CORS/Mixed Content
 const checkCorsIssue = (): { hasCorsIssue: boolean; solution: string } => {
-  if (IS_FIREBASE_HOSTING) {
-    console.log('🔥 Firebase-only mode - No CORS issues');
-    return { hasCorsIssue: false, solution: '' };
-  }
-  
   if (typeof window === 'undefined') return { hasCorsIssue: false, solution: '' };
   
   const isHttps = window.location.protocol === 'https:';
@@ -118,32 +121,35 @@ if (corsCheck.hasCorsIssue) {
   console.warn('⚠️ CORS Issue Detected:', corsCheck.solution);
 }
 
-// Enhanced API Configuration with Firebase-only support
+// Enhanced API Configuration with ngrok support
 export const API_CONFIG = {
-  BASE_URL: FINAL_API_URL, // 🔥 จะเป็น 'FIREBASE_ONLY_MODE' ใน production
+  BASE_URL: FINAL_API_URL, // 🎯 ใช้ FINAL_API_URL แทน BASE_API_URL
   TIMEOUT: 10000,
   FAST_TIMEOUT: 1000,
   RETRY_DELAY: 1000,
   MAX_RETRIES: 3,
   CACHE_DURATION: 30000,
 
-  // ngrok specific configuration - ปิดใน Firebase hosting
+  // ngrok specific configuration
   NGROK_CONFIG: {
-    AUTO_DETECT: !IS_FIREBASE_HOSTING,
+    AUTO_DETECT: true,
     DETECTION_INTERVAL: 60000,
     STORE_IN_LOCALSTORAGE: true,
-    FALLBACK_TO_LOCALHOST: !IS_FIREBASE_HOSTING
+    FALLBACK_TO_LOCALHOST: true
   },
 
   // Firebase hosting configuration
   FIREBASE_CONFIG: {
-    ENABLE_OFFLINE_MODE: IS_FIREBASE_HOSTING,
+    ENABLE_OFFLINE_MODE: process.env.REACT_APP_ENABLE_OFFLINE_MODE === 'true' || 
+                        (typeof window !== 'undefined' && 
+                         (window.location.hostname.includes('.web.app') || 
+                          window.location.hostname.includes('firebase'))),
     CACHE_API_RESPONSES: true,
-    MOCK_WHEN_OFFLINE: false
+    REAL_DATA_ONLY: true
   },
 
-  // 🔥 FORCE Firebase-only mode ใน production
-  FIREBASE_ONLY_MODE: IS_FIREBASE_HOSTING || FINAL_API_URL === 'FIREBASE_ONLY_MODE',
+  // Firebase-only mode configuration - ใช้ Firebase Database เท่านั้นใน production
+  FIREBASE_ONLY_MODE: typeof window !== 'undefined' && window.location.hostname.includes('.web.app'), // 🔥 Firebase-only ใน production
 
   // Refresh intervals optimized for performance
   REFRESH_INTERVALS: {
@@ -369,52 +375,25 @@ const resetConnectionState = () => {
   console.log('🔄 Connection state reset - will retry API calls');
 };
 
-// Aggressive global error suppression (run once on module load)
+// Simplified error suppression for network issues only
 (function setupGlobalErrorSuppression() {
   const originalConsoleError = console.error;
-  const originalConsoleWarn = console.warn;
-  const originalConsoleLog = console.log;
   
-  // Track the current script element to filter by source
-  const currentScript = (document.currentScript as HTMLScriptElement)?.src || '';
-  
-  // Override console.error to filter out ALL network errors
+  // Override console.error to filter out network errors only
   console.error = (...args) => {
     const message = String(args[0] || '');
     
-    // Suppress ALL localhost:5000 related errors
-    if (message.includes('localhost:5000') ||
-        message.includes('net::ERR_CONNECTION_REFUSED') ||
-        message.includes('ERR_CONNECTION_REFUSED') ||
-        message.includes('Failed to fetch') ||
-        (message.includes('GET http://') && message.includes('net::ERR_'))) {
-      return; // Completely suppress
+    // Suppress only connection refused errors
+    if (message.includes('net::ERR_CONNECTION_REFUSED') ||
+        message.includes('Failed to fetch') && message.includes('localhost:5000')) {
+      return; // Suppress network connection errors only
     }
     
-    // Call original console.error for other messages
+    // Call original console.error for all other messages
     originalConsoleError.apply(console, args);
   };
 
-  // Override console.warn to filter out network warnings
-  console.warn = (...args) => {
-    const message = String(args[0] || '');
-    if (message.includes('localhost:5000') ||
-        message.includes('net::ERR_') ||
-        message.includes('Failed to fetch')) {
-      return;
-    }
-    originalConsoleWarn.apply(console, args);
-  };
-
-  // Override console.log to filter out network logs  
-  console.log = (...args) => {
-    const message = String(args[0] || '');
-    if (message.includes('GET http://localhost:5000') ||
-        (message.includes('localhost:5000') && message.includes('ERR_'))) {
-      return;
-    }
-    originalConsoleLog.apply(console, args);
-  };
+  // Keep original console.warn and console.log unchanged
 
   // Global error event handler to catch any remaining errors
   const originalErrorHandler = window.onerror;
@@ -464,7 +443,7 @@ const resetConnectionState = () => {
     
     // If URL contains localhost:5000 and we're in aggressive offline mode
     if (url.includes('localhost:5000') && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      // Return a fake promise that rejects immediately 
+      // Return rejected promise for offline state 
       return Promise.reject(new Error('CONNECTION_FAILED_INTERCEPTED'));
     }
     
@@ -700,109 +679,103 @@ export class FishFeederApiClient {
     useCache: boolean = true,
     timeout: number = API_CONFIG.TIMEOUT,
   ): Promise<any> {
-    // 🔥 SKIP ALL HTTP REQUESTS IN FIREBASE-ONLY MODE
-    if (API_CONFIG.FIREBASE_ONLY_MODE || this.baseURL === 'FIREBASE_ONLY_MODE') {
-      console.log('🔥 Firebase-only mode - Skipping HTTP request:', endpoint);
-      // Return a Firebase-only response
+    // ตรวจสอบปัญหา CORS ก่อน
+    if (this.corsIssue) {
+      console.warn(`🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`);
       return {
-        status: 'firebase_only',
-        message: 'Using Firebase-only mode - no HTTP requests',
-        firebase_mode: true,
-        timestamp: new Date().toISOString()
+        status: 'offline',
+        message: `CORS/Mixed Content: HTTPS site cannot access HTTP localhost. Open http://localhost:3000 or setup ngrok.`,
+        timestamp: new Date().toISOString(),
+        corsIssue: true
       };
     }
 
-    // 🚫 EARLY DETECTION: Skip ถ้า URL ไม่ถูกต้อง
-    if (shouldSkipRequest(this.baseURL)) {
-      console.log('🚫 Skipping request due to invalid URL:', this.baseURL);
-      throw new ApiError(
-        `Request skipped - invalid URL: ${this.baseURL}`,
-        0,
-        endpoint
-      );
+    // Handle Firebase-only mode
+    if (API_CONFIG.FIREBASE_ONLY_MODE) {
+      console.log(`🔄 API Firebase-only Mode: Skipping ${endpoint}`);
+      throw new ApiError("Firebase-only mode - API not available", 503, endpoint);
     }
-
-    // Cache check
-    const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
-    if (useCache && (options.method === 'GET' || !options.method)) {
-      const cachedData = apiCache.get(cacheKey);
-      if (cachedData) {
-        console.log('📦 Cache hit:', endpoint);
-        return cachedData;
-      }
-    }
-
-    const url = `${this.baseURL}${endpoint}`;
+    const baseURL = this.baseURL || API_CONFIG.BASE_URL;
     
-    // Cancel previous request
+    // Get final URL - use ngrok if available, fallback to base URL
+    const secureBaseURL = baseURL;
+    const url = `${secureBaseURL}${endpoint}`;
+    const cacheKey = `${options.method || "GET"}:${url}`;
+
+    // Check cache for GET requests
+    if (options.method !== "POST" && useCache && apiCache.has(cacheKey)) {
+      return apiCache.get(cacheKey);
+    }
+
+    // Cancel previous request if exists
     if (this.abortController) {
       this.abortController.abort();
     }
+
     this.abortController = new AbortController();
 
-    const requestOptions: RequestInit = {
+    const fetchOptions: RequestInit = {
       ...options,
       signal: this.abortController.signal,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
     };
 
     try {
       const response = await withTimeout(
-        silentFetch(url, requestOptions),
-        timeout
+        withRetry(() => silentFetch(url, fetchOptions)),
+        timeout,
       );
 
       if (!response.ok) {
-        updateConnectionState(false);
         throw new ApiError(
           `HTTP ${response.status}: ${response.statusText}`,
           response.status,
-          endpoint
+          endpoint,
         );
       }
 
-      updateConnectionState(true);
       const data = await response.json();
 
-      // Cache successful GET requests
-      if (useCache && (options.method === 'GET' || !options.method)) {
+      // Cache successful GET responses
+      if (options.method !== "POST" && useCache && data.status === "success") {
         apiCache.set(cacheKey, data);
       }
 
       return data;
     } catch (error) {
-      updateConnectionState(false);
-
-      if (error instanceof ApiError) {
-        throw error;
-      }
-
-      // Handle specific error types
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new ApiError('Request was cancelled', 0, endpoint);
-      }
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        this.corsIssue = true;
-        const corsCheck = checkCorsIssue();
-        if (corsCheck.hasCorsIssue) {
-          console.warn('🔐 CORS/Mixed Content Issue:', corsCheck.solution);
-          throw new ApiError(
-            `Connection failed: ${corsCheck.solution}`,
-            0,
-            endpoint
-          );
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          throw new ApiError("Request was cancelled", 0, endpoint);
         }
+        
+        // Handle connection errors gracefully in production
+        if (error.message.includes('CONNECTION_FAILED') ||
+            error.message.includes('CONNECTION_FAILED_CACHED') ||
+            error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
+            error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
+            error.message.includes('CONNECTION_FAILED_OFFLINE') ||
+            error.message.includes('ERR_CONNECTION_REFUSED') || 
+            error.message.includes('Request timeout') ||
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('fetch is not defined')) {
+          // Only log once per connection state change to reduce noise
+          if (error.message.includes('CONNECTION_FAILED_CACHED') || 
+              error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
+              error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
+              error.message.includes('CONNECTION_FAILED_OFFLINE')) {
+            // Don't log for cached/aggressive/intercepted failures - completely silent
+          } else {
+            console.log(`🔄 API connection failed for ${endpoint}, returning offline response`);
+          }
+          throw new ApiError("Connection failed - no offline fallback", 503, endpoint);
+        }
+        
+        throw new ApiError(error.message, 0, endpoint);
       }
-
-      throw new ApiError(
-        error instanceof Error ? error.message : 'Unknown error',
-        0,
-        endpoint
-      );
+      throw error;
     }
   }
 
@@ -1063,7 +1036,7 @@ export class FishFeederApiClient {
 
   // Enhanced Relay Control (แก้ปัญหาติดกัน)
   async controlLEDSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
-    const command = action === 'on' ? 'R:1' : 'R:3';
+    const command = action === 'on' ? 'R:1' : 'R:4';  // Archive: R:1=LED ON, R:4=LED OFF
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
@@ -1076,7 +1049,7 @@ export class FishFeederApiClient {
   }
 
   async controlFanSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
-    const command = action === 'on' ? 'R:2' : 'R:4';
+    const command = action === 'on' ? 'R:2' : 'R:0';  // Archive: R:2=FAN ON, R:0=ALL OFF
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.FAN_CONTROL,
       {

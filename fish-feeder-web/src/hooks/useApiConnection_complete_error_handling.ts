@@ -70,8 +70,10 @@ class ErrorLogger {
       this.errors.communication_errors++;
     }
     
-    // Console logging for debugging
-    console.error(`[ERROR] ${category}: ${message}`, details);
+    // Only log non-connection errors for debugging
+    if (!message.includes('CONNECTION_FAILED') && !message.includes('net::ERR_CONNECTION_REFUSED')) {
+      console.error(`[ERROR] ${category}: ${message}`, details);
+    }
   }
 
   logCommand(success: boolean, command: string, response?: any) {
@@ -81,7 +83,10 @@ class ErrorLogger {
       console.log(`[SUCCESS] Command: ${command}`, response);
     } else {
       this.errors.failed_commands++;
-      console.error(`[FAILED] Command: ${command}`, response);
+      // Only log non-connection command failures
+      if (!command.includes('CONNECTION_FAILED')) {
+        console.error(`[FAILED] Command: ${command}`, response);
+      }
     }
   }
 
@@ -360,11 +365,9 @@ export const useApiConnection = () => {
         
         // Map commands to control functions for better error handling
         const commandMap: Record<string, () => Promise<any>> = {
-          'R:01': () => firebaseControlLED('off'),
           'R:4': () => firebaseControlLED('off'),
           'R:1': () => firebaseControlLED('on'),
-          'R:3': () => firebaseControlLED('on'),
-          'R:02': () => firebaseControlFan('off'),
+          'R:0': () => firebaseControlFan('off'),
           'R:6': () => firebaseControlFan('off'),
           'R:2': () => firebaseControlFan('on'),
           'R:5': () => firebaseControlFan('on'),

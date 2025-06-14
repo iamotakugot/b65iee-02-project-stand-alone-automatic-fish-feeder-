@@ -10,15 +10,16 @@ import {
   off,
 } from "firebase/database";
 
-// Firebase configuration (Updated for fish-feeder-test-1)
+// Firebase configuration (Updated for b65iee-02-fishfeederstandalone)
 const firebaseConfig = {
-  apiKey: "AIzaSyDDJOzZOzNJoWmTNbHVGAL0-5KPQNcr8iY",
-  authDomain: "fish-feeder-test-1.firebaseapp.com",
-  databaseURL: "https://fish-feeder-test-1-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "fish-feeder-test-1",
-  storageBucket: "fish-feeder-test-1.firebasestorage.app",
-  messagingSenderId: "965648166404",
-  appId: "1:965648166404:web:9a8e0c5c8be5b2e4b5f9e8",
+  apiKey: "AIzaSyClORmzLSHy9Zj38RlJudEb4sUNStVX2zc",
+  authDomain: "b65iee-02-fishfeederstandalone.firebaseapp.com",
+  databaseURL: "https://b65iee-02-fishfeederstandalone-default-rtdb.firebaseio.com/",
+  projectId: "b65iee-02-fishfeederstandalone",
+  storageBucket: "b65iee-02-fishfeederstandalone.firebasestorage.app",
+  messagingSenderId: "823036841241",
+  appId: "1:823036841241:web:a457dfd3f197412b448988",
+  measurementId: "G-829WX2408T"
 };
 
 // Types for Arduino sensor data
@@ -148,7 +149,7 @@ class FirebaseClient {
 
   // Get real-time sensor data updates
   getSensorData(callback: (data: FirebaseData | null) => void): () => void {
-    const sensorsRef = ref(this.database, "fish_feeder");
+    const sensorsRef = ref(this.database, "sensors");
 
     const unsubscribe = onValue(
       sensorsRef,
@@ -244,7 +245,7 @@ class FirebaseClient {
       // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:3 (ON) หรือ R:4 (OFF)
       const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus());
       await set(controlRef, value);
-      
+
       console.log(`✅ LED command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {
@@ -262,7 +263,7 @@ class FirebaseClient {
       // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:1 (ON) หรือ R:2 (OFF)
       const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus());
       await set(controlRef, value);
-      
+
       console.log(`✅ Fan command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {
@@ -300,7 +301,7 @@ class FirebaseClient {
       // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น B:1 (ON) หรือ B:0 (OFF)
       const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentBlowerStatus());
       await set(controlRef, value);
-      
+
       console.log(`✅ Blower command sent successfully: ${action} (${value})`);
       return true;
     } catch (error) {

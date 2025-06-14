@@ -59,8 +59,11 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
       setTimeout(() => unsubscribe(), 1000);
       setError(null);
     } catch (err) {
-      console.error("❌ Relay status fetch failed:", err);
-      setError(err instanceof Error ? err.message : "Status fetch failed");
+      // Simplified error handling - only log critical errors
+      if (err instanceof Error && !err.message.includes('CONNECTION_FAILED')) {
+        console.error("❌ Relay status fetch failed:", err);
+        setError(err.message);
+      }
     }
   }, [relayStatus]);
 
@@ -103,13 +106,13 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
           const newStatus = { ...relayStatus };
 
           if (relay_id === 1) {
-            // R:1 = IN1 (FAN) ON
-            newStatus.fan = true;
+            // R:1 = LED ON (Archive Protocol)
+            newStatus.led = true;
           } else if (relay_id === 2) {
-            // R:2 = IN1 (FAN) OFF
-            newStatus.fan = false;
+            // R:2 = FAN ON (Archive Protocol)
+            newStatus.fan = true;
           } else if (relay_id === 3) {
-            // R:3 = IN2 (LED) ON
+            // R:3 = LED ON (Legacy)
             newStatus.led = true;
           } else if (relay_id === 4) {
             // R:4 = IN2 (LED) OFF
@@ -154,7 +157,7 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleFanOn = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 1); // R:1 = IN1 (FAN) ON
+              ultraFastControl("fan", 2); // R:2 = FAN ON (Archive Protocol)
     },
     [ultraFastControl],
   );
@@ -162,7 +165,7 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleFanOff = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("fan", 2); // R:2 = IN1 (FAN) OFF
+              ultraFastControl("fan", 0); // R:0 = ALL OFF (Archive Protocol)
     },
     [ultraFastControl],
   );
@@ -170,7 +173,7 @@ const UltraFastRelayControl: React.FC<UltraFastRelayControlProps> = ({
   const handleLEDOn = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      ultraFastControl("led", 3); // R:3 = IN2 (LED) ON
+              ultraFastControl("led", 1); // R:1 = IN1 (LED) ON (Archive Protocol)
     },
     [ultraFastControl],
   );
