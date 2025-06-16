@@ -29,8 +29,8 @@
 // ===== PIN DEFINITIONS (ตามไฟล์อ้างอิง) =====
 // Sensors
 #define SOIL_PIN A2
-#define DHT_FEED_PIN 48        // DHT22 ในถังอาหาร
-#define DHT_BOX_PIN 46         // DHT22 ในกล่องควบคุม
+#define DHT_FEED_PIN 46        // DHT22 ในถังอาหาร (PIN MAP CORRECTED)
+#define DHT_BOX_PIN 48         // DHT22 ในกล่องควบคุม (PIN MAP CORRECTED)
 #define SOLAR_VOLTAGE_PIN A3   // แรงดันโซลาร์
 #define SOLAR_CURRENT_PIN A4   // กระแสโซลาร์
 #define LOAD_VOLTAGE_PIN A1    // แรงดันโหลด
@@ -38,9 +38,9 @@
 #define LOADCELL_DOUT_PIN 28
 #define LOADCELL_SCK_PIN 26
 
-// Controls - ตามต้นฉบับ
-#define LED_RELAY_PIN 50       // Relay IN1 (LED)
-#define FAN_RELAY_PIN 52       // Relay IN2 (FAN)
+// Controls - ตาม PIN MAP REFERENCE (CORRECTED)
+#define LED_RELAY_PIN 50       // Relay IN2 (LED) - PIN MAP CORRECTED
+#define FAN_RELAY_PIN 52       // Relay IN1 (FAN) - PIN MAP CORRECTED
 #define BLOWER_RPWM_PIN 5      // Blower RPWM
 #define BLOWER_LPWM_PIN 6      // Blower LPWM
 #define AUGER_ENA_PIN 8        // Auger PWM Enable
@@ -96,11 +96,15 @@ JsonDocument jsonBuffer;
 unsigned long lastDataSend = 0;
 const unsigned long DATA_SEND_INTERVAL = 3000;  // 3 seconds
 
+unsigned long lastSensorSend = 0;
+const unsigned long SENSOR_SEND_INTERVAL = 10000; // 10 seconds
+
 // ===== FUNCTION DECLARATIONS =====
 void showMainMenu();
 void processSerialInput();
 void updateSolarBatteryGlobals();
 void sendJsonData();
+void sendSensorDataJSON();
 void displayAllSensors();
 void processFirebaseCommand(String cmd);
 void processJsonCommand(String jsonStr);
@@ -190,6 +194,15 @@ void loop() {
     displayAllSensors();
     lastSensorRead = currentTime;
   }
+  
+  // Auto-transmit sensor data every 10 seconds
+  if (currentTime - lastSensorSend >= SENSOR_SEND_INTERVAL) {
+    sendSensorDataJSON();
+    lastSensorSend = currentTime;
+  }
+  
+  // Small delay to prevent overwhelming the system
+  delay(100);
 }
 
 // ===== JSON COMMUNICATION FUNCTIONS =====
@@ -241,6 +254,62 @@ void sendJsonData() {
   system["lastCommand"] = "OK";
   
   // Send JSON to Pi
+  serializeJson(jsonBuffer, Serial);
+  Serial.println();
+}
+
+// ===== AUTO SENSOR DATA TRANSMISSION =====
+// Function to automatically send sensor data every 10 seconds
+void sendSensorDataJSON() {
+  jsonBuffer.clear();
+  
+  // Read sensor data
+  float feedTemp = dhtFeed.readTemperature();
+  float feedHum = dhtFeed.readHumidity();
+  float boxTemp = dhtBox.readTemperature();
+  float boxHum = dhtBox.readHumidity();
+  float weight = scale.get_units(5);
+  int soilRaw = analogRead(SOIL_PIN);
+  float soilPct = map(soilRaw, 300, 1023, 100, 0);
+  soilPct = constrain(soilPct, 0, 100);
+  
+  // 🚀 AUTO-TRANSMISSION FORMAT - For Pi Server
+  jsonBuffer["source"] = "arduino_auto";
+  jsonBuffer["timestamp"] = millis();
+  jsonBuffer["interval"] = "10s";
+  
+  // 📊 SENSORS - Complete sensor package
+  JsonObject sensors = jsonBuffer["sensors"].to<JsonObject>();
+  sensors["feedTemp"] = isnan(feedTemp) ? 0 : feedTemp;
+  sensors["feedHumidity"] = isnan(feedHum) ? 0 : feedHum;
+  sensors["boxTemp"] = isnan(boxTemp) ? 0 : boxTemp;
+  sensors["boxHumidity"] = isnan(boxHum) ? 0 : boxHum;
+  sensors["weight"] = weight;
+  sensors["soilMoisture"] = soilPct;
+  sensors["solarVoltage"] = currentSolarVoltage;
+  sensors["solarCurrent"] = currentSolarCurrent;
+  sensors["loadVoltage"] = currentLoadVoltage;
+  sensors["loadCurrent"] = currentLoadCurrent;
+  sensors["batteryPercent"] = currentBatteryPercent;
+  sensors["batteryVoltage"] = currentLoadVoltage;
+  sensors["batteryCurrent"] = currentLoadCurrent;
+  
+  // 🎛️ CONTROLS STATE
+  JsonObject controls = jsonBuffer["controls"].to<JsonObject>();
+  controls["led"] = ledState;
+  controls["fan"] = fanState;
+  controls["augerSpeed"] = augerSpeed;
+  controls["blowerSpeed"] = blowerPWM;
+  controls["actuatorPos"] = actuatorPosition;
+  
+  // 🖥️ SYSTEM HEALTH
+  JsonObject system = jsonBuffer["system"].to<JsonObject>();
+  system["uptime"] = millis();
+  system["freeMemory"] = getFreeMemory();
+  system["autoTransmit"] = true;
+  system["connected"] = true;
+  
+  // Send to Pi Server
   serializeJson(jsonBuffer, Serial);
   Serial.println();
 }
@@ -581,14 +650,16 @@ void processFirebaseCommand(String cmd) {
   
   // Blower Control: B:1 (ON), B:0 (OFF), B:SPD:xxx (SPEED)
   else if (cmd.equals("B:1")) {
-    analogWrite(BLOWER_RPWM_PIN, 255);  // Full speed
-    blowerPWM = 255;
+    analogWrite(BLOWER_RPWM_PIN, 250);  // Minimum working PWM (≥230)
+    digitalWrite(BLOWER_LPWM_PIN, LOW);
+    blowerPWM = 250;
     success = true;
     message = "BLOWER ON";
-    Serial.println("{\"device\":\"blower\",\"status\":\"on\",\"speed\":255,\"success\":true}");
+    Serial.println("{\"device\":\"blower\",\"status\":\"on\",\"speed\":250,\"success\":true}");
   }
   else if (cmd.equals("B:0")) {
     analogWrite(BLOWER_RPWM_PIN, 0);  // OFF
+    digitalWrite(BLOWER_LPWM_PIN, LOW);
     blowerPWM = 0;
     success = true;
     message = "BLOWER OFF";
@@ -597,7 +668,9 @@ void processFirebaseCommand(String cmd) {
   else if (cmd.startsWith("B:SPD:")) {
     int speed = cmd.substring(6).toInt();  // Remove "B:SPD:"
     speed = constrain(speed, 0, 255);
+    if (speed > 0 && speed < 230) speed = 230;  // Minimum working PWM
     analogWrite(BLOWER_RPWM_PIN, speed);
+    digitalWrite(BLOWER_LPWM_PIN, LOW);
     blowerPWM = speed;
     success = true;
     message = "BLOWER SPEED " + String(speed);
@@ -835,22 +908,22 @@ void handleRelayControl(int input) {
     case 1: // LED ON
       digitalWrite(LED_RELAY_PIN, LOW);
       ledState = true;
-      Serial.println("รีเลย์ IN1 เปิด (ไฟ LED ส่องบ่อน้ำ)");
+      Serial.println("รีเลย์ IN2 เปิด (ไฟ LED ส่องบ่อน้ำ)");
       break;
     case 2: // FAN ON
       digitalWrite(FAN_RELAY_PIN, LOW);
       fanState = true;
-      Serial.println("รีเลย์ IN2 เปิด (พัดลมตู้คอนโทรล)");
+      Serial.println("รีเลย์ IN1 เปิด (พัดลมตู้คอนโทรล)");
       break;
     case 3: // LED OFF
       digitalWrite(LED_RELAY_PIN, HIGH);
       ledState = false;
-      Serial.println("รีเลย์ IN1 ปิด (ไฟ LED ส่องบ่อน้ำ)");
+      Serial.println("รีเลย์ IN2 ปิด (ไฟ LED ส่องบ่อน้ำ)");
       break;
     case 4: // FAN OFF
       digitalWrite(FAN_RELAY_PIN, HIGH);
       fanState = false;
-      Serial.println("รีเลย์ IN2 ปิด (พัดลมตู้คอนโทรล)");
+      Serial.println("รีเลย์ IN1 ปิด (พัดลมตู้คอนโทรล)");
       break;
     case 0: // Emergency Stop
       digitalWrite(LED_RELAY_PIN, HIGH);

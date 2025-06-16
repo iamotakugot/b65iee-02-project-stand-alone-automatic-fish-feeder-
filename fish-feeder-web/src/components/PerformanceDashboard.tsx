@@ -86,6 +86,12 @@ const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
     };
   }, [enabled, isVisible]);
 
+  const clearConsole = () => {
+    // Remove console.clear() for production
+    // Only clear performance metrics display
+    window.location.reload();
+  };
+
   if (!enabled) return null;
 
   const positionClasses = {
@@ -172,12 +178,7 @@ const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
           {/* Quick Actions */}
           <div className="flex gap-2 mt-3">
             <button
-              onClick={() => {
-                // Clear performance data
-                performance.clearMarks();
-                performance.clearMeasures();
-                console.clear();
-              }}
+              onClick={clearConsole}
               className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs"
             >
               Clear

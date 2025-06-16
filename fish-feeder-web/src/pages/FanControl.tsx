@@ -88,10 +88,16 @@ const FanControl: React.FC = () => {
     
     try {
       const { firebaseClient } = await import('../config/firebase');
-      const success = await firebaseClient.controlFan(newState ? 'on' : 'off');
+      
+      // ⚡ FIXED: Use sendRelayCommand for proper Arduino communication
+      const command = newState ? 'R:1' : 'R:2';  // R:1=Fan ON, R:2=Fan OFF
+      const success = await firebaseClient.sendRelayCommand(command);
       
       if (success) {
         setFanEnabled(newState);
+        console.log(`✅ Fan ${newState ? 'ON' : 'OFF'} command sent successfully`);
+      } else {
+        console.error('❌ Fan control command failed');
       }
     } catch (error) {
       console.error('Fan control error:', error);

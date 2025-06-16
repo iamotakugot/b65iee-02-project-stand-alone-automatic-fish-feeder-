@@ -15,9 +15,10 @@ const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
 const SimpleControl = lazy(() => import("@/pages/SimpleControl"));
 const FeedControl = lazy(() => import("@/pages/FeedControlPanel"));
 const FanControl = lazy(() => import("@/pages/FanControl"));
-
+const DataManagement = lazy(() => import("@/pages/DataManagement"));
 
 const Settings = lazy(() => import("@/pages/Settings"));
+const SystemStatus = lazy(() => import("@/pages/SystemStatus"));
 const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const SensorCharts = lazy(() => import("@/pages/SensorCharts"));
@@ -82,7 +83,7 @@ const AppContent = () => {
         <div className="fixed top-4 left-4 right-4 z-50">
           <div className="bg-blue-600 text-white p-2 rounded-lg shadow-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg">🌐</span>
+              <span className="text-lg">[WEB]</span>
               <span className="text-sm font-medium">Firebase Mode - Global Access</span>
             </div>
             <button 
@@ -111,8 +112,8 @@ const AppContent = () => {
           }`}>
             <span>
               {isConnected 
-                ? '🟢 Pi Connected' 
-                : '🟡 Pi Offline'
+                ? '[ONLINE] Pi Connected' 
+                : '[OFFLINE] Pi Offline'
               }
             </span>
             <button 
@@ -134,7 +135,7 @@ const AppContent = () => {
       {/* Hidden settings panel - Access via Ctrl+Shift+U */}
       <div className="fixed bottom-4 left-4 z-50 opacity-0 hover:opacity-100 transition-opacity">
         <div className="bg-gray-800 text-white p-2 rounded text-xs">
-          <div>💡 Tips:</div>
+          <div>TIPS:</div>
           <div>• Add ?minimal=true to URL for minimal UI</div>
           <div>• Add ?nomodals=true to disable all modals</div>
           <div>• Add ?nosplash=true to skip splash</div>
@@ -152,14 +153,15 @@ const AppContent = () => {
             <Route element={<FirebaseDashboard />} path="dashboard" />
             <Route element={<Dashboard />} path="api-dashboard" />
             <Route element={<FirebaseDashboard />} path="firebase-dashboard" />
-                        <Route element={<FeedControl />} path="feed-control" />
+            <Route element={<FeedControl />} path="feed-control" />
             <Route element={<FanControl />} path="fan-control" />
-
+            <Route element={<DataManagement />} path="data-management" />
       
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
     
             <Route element={<Settings />} path="settings" />
+            <Route element={<SystemStatus />} path="system-status" />
             <Route element={<SimpleControl />} path="simple-control" />
           </Route>
         </Routes>

@@ -35,10 +35,10 @@ export interface DashboardSensorValues {
 
 // แปลง Firebase data เป็นรูปแบบที่ Dashboard ใช้ได้
 export function convertFirebaseToSensorValues(sensorData: ArduinoSensorData | null): DashboardSensorValues {
-  console.log("🔄 Converting sensor data:", sensorData);
+  console.log("Converting sensor data:", sensorData);
   
   if (!sensorData) {
-    console.log("❌ No sensor data to convert");
+    console.log("No sensor data to convert");
     return {
       feederTemp: null,
       feederHumidity: null,
@@ -58,7 +58,7 @@ export function convertFirebaseToSensorValues(sensorData: ArduinoSensorData | nu
 
   // Check if sensor data is empty object
   if (Object.keys(sensorData).length === 0) {
-    console.log("⚠️ Sensor data is empty object");
+    console.log("WARNING: Sensor data is empty object");
     return {
       feederTemp: null,
       feederHumidity: null,
@@ -76,38 +76,50 @@ export function convertFirebaseToSensorValues(sensorData: ArduinoSensorData | nu
     };
   }
 
-  // Use actual Firebase sensor names (updated for new Arduino format)
-  const feederWeight = sensorData.HX711_FEEDER?.weight?.value || sensorData.WEIGHT?.weight?.value || null;
-  
-  console.log("📊 Individual sensor values:", {
-    DHT22_FEEDER: sensorData.DHT22_FEEDER,
-    DHT22_SYSTEM: sensorData.DHT22_SYSTEM,
-    HX711_FEEDER: sensorData.HX711_FEEDER,
-    WEIGHT: sensorData.WEIGHT, // Legacy support
-    BATTERY_STATUS: sensorData.BATTERY_STATUS,
-    SOLAR_VOLTAGE: sensorData.SOLAR_VOLTAGE,
-    SOLAR_CURRENT: sensorData.SOLAR_CURRENT,
-    SOIL_MOISTURE: sensorData.SOIL_MOISTURE,
+  // ⚡ FIXED: Handle new Arduino JSON format (direct values)
+  // Arduino sends: {"feedTemp": 25.5, "feedHumidity": 60, "boxTemp": 30, ...}
+  const feedTemp = (sensorData as any).feedTemp || sensorData.DHT22_FEEDER?.temperature?.value || null;
+  const feedHumidity = (sensorData as any).feedHumidity || sensorData.DHT22_FEEDER?.humidity?.value || null;
+  const boxTemp = (sensorData as any).boxTemp || sensorData.DHT22_SYSTEM?.temperature?.value || null;
+  const boxHumidity = (sensorData as any).boxHumidity || sensorData.DHT22_SYSTEM?.humidity?.value || null;
+  const weight = (sensorData as any).weight || sensorData.HX711_FEEDER?.weight?.value || sensorData.WEIGHT?.weight?.value || null;
+  const batteryVoltage = (sensorData as any).loadVoltage || (sensorData as any).batteryVoltage || sensorData.BATTERY_STATUS?.voltage?.value || null;
+  const batteryCurrent = (sensorData as any).loadCurrent || (sensorData as any).batteryCurrent || sensorData.BATTERY_STATUS?.current?.value || null;
+  const solarVoltage = (sensorData as any).solarVoltage || sensorData.SOLAR_VOLTAGE?.voltage?.value || null;
+  const solarCurrent = (sensorData as any).solarCurrent || sensorData.SOLAR_CURRENT?.current?.value || null;
+  const soilMoisture = (sensorData as any).soilMoisture || sensorData.SOIL_MOISTURE?.moisture?.value || null;
+
+  console.log("DATA: Converted sensor values:", {
+    feedTemp,
+    feedHumidity,
+    boxTemp,
+    boxHumidity,
+    weight,
+    batteryVoltage,
+    batteryCurrent,
+    solarVoltage,
+    solarCurrent,
+    soilMoisture,
   });
   
   return {
-    // Temperature sensors - keep null if not available
-    feederTemp: sensorData.DHT22_FEEDER?.temperature?.value || null,
-    feederHumidity: sensorData.DHT22_FEEDER?.humidity?.value || null,
-    systemTemp: sensorData.DHT22_SYSTEM?.temperature?.value || null,
-    systemHumidity: sensorData.DHT22_SYSTEM?.humidity?.value || null,
+    // Temperature sensors - use Arduino direct format first
+    feederTemp: feedTemp,
+    feederHumidity: feedHumidity,
+    systemTemp: boxTemp,
+    systemHumidity: boxHumidity,
     
-    // System sensors - use correct Firebase sensor names
-    feederWeight,
-    weight: feederWeight, // alias for compatibility
-    batteryVoltage: sensorData.BATTERY_STATUS?.voltage?.value || null,
-    batteryPercentage: calculateBatteryPercentage(sensorData.BATTERY_STATUS?.voltage?.value || null),
-    loadVoltage: sensorData.BATTERY_STATUS?.voltage?.value || null, // Use battery voltage for load voltage
-    loadCurrent: sensorData.BATTERY_STATUS?.current?.value || null, // Use battery current for load current
+    // System sensors - use Arduino direct format first
+    feederWeight: weight,
+    weight: weight, // alias for compatibility
+    batteryVoltage: batteryVoltage,
+    batteryPercentage: calculateBatteryPercentage(batteryVoltage),
+    loadVoltage: batteryVoltage, // Use battery voltage for load voltage
+    loadCurrent: batteryCurrent, // Use battery current for load current
     // Solar sensors
-    solarVoltage: sensorData.SOLAR_VOLTAGE?.voltage?.value || null,
-    solarCurrent: sensorData.SOLAR_CURRENT?.current?.value || null,
-    soilMoisture: sensorData.SOIL_MOISTURE?.moisture?.value || null,
+    solarVoltage: solarVoltage,
+    solarCurrent: solarCurrent,
+    soilMoisture: soilMoisture,
   };
 }
 

@@ -33,6 +33,7 @@ import { FishFeederApiClient, API_CONFIG } from "../config/api";
 import { useApi } from "../contexts/ApiContext";
 import MotorPWMSettings from "../components/MotorPWMSettings";
 import JsonDebugSettings from "../components/JsonDebugSettings";
+import RelayControlPanel from "../components/RelayControlPanel";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -98,17 +99,12 @@ const Settings = () => {
 
     // 🎯 ON-DEMAND MODE: No auto-refresh intervals!
     // Use manual refresh button for updates
-    console.log('🎯 Settings: ON-DEMAND MODE - Use refresh button for updates');
-
-    // No setInterval polling for better performance!
   }, []);
 
   // Load system configuration
   const loadConfiguration = async () => {
     setLoading(prev => ({ ...prev, config: true }));
     try {
-      console.log("🔄 Loading configuration data...");
-      
       // Use Firebase instead of API client
       // For now, use default config since Firebase doesn't have getConfig
       const data = null; // await firebaseClient.getConfig() - not implemented
@@ -138,7 +134,6 @@ const Settings = () => {
         throw new Error("No config data received");
       }
     } catch (error) {
-      console.log("Config load failed, using defaults:", error);
       // Fallback to default config
       setConfig({
         timing: {
@@ -200,7 +195,6 @@ const Settings = () => {
           piServerConnected = !!arduinoResponse; // Pi server needed for Arduino communication
         }
       } catch (error) {
-        console.warn("Connection test failed:", error);
         firebaseConnected = false;
         arduinoConnected = false;
         piServerConnected = false;
@@ -214,7 +208,6 @@ const Settings = () => {
         pi_server_connected: piServerConnected,
       });
     } catch (error) {
-      console.error("Status check failed:", error);
       setSystemStatus({
         arduino_connected: false,
         firebase_connected: false,
@@ -247,7 +240,6 @@ const Settings = () => {
     } catch (error) {
       // Only log non-connection errors
       if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-      console.error("Weight monitoring failed:", error);
       }
     }
   };
@@ -341,10 +333,6 @@ const Settings = () => {
         throw new Error('Tare failed');
       }
     } catch (error) {
-      // Only log non-connection errors
-      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
-      console.error("Tare failed:", error);
-      }
       setCalibrationMessage("❌ การปรับเทียร์ล้มเหลว กรุณาลองใหม่");
       showMessage("error", "❌ การปรับเทียร์ล้มเหลว");
     } finally {
@@ -374,7 +362,6 @@ const Settings = () => {
         throw new Error('Calibration failed');
       }
     } catch (error) {
-      console.error("Calibration failed:", error);
       setCalibrationMessage("❌ การปรับค่าล้มเหลว กรุณาตรวจสอบน้ำหนักและลองใหม่");
       showMessage("error", "❌ การปรับค่าเครื่องชั่งล้มเหลว");
     } finally {
@@ -416,6 +403,12 @@ const Settings = () => {
     } finally {
       setLoading(prev => ({ ...prev, config: false }));
     }
+  };
+
+  // Add proper error handling without console statements
+  const handleError = (operation: string, error: any) => {
+    // Log to error reporting service in production
+    // For now, just store in state for user feedback
   };
 
   return (
@@ -978,6 +971,9 @@ const Settings = () => {
 
         {/* Firebase JSON Debug Settings */}
         <JsonDebugSettings />
+
+        {/* Relay Control Panel */}
+        <RelayControlPanel />
 
         {/* Auto Feed Configuration */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">

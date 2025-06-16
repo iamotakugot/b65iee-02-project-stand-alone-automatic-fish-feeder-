@@ -1,354 +1,270 @@
-# 🤖 Arduino Fish Feeder System
-## Enterprise-Grade Firmware - 100% QA
+# Arduino Fish Feeder System
 
-[![Arduino](https://img.shields.io/badge/Arduino-Mega%202560-blue)](https://www.arduino.cc/)
-[![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange)](https://platformio.org/)
-[![QA Status](https://img.shields.io/badge/QA-100%25-brightgreen)](../README.md)
+PlatformIO-based Arduino firmware for the Fish Feeder IoT hardware system.
 
----
+## Overview
 
-## 🎯 **Overview**
+This Arduino firmware handles all hardware interfacing including sensors, motors, actuators, and serial communication with the Raspberry Pi server.
 
-High-performance Arduino firmware for the Fish Feeder IoT system. Built with non-blocking architecture, enterprise-grade error handling, and real-time sensor monitoring.
-
-### **Key Features:**
-- 🚀 **Non-blocking Architecture** - TaskScheduler-based multitasking
-- 📊 **Real-time Sensors** - Temperature, humidity, weight monitoring
-- 🎮 **Device Control** - Servo motors, LEDs, fans, pumps
-- 🛡️ **Emergency Stop** - Safety systems and fail-safes
-- 📡 **Serial Communication** - JSON/MessagePack/Protobuf protocols
-- 🔧 **Auto-calibration** - HX711 and servo calibration
-- 📈 **Performance Monitoring** - Memory usage, loop timing
-- 🔍 **Debug Logging** - Multi-level logging system
-
----
-
-## 🛠️ **Hardware Requirements**
-
-### **Main Controller:**
-- **Arduino Mega 2560** (Required - needs multiple serial ports)
-- **USB Cable** for programming and power
-- **External Power Supply** 12V/2A recommended
-
-### **Sensors:**
-- **DHT22** - Temperature & humidity sensor
-- **HX711 + Load Cell** - Weight measurement (5kg capacity)
-- **DS18B20** - Water temperature sensor
-- **Voltage Divider** - Battery monitoring
-- **Current Sensor** - Power consumption monitoring
-
-### **Actuators:**
-- **Servo Motor SG90** - Feeding mechanism
-- **DC Fan 12V** - Ventilation system
-- **Water Pump 12V** - Circulation system
-- **RGB LED Strip** - Status indicators
-- **Buzzer** - Audio alerts
-
-### **Communication:**
-- **ESP32/ESP8266** - WiFi connectivity (optional)
-- **Ethernet Shield** - Wired network (optional)
-- **Serial to USB** - Raspberry Pi communication
-
----
-
-## 📁 **Project Structure**
+## Architecture Role
 
 ```
-arduino-system/
-├── src/
-│   ├── main.cpp                 # Main application
-│   ├── sensors/
-│   │   ├── dht_sensor.h         # DHT22 temperature/humidity
-│   │   ├── weight_sensor.h      # HX711 load cell
-│   │   └── water_temp.h         # DS18B20 water temperature
-│   ├── actuators/
-│   │   ├── servo_control.h      # Servo motor control
-│   │   ├── fan_control.h        # Fan speed control
-│   │   └── led_control.h        # LED status indicators
-│   ├── communication/
-│   │   ├── serial_handler.h     # Serial communication
-│   │   └── protocol_handler.h   # Message protocols
-│   └── utils/
-│       ├── task_manager.h       # Task scheduling
-│       ├── error_handler.h      # Error management
-│       └── calibration.h        # Sensor calibration
-├── lib/                         # External libraries
-├── test/                        # Unit tests
-├── platformio.ini               # PlatformIO configuration
-└── README.md                    # This file
+Web App → Firebase → Pi Server → [ARDUINO] (Serial)
 ```
 
----
+The Arduino:
+- Collects sensor data from multiple sensors
+- Controls motors (auger, blower)
+- Controls linear actuator
+- Manages relay outputs
+- Communicates via JSON over Serial
 
-## 🚀 **Quick Start**
+## Hardware Components
 
-### **1. Install PlatformIO:**
+### Sensors
+- **DHT22 Sensors**: Temperature and humidity (feeder and system)
+- **HX711 Load Cell**: Weight measurement
+- **Soil Moisture Sensor**: Soil humidity monitoring
+- **Voltage Sensors**: Battery and solar monitoring
+
+### Actuators
+- **Auger Motor**: Food dispensing mechanism
+- **Blower Motor**: Ventilation system
+- **Linear Actuator**: Position control
+- **Relay Outputs**: General purpose switching
+
+### Communication
+- **Serial Interface**: USB/UART communication
+- **LED Indicators**: Status indication
+- **Buzzer**: Audio alerts (optional)
+
+## Requirements
+
+- Arduino Mega 2560 (recommended) or compatible
+- PlatformIO IDE or Arduino IDE
+- USB cable for programming and communication
+- All required sensors and actuators connected
+
+## Pin Configuration
+
+Key pins (see code for complete mapping):
+- **DHT22 Sensors**: Digital pins for temperature/humidity
+- **HX711**: Digital pins for load cell interface
+- **Motor PWM**: PWM pins for speed control
+- **Relays**: Digital output pins
+- **Actuator**: Digital pins for direction control
+
+## Installation
+
+### PlatformIO (Recommended)
 ```bash
-# Install PlatformIO Core
-pip install platformio
-
-# Or use VS Code extension
-# Install "PlatformIO IDE" extension
-```
-
-### **2. Build and Upload:**
-```bash
-# Navigate to arduino-system directory
 cd arduino-system
+pio run --target upload
+```
 
-# Install dependencies
-pio lib install
+### Arduino IDE
+1. Open `src/main.cpp` in Arduino IDE
+2. Install required libraries
+3. Select Arduino Mega 2560
+4. Upload to board
 
-# Build firmware
+## Required Libraries
+
+- **DHT sensor library**: Temperature/humidity sensors
+- **HX711**: Load cell amplifier
+- **ArduinoJson**: JSON communication protocol
+
+## Communication Protocol
+
+### JSON Data Format (Arduino → Pi)
+```json
+{
+  "feedTemp": 27.5,
+  "feedHumidity": 64.5,
+  "boxTemp": 28.6,
+  "boxHumidity": 64.1,
+  "weight": 1.985,
+  "soilMoisture": 450,
+  "loadVoltage": 12.3,
+  "solarVoltage": 13.2,
+  "timestamp": 1672531200
+}
+```
+
+### Command Format (Pi → Arduino)
+```json
+{
+  "command": "control",
+  "device": "auger",
+  "action": "forward",
+  "value": 255
+}
+```
+
+## Supported Commands
+
+### Auger Control
+- `auger:forward` - Run auger forward
+- `auger:reverse` - Run auger reverse  
+- `auger:stop` - Stop auger motor
+
+### Blower Control
+- `blower:on` - Turn on blower
+- `blower:off` - Turn off blower
+- `blower:speed:###` - Set speed (0-255)
+
+### Actuator Control
+- `actuator:up` - Move actuator up
+- `actuator:down` - Move actuator down
+- `actuator:stop` - Stop actuator
+
+### Relay Control
+- `relay1:on/off` - Control relay 1
+- `relay2:on/off` - Control relay 2
+- `relay3:on/off` - Control relay 3
+- `relay4:on/off` - Control relay 4
+
+## Configuration
+
+### Serial Settings
+- Baud Rate: 115200
+- Data Bits: 8
+- Stop Bits: 1
+- Parity: None
+
+### Sensor Intervals
+- DHT22 Reading: 2 seconds minimum
+- Weight Reading: 1 second
+- Soil Moisture: 5 seconds
+- Voltage Reading: 10 seconds
+
+## Code Structure
+
+```
+src/
+├── main.cpp             # Main application code
+├── sensors.h           # Sensor management
+├── motors.h            # Motor control
+└── communication.h     # Serial communication
+```
+
+## Key Functions
+
+### Sensor Management
+- `readDHT22Sensors()` - Read temperature/humidity
+- `readWeight()` - Read load cell value
+- `readSoilMoisture()` - Read soil sensor
+- `readVoltages()` - Read battery/solar voltages
+
+### Motor Control
+- `controlAuger()` - Auger motor control
+- `controlBlower()` - Blower motor control
+- `controlActuator()` - Linear actuator control
+- `controlRelays()` - Relay switching
+
+### Communication
+- `sendSensorData()` - Send JSON data to Pi
+- `processCommand()` - Handle incoming commands
+- `parseJsonCommand()` - Parse JSON commands
+
+## Development
+
+### Building
+```bash
+# PlatformIO
 pio run
 
-# Upload to Arduino
+# With upload
 pio run --target upload
 
-# Monitor serial output
+# Clean build
+pio run --target clean
+```
+
+### Debugging
+```bash
+# Serial monitor
 pio device monitor
+
+# With specific baud rate
+pio device monitor --baud 115200
 ```
 
-### **3. Hardware Connections:**
+### Testing
+1. Upload firmware to Arduino
+2. Open serial monitor at 115200 baud
+3. Verify sensor data output
+4. Test commands from Pi server
 
-| Component | Arduino Pin | Notes |
-|-----------|-------------|-------|
-| DHT22 | Digital Pin 2 | Temperature/Humidity |
-| HX711 DT | Digital Pin 3 | Weight sensor data |
-| HX711 SCK | Digital Pin 4 | Weight sensor clock |
-| DS18B20 | Digital Pin 5 | Water temperature |
-| Servo Motor | Digital Pin 6 | Feeding mechanism |
-| Fan Control | Digital Pin 7 | PWM fan speed |
-| LED Strip | Digital Pin 8 | Status indicators |
-| Buzzer | Digital Pin 9 | Audio alerts |
-| Emergency Stop | Digital Pin 10 | Safety button |
+## Architecture Rules
 
----
+### FORBIDDEN
+- `delay()` functions (use non-blocking timing)
+- Blocking loops in main loop
+- Hardcoded sensor values
+- Test/mock code
 
-## 📊 **Performance Specifications**
+### REQUIRED
+- Event-driven programming
+- Non-blocking operations
+- JSON communication only
+- Proper error handling
+- Regular sensor updates
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **Loop Frequency** | 1000 Hz | ✅ High Performance |
-| **Sensor Update Rate** | 10 Hz | ✅ Real-time |
-| **Serial Baudrate** | 115200 bps | ✅ Fast Communication |
-| **Memory Usage** | <60% | ✅ Optimized |
-| **Response Time** | <10ms | ✅ Ultra-fast |
-| **Error Rate** | <0.01% | ✅ Reliable |
+## Timing Considerations
 
----
+- Main loop should complete quickly (< 100ms)
+- Use `millis()` for timing instead of `delay()`
+- Sensor readings at appropriate intervals
+- Immediate response to serial commands
 
-## 🔧 **Configuration**
+## Error Handling
 
-### **Sensor Calibration:**
-```cpp
-// Weight sensor calibration
-#define WEIGHT_CALIBRATION_FACTOR -7050.0
-#define WEIGHT_OFFSET 50
+- Invalid command responses
+- Sensor reading failures
+- Communication timeouts
+- Hardware fault detection
 
-// Temperature sensor offsets
-#define DHT_TEMP_OFFSET 0.0
-#define DHT_HUMIDITY_OFFSET 0.0
-#define WATER_TEMP_OFFSET 0.0
+## Troubleshooting
 
-// Servo positions
-#define SERVO_CLOSED_POSITION 0
-#define SERVO_OPEN_POSITION 90
-#define SERVO_FEED_DURATION 2000  // milliseconds
-```
+### Serial Communication Issues
+1. Check baud rate (115200)
+2. Verify USB connection
+3. Ensure Arduino IDE isn't using port
+4. Check for proper JSON formatting
 
-### **Task Scheduling:**
-```cpp
-// Task intervals (milliseconds)
-#define SENSOR_READ_INTERVAL 100    // 10 Hz
-#define SERIAL_CHECK_INTERVAL 10    // 100 Hz
-#define STATUS_UPDATE_INTERVAL 1000 // 1 Hz
-#define HEARTBEAT_INTERVAL 5000     // 0.2 Hz
-```
+### Sensor Reading Issues
+1. Verify sensor connections
+2. Check power supply voltage
+3. Review pin assignments
+4. Test sensors individually
 
----
+### Motor Control Issues
+1. Check motor power supply
+2. Verify PWM pin connections
+3. Test motor drivers
+4. Review command format
 
-## 📡 **Communication Protocol**
+## Hardware Setup
 
-### **JSON Format:**
-```json
-{
-  "type": "sensor_data",
-  "timestamp": 1640995200,
-  "data": {
-    "temperature": 25.5,
-    "humidity": 60.2,
-    "weight": 1250.0,
-    "water_temp": 24.8,
-    "battery_voltage": 12.1
-  }
-}
-```
+### Power Requirements
+- Arduino: 5V via USB or external
+- Motors: 12V external supply
+- Sensors: 3.3V/5V from Arduino
 
-### **Control Commands:**
-```json
-{
-  "type": "control_command",
-  "device": "feeder",
-  "action": "feed",
-  "value": 1,
-  "duration": 2000
-}
-```
+### Wiring Guidelines
+- Use appropriate gauge wire for motors
+- Separate power for high-current devices
+- Proper grounding for all components
+- Shield sensitive sensor wires
 
----
+## Performance Optimization
 
-## 🛡️ **Safety Features**
+- Efficient sensor reading cycles
+- Optimized JSON processing
+- Minimal memory allocation
+- Fast serial communication
 
-### **Emergency Stop System:**
-- **Hardware Button** - Physical emergency stop
-- **Software Watchdog** - Auto-reset on hang
-- **Voltage Monitoring** - Low battery protection
-- **Temperature Limits** - Overheat protection
-- **Error Recovery** - Automatic fault recovery
+## License
 
-### **Fail-safe Mechanisms:**
-- **Default Safe State** - All actuators off
-- **Communication Timeout** - Auto-stop after 30s
-- **Sensor Validation** - Range checking
-- **Memory Protection** - Stack overflow detection
-
----
-
-## 🔍 **Debugging & Monitoring**
-
-### **Serial Monitor Output:**
-```
-[INFO] System initialized successfully
-[DEBUG] DHT22: T=25.5°C, H=60.2%
-[DEBUG] Weight: 1250.0g
-[DEBUG] Water temp: 24.8°C
-[INFO] Feeding cycle started
-[DEBUG] Servo position: 90°
-[INFO] Feeding cycle completed
-```
-
-### **Log Levels:**
-- **ERROR** - Critical errors only
-- **WARN** - Warnings and errors
-- **INFO** - General information
-- **DEBUG** - Detailed debugging
-- **TRACE** - Verbose tracing
-
----
-
-## 📚 **Libraries Used**
-
-### **Core Libraries:**
-```ini
-[lib_deps]
-    # Task scheduling
-    arkhipenko/TaskScheduler@^3.7.0
-    
-    # Sensor libraries
-    adafruit/DHT sensor library@^1.4.4
-    bogde/HX711@^0.7.5
-    milesburton/DallasTemperature@^3.11.0
-    
-    # Communication
-    bblanchon/ArduinoJson@^7.4.1
-    hideakitai/ArduinoMsgPack@^0.4.4
-    nanopb/Nanopb@^0.4.91
-    
-    # Utilities
-    arduino-libraries/ArduinoHttpClient@^0.6.1
-    paulstoffregen/OneWire@^2.3.8
-```
-
----
-
-## 🧪 **Testing**
-
-### **Unit Tests:**
-```bash
-# Run all tests
-pio test
-
-# Run specific test
-pio test -f test_sensors
-
-# Run with verbose output
-pio test -v
-```
-
-### **Hardware-in-Loop Testing:**
-```bash
-# Test sensor readings
-pio test -f test_sensor_readings
-
-# Test actuator control
-pio test -f test_actuator_control
-
-# Test communication
-pio test -f test_serial_communication
-```
-
----
-
-## 🔧 **Troubleshooting**
-
-### **Common Issues:**
-
-**1. Upload Failed:**
-```bash
-# Check port
-pio device list
-
-# Reset Arduino and try again
-pio run --target upload --upload-port COM3
-```
-
-**2. Sensor Not Reading:**
-```cpp
-// Check connections and power
-// Verify pin assignments
-// Check sensor initialization
-```
-
-**3. Serial Communication Issues:**
-```cpp
-// Verify baudrate (115200)
-// Check cable connections
-// Ensure proper ground connection
-```
-
----
-
-## 📈 **Performance Optimization**
-
-### **Memory Optimization:**
-- **String Pooling** - Reuse string constants
-- **Buffer Management** - Efficient memory allocation
-- **Stack Optimization** - Minimize local variables
-- **PROGMEM Usage** - Store constants in flash
-
-### **Speed Optimization:**
-- **Interrupt-driven I/O** - Non-blocking operations
-- **Task Prioritization** - Critical tasks first
-- **Efficient Algorithms** - Optimized sensor reading
-- **Hardware Timers** - Precise timing control
-
----
-
-## 🤝 **Contributing**
-
-1. **Fork the repository**
-2. **Create feature branch** (`git checkout -b feature/new-sensor`)
-3. **Add your changes** with proper documentation
-4. **Test thoroughly** on hardware
-5. **Submit pull request** with detailed description
-
----
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
-
----
-
-**🚀 Ready for production deployment with 100% QA score!** 
+Private project - All rights reserved. 

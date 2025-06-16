@@ -207,15 +207,28 @@ const FeedControlPanel = () => {
 
   const checkConnection = async () => {
     try {
-      const health = await getHealth();
-
-      setConnectionStatus(
-        health.serial_connected
-          ? "✅ Connected to Pi Server"
-          : "⚠️ Pi Server connected, Arduino disconnected",
-      );
+      // ⚡ FIXED: Use Firebase connection check
+      const { firebaseClient } = await import('../config/firebase');
+      const testConnection = await new Promise((resolve) => {
+        const unsubscribe = firebaseClient.getSensorData((data) => {
+          unsubscribe();
+          resolve(data !== null);
+        });
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          unsubscribe();
+          resolve(false);
+        }, 5000);
+      });
+      
+      if (testConnection) {
+        setConnectionStatus("✅ Connected to Firebase & Arduino System");
+      } else {
+        setConnectionStatus("❌ Firebase Connection Failed");
+      }
     } catch (error) {
-      setConnectionStatus("❌ Cannot connect to Pi Server");
+      setConnectionStatus("❌ Connection Error: " + (error as Error).message);
     }
   };
 

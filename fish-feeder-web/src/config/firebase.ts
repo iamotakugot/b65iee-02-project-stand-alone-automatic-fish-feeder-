@@ -194,9 +194,9 @@ class GlobalFirebaseListenerManager {
           const rawData = snapshot.val();
           console.log("🔥 Global Firebase raw data received:", rawData);
 
-          // ⚡ SIMPLE DATA PROCESSING - No complex variable declarations
+          // ⚡ FIXED DATA PROCESSING - Simple variable declarations
           let processedData: FirebaseData;
-
+          
           if (rawData) {
             processedData = {
               timestamp: rawData.timestamp || new Date().toISOString(),
@@ -223,31 +223,31 @@ class GlobalFirebaseListenerManager {
           // Store last data
           this.lastData = processedData;
 
-          // ⚡ SAFE CALLBACK EXECUTION
-          const callbacks = Array.from(this.listenerCallbacks);
-          callbacks.forEach(callback => {
+          // ⚡ SAFE CALLBACK EXECUTION - Fixed callback loop
+          const callbackArray = Array.from(this.listenerCallbacks);
+          for (const callbackFn of callbackArray) {
             try {
-              callback(processedData);
-            } catch (error) {
-              console.error("❌ Global callback error:", error);
+              callbackFn(processedData);
+            } catch (callbackError) {
+              console.error("❌ Global callback error:", callbackError);
             }
-          });
+          }
 
-        } catch (error) {
-          console.error("❌ Global Firebase data processing error:", error);
-          const callbacks = Array.from(this.listenerCallbacks);
-          callbacks.forEach(callback => {
+        } catch (processingError) {
+          console.error("❌ Global Firebase data processing error:", processingError);
+          const callbackArray = Array.from(this.listenerCallbacks);
+          for (const callbackFn of callbackArray) {
             try {
-              callback(null);
-            } catch (error) {
-              console.error("❌ Global callback error:", error);
+              callbackFn(null);
+            } catch (callbackError) {
+              console.error("❌ Global callback error:", callbackError);
             }
-          });
+          }
         }
       },
-      (error) => {
+      (firebaseError) => {
         if (!isActive) return;
-        console.error("❌ Global Firebase error:", error);
+        console.error("❌ Global Firebase error:", firebaseError);
         
         const errorData: FirebaseData = {
           timestamp: new Date().toISOString(),
@@ -259,14 +259,14 @@ class GlobalFirebaseListenerManager {
           }
         };
 
-        const callbacks = Array.from(this.listenerCallbacks);
-        callbacks.forEach(callback => {
+        const callbackArray = Array.from(this.listenerCallbacks);
+        for (const callbackFn of callbackArray) {
           try {
-            callback(errorData);
-          } catch (error) {
-            console.error("❌ Global callback error:", error);
+            callbackFn(errorData);
+          } catch (callbackError) {
+            console.error("❌ Global callback error:", callbackError);
           }
-        });
+        }
       }
     );
 
@@ -461,23 +461,34 @@ class FirebaseClient {
     }
   }
 
-  // Control Motor PWM
+  // Set Motor PWM - ✅ ส่งข้อมูลที่ Pi แปลงเป็น Arduino Protocol ได้
   async setMotorPWM(motorId: string, speed: number): Promise<boolean> {
     try {
       console.log(`⚙️ Setting Motor ${motorId} PWM: ${speed}`);
-      const controlRef = ref(this.database, `fish_feeder/control/motors/${motorId}`);
-
-      await set(controlRef, {
-        speed: speed,
-        enabled: speed > 0,
-        timestamp: new Date().toISOString()
-      });
-      console.log(`✅ Motor PWM set successfully: ${motorId} = ${speed}`);
-
+      
+      // Send direct speed command based on motor type
+      if (motorId === "blower") {
+        const controlRef = ref(this.database, "fish_feeder/commands/blower_speed");
+        await set(controlRef, speed);
+        console.log(`✅ Blower PWM set successfully: ${speed}`);
+      } else if (motorId === "auger") {
+        const controlRef = ref(this.database, "fish_feeder/commands/auger_speed"); 
+        await set(controlRef, speed);
+        console.log(`✅ Auger PWM set successfully: ${speed}`);
+      } else {
+        // Generic motor command
+        const controlRef = ref(this.database, "fish_feeder/commands/motor_speed");
+        await set(controlRef, {
+          device: motorId,
+          speed: speed,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`✅ Motor PWM set successfully: ${motorId} = ${speed}`);
+      }
+      
       return true;
     } catch (error) {
-      console.error("❌ Motor PWM control error:", error);
-
+      console.error("❌ Motor PWM error:", error);
       return false;
     }
   }
