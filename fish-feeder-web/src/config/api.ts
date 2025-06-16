@@ -14,35 +14,41 @@ const getApiBaseUrl = (): string => {
   // 5. Production fallback
 
   // Check runtime environment (Firebase hosting)
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Check if we have stored ngrok URL
-    const storedNgrokUrl = localStorage.getItem('NGROK_API_URL');
-    if (storedNgrokUrl && storedNgrokUrl.includes('ngrok')) {
-      console.log('🌐 Using stored ngrok URL:', storedNgrokUrl);
+    const storedNgrokUrl = localStorage.getItem("NGROK_API_URL");
+
+    if (storedNgrokUrl && storedNgrokUrl.includes("ngrok")) {
+      console.log("🌐 Using stored ngrok URL:", storedNgrokUrl);
+
       return storedNgrokUrl;
     }
-    
+
     // Check if we're on Firebase hosting
-    if (window.location.hostname.includes('web.app') || 
-        window.location.hostname.includes('firebaseapp.com')) {
-      console.log('🔥 Running on Firebase hosting');
-      
+    if (
+      window.location.hostname.includes("web.app") ||
+      window.location.hostname.includes("firebaseapp.com")
+    ) {
+      console.log("🔥 Running on Firebase hosting");
+
       // Try to get ngrok URL from build-time env
       const buildTimeUrl = process.env.REACT_APP_API_BASE_URL;
-      if (buildTimeUrl && buildTimeUrl.includes('ngrok')) {
-        console.log('🌐 Using build-time ngrok URL:', buildTimeUrl);
+
+      if (buildTimeUrl && buildTimeUrl.includes("ngrok")) {
+        console.log("🌐 Using build-time ngrok URL:", buildTimeUrl);
+
         return buildTimeUrl;
       }
     }
   }
 
   // Development mode
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+  if (process.env.NODE_ENV === "development") {
+    return process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
   }
 
   // Production fallback
-  return process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+  return process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 };
 
 // Auto-detect and store ngrok URL if available
@@ -51,28 +57,29 @@ const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
     // List of potential ngrok URLs to try
     const potentialUrls = [
       // Check if we have a stored URL first
-      localStorage.getItem('NGROK_API_URL'),
+      localStorage.getItem("NGROK_API_URL"),
       // Check build-time environment
       process.env.REACT_APP_API_BASE_URL,
       // Try common ngrok patterns
-      'https://fish-feeder-api.ngrok.io',
+      "https://fish-feeder-api.ngrok.io",
     ].filter(Boolean);
 
     for (const url of potentialUrls) {
-      if (url && url.includes('ngrok')) {
+      if (url && url.includes("ngrok")) {
         try {
           // ⚡ IMMEDIATE CONNECTION TEST - No setTimeout delays!
           const controller = new AbortController();
-          
-          const response = await fetch(`${url}/api/health`, { 
-            method: 'GET',
-            signal: controller.signal
+
+          const response = await fetch(`${url}/api/health`, {
+            method: "GET",
+            signal: controller.signal,
           });
-          
+
           if (response.ok) {
-            console.log('✅ ngrok URL detected and verified:', url);
-            localStorage.setItem('NGROK_API_URL', url);
-            localStorage.setItem('NGROK_DETECTED_AT', new Date().toISOString());
+            console.log("✅ ngrok URL detected and verified:", url);
+            localStorage.setItem("NGROK_API_URL", url);
+            localStorage.setItem("NGROK_DETECTED_AT", new Date().toISOString());
+
             return url;
           }
         } catch (e) {
@@ -81,9 +88,9 @@ const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
       }
     }
   } catch (error) {
-    console.log('ngrok auto-detection failed:', error);
+    console.log("ngrok auto-detection failed:", error);
   }
-  
+
   return null;
 };
 
@@ -91,34 +98,37 @@ const detectAndStoreNgrokUrl = async (): Promise<string | null> => {
 const BASE_API_URL = getApiBaseUrl();
 
 // 🎯 แก้ไข: บังคับใช้ localhost เมื่อไม่มี ngrok URL
-const FORCE_LOCALHOST = typeof window !== 'undefined' && 
-                       window.location.hostname.includes('.web.app') &&
-                       !localStorage.getItem('NGROK_API_URL');
+const FORCE_LOCALHOST =
+  typeof window !== "undefined" &&
+  window.location.hostname.includes(".web.app") &&
+  !localStorage.getItem("NGROK_API_URL");
 
-const FINAL_API_URL = FORCE_LOCALHOST ? 'http://localhost:5000' : BASE_API_URL;
+const FINAL_API_URL = FORCE_LOCALHOST ? "http://localhost:5000" : BASE_API_URL;
 
 // 🛡️ ตรวจสอบปัญหา CORS/Mixed Content
 const checkCorsIssue = (): { hasCorsIssue: boolean; solution: string } => {
-  if (typeof window === 'undefined') return { hasCorsIssue: false, solution: '' };
-  
-  const isHttps = window.location.protocol === 'https:';
-  const isFirebaseHosting = window.location.hostname.includes('.web.app');
-  const usingLocalhost = FINAL_API_URL.includes('localhost');
-  
+  if (typeof window === "undefined")
+    return { hasCorsIssue: false, solution: "" };
+
+  const isHttps = window.location.protocol === "https:";
+  const isFirebaseHosting = window.location.hostname.includes(".web.app");
+  const usingLocalhost = FINAL_API_URL.includes("localhost");
+
   if (isHttps && isFirebaseHosting && usingLocalhost) {
     return {
       hasCorsIssue: true,
-      solution: `🔐 เว็บ HTTPS ไม่สามารถเรียก HTTP localhost ได้\n\n✅ วิธีแก้ไข:\n1. เปิดเว็บใน localhost: http://localhost:3000\n2. หรือใช้ ngrok สำหรับ HTTPS tunnel\n\nAPI ปัจจุบัน: ${FINAL_API_URL}`
+      solution: `🔐 เว็บ HTTPS ไม่สามารถเรียก HTTP localhost ได้\n\n✅ วิธีแก้ไข:\n1. เปิดเว็บใน localhost: http://localhost:3000\n2. หรือใช้ ngrok สำหรับ HTTPS tunnel\n\nAPI ปัจจุบัน: ${FINAL_API_URL}`,
     };
   }
-  
-  return { hasCorsIssue: false, solution: '' };
+
+  return { hasCorsIssue: false, solution: "" };
 };
 
 // ตรวจสอบปัญหา CORS และแสดงคำเตือน
 const corsCheck = checkCorsIssue();
+
 if (corsCheck.hasCorsIssue) {
-  console.warn('⚠️ CORS Issue Detected:', corsCheck.solution);
+  console.warn("⚠️ CORS Issue Detected:", corsCheck.solution);
 }
 
 // Enhanced API Configuration with ngrok support
@@ -135,24 +145,26 @@ export const API_CONFIG = {
     AUTO_DETECT: true,
     DETECTION_INTERVAL: 60000,
     STORE_IN_LOCALSTORAGE: true,
-    FALLBACK_TO_LOCALHOST: true
+    FALLBACK_TO_LOCALHOST: true,
   },
 
   // Firebase hosting configuration
   FIREBASE_CONFIG: {
-    ENABLE_OFFLINE_MODE: process.env.REACT_APP_ENABLE_OFFLINE_MODE === 'true' || 
-                        (typeof window !== 'undefined' && 
-                         (window.location.hostname.includes('.web.app') || 
-                          window.location.hostname.includes('firebase'))),
+    ENABLE_OFFLINE_MODE:
+      process.env.REACT_APP_ENABLE_OFFLINE_MODE === "true" ||
+      (typeof window !== "undefined" &&
+        (window.location.hostname.includes(".web.app") ||
+          window.location.hostname.includes("firebase"))),
     CACHE_API_RESPONSES: true,
-    REAL_DATA_ONLY: true
+    REAL_DATA_ONLY: true,
   },
 
   // 🔥 FIREBASE-ONLY MODE - แก้ไข CORS Issue
-  FIREBASE_ONLY_MODE: typeof window !== 'undefined' && 
-                      (window.location.hostname.includes('.web.app') || 
-                       window.location.hostname.includes('firebaseapp.com') ||
-                       window.location.protocol === 'https:'), // Force Firebase-only in production and HTTPS
+  FIREBASE_ONLY_MODE:
+    typeof window !== "undefined" &&
+    (window.location.hostname.includes(".web.app") ||
+      window.location.hostname.includes("firebaseapp.com") ||
+      window.location.protocol === "https:"), // Force Firebase-only in production and HTTPS
 
   // Refresh intervals optimized for performance
   REFRESH_INTERVALS: {
@@ -215,7 +227,7 @@ export const API_CONFIG = {
 
     // Room sensors
     ROOM_TEMPERATURE: "ROOM_TEMPERATURE",
-    ROOM_HUMIDITY: "ROOM_HUMIDITY", 
+    ROOM_HUMIDITY: "ROOM_HUMIDITY",
     LIGHT_LEVEL: "LIGHT_LEVEL",
     MOTION_SENSOR: "MOTION_SENSOR",
     AIR_QUALITY: "AIR_QUALITY",
@@ -325,7 +337,7 @@ const withTimeout = <T>(promise: Promise<T>, timeout: number): Promise<T> => {
 
 // Retry helper with exponential backoff and offline mode handling
 // Aggressive connection state tracking to prevent repeated failed requests
-let connectionState = 'unknown'; // 'online', 'offline', 'unknown'
+let connectionState = "unknown"; // 'online', 'offline', 'unknown'
 let lastConnectionCheck = 0;
 let consecutiveFailures = 0;
 const CONNECTION_CHECK_INTERVAL = 30000; // 30 seconds for aggressive caching
@@ -334,37 +346,46 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 // Check if we should skip API calls based on previous failures
 const shouldSkipRequest = (url: string): boolean => {
   const now = Date.now();
-  
+
   // If we've had multiple consecutive failures, extend the offline period
-  if (connectionState === 'offline' && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    const extendedInterval = CONNECTION_CHECK_INTERVAL * Math.min(consecutiveFailures, 10);
+  if (
+    connectionState === "offline" &&
+    consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+  ) {
+    const extendedInterval =
+      CONNECTION_CHECK_INTERVAL * Math.min(consecutiveFailures, 10);
+
     if (now - lastConnectionCheck < extendedInterval) {
       return true;
     }
   }
-  
+
   // Regular offline check
-  if (connectionState === 'offline' && now - lastConnectionCheck < CONNECTION_CHECK_INTERVAL) {
+  if (
+    connectionState === "offline" &&
+    now - lastConnectionCheck < CONNECTION_CHECK_INTERVAL
+  ) {
     return true;
   }
-  
+
   return false;
 };
 
 // Update connection state based on request results
 const updateConnectionState = (success: boolean) => {
   const previousState = connectionState;
-  connectionState = success ? 'online' : 'offline';
+
+  connectionState = success ? "online" : "offline";
   lastConnectionCheck = Date.now();
-  
+
   if (success) {
     consecutiveFailures = 0; // Reset failure count on success
-    if (previousState === 'offline') {
-      console.log('🟢 API connection restored!');
+    if (previousState === "offline") {
+      console.log("🟢 API connection restored!");
     }
   } else {
     consecutiveFailures++;
-    if (previousState !== 'offline') {
+    if (previousState !== "offline") {
       console.log(`🔴 API connection lost (failure ${consecutiveFailures})`);
     }
   }
@@ -372,26 +393,29 @@ const updateConnectionState = (success: boolean) => {
 
 // Reset connection state (useful for manual retry)
 const resetConnectionState = () => {
-  connectionState = 'unknown';
+  connectionState = "unknown";
   lastConnectionCheck = 0;
   consecutiveFailures = 0;
-  console.log('🔄 Connection state reset - will retry API calls');
+  console.log("🔄 Connection state reset - will retry API calls");
 };
 
 // Simplified error suppression for network issues only
 (function setupGlobalErrorSuppression() {
   const originalConsoleError = console.error;
-  
+
   // Override console.error to filter out network errors only
   console.error = (...args) => {
-    const message = String(args[0] || '');
-    
+    const message = String(args[0] || "");
+
     // Suppress only connection refused errors
-    if (message.includes('net::ERR_CONNECTION_REFUSED') ||
-        message.includes('Failed to fetch') && message.includes('localhost:5000')) {
+    if (
+      message.includes("net::ERR_CONNECTION_REFUSED") ||
+      (message.includes("Failed to fetch") &&
+        message.includes("localhost:5000"))
+    ) {
       return; // Suppress network connection errors only
     }
-    
+
     // Call original console.error for all other messages
     originalConsoleError.apply(console, args);
   };
@@ -400,76 +424,109 @@ const resetConnectionState = () => {
 
   // Global error event handler to catch any remaining errors
   const originalErrorHandler = window.onerror;
-  window.onerror = function(message, source, lineno, colno, error) {
-    const errorMessage = String(message || '');
-    
+
+  window.onerror = function (message, source, lineno, colno, error) {
+    const errorMessage = String(message || "");
+
     // Suppress network-related errors
-    if (errorMessage.includes('localhost:5000') ||
-        errorMessage.includes('net::ERR_CONNECTION_REFUSED') ||
-        errorMessage.includes('Failed to fetch')) {
+    if (
+      errorMessage.includes("localhost:5000") ||
+      errorMessage.includes("net::ERR_CONNECTION_REFUSED") ||
+      errorMessage.includes("Failed to fetch")
+    ) {
       return true; // Prevent default browser error logging
     }
-    
+
     // Call original error handler if exists
     if (originalErrorHandler) {
-      return originalErrorHandler.call(this, message, source, lineno, colno, error);
+      return originalErrorHandler.call(
+        this,
+        message,
+        source,
+        lineno,
+        colno,
+        error,
+      );
     }
+
     return false;
   };
 
   // Unhandled promise rejection handler
   const originalRejectionHandler = window.onunhandledrejection;
-  window.onunhandledrejection = function(event) {
-    const reason = String(event.reason?.message || event.reason || '');
-    
+
+  window.onunhandledrejection = function (event) {
+    const reason = String(event.reason?.message || event.reason || "");
+
     // Suppress network-related promise rejections
-    if (reason.includes('localhost:5000') ||
-        reason.includes('net::ERR_CONNECTION_REFUSED') ||
-        reason.includes('Failed to fetch') ||
-        reason.includes('CONNECTION_FAILED')) {
+    if (
+      reason.includes("localhost:5000") ||
+      reason.includes("net::ERR_CONNECTION_REFUSED") ||
+      reason.includes("Failed to fetch") ||
+      reason.includes("CONNECTION_FAILED")
+    ) {
       event.preventDefault(); // Prevent logging
+
       return;
     }
-    
+
     // Call original handler if exists
     if (originalRejectionHandler) {
       return originalRejectionHandler.call(window, event);
     }
-     };
+  };
 
   // Aggressive fetch override to prevent localhost:5000 calls completely
   const originalFetch = window.fetch;
-  window.fetch = function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const url = typeof input === 'string' ? input : 
-                input instanceof URL ? input.href :
-                input instanceof Request ? input.url : '';
-    
+
+  window.fetch = function (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input instanceof Request
+            ? input.url
+            : "";
+
     // If URL contains localhost:5000 and we're in aggressive offline mode
-    if (url.includes('localhost:5000') && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      // Return rejected promise for offline state 
-      return Promise.reject(new Error('CONNECTION_FAILED_INTERCEPTED'));
+    if (
+      url.includes("localhost:5000") &&
+      consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+    ) {
+      // Return rejected promise for offline state
+      return Promise.reject(new Error("CONNECTION_FAILED_INTERCEPTED"));
     }
-    
+
     // If we know we're offline, prevent localhost calls
-    if (url.includes('localhost:5000') && connectionState === 'offline') {
-      return Promise.reject(new Error('CONNECTION_FAILED_OFFLINE'));
+    if (url.includes("localhost:5000") && connectionState === "offline") {
+      return Promise.reject(new Error("CONNECTION_FAILED_OFFLINE"));
     }
-    
+
     // Call original fetch for other URLs
     return originalFetch.call(this, input, init);
   };
 })();
 
 // Enhanced silent fetch with aggressive error suppression
-const silentFetch = async (url: string, options: RequestInit): Promise<Response> => {
+const silentFetch = async (
+  url: string,
+  options: RequestInit,
+): Promise<Response> => {
   // Skip request if we know we're offline (COMPLETELY PREVENT NETWORK CALL)
   if (shouldSkipRequest(url)) {
-    throw new Error('CONNECTION_FAILED_CACHED');
+    throw new Error("CONNECTION_FAILED_CACHED");
   }
-  
+
   // Additional check for localhost URLs - prevent all localhost calls in aggressive mode
-  if (url.includes('localhost:5000') && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    throw new Error('CONNECTION_FAILED_AGGRESSIVE');
+  if (
+    url.includes("localhost:5000") &&
+    consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+  ) {
+    throw new Error("CONNECTION_FAILED_AGGRESSIVE");
   }
 
   // Store original console methods and global error handler
@@ -477,32 +534,41 @@ const silentFetch = async (url: string, options: RequestInit): Promise<Response>
   const originalWarn = console.warn;
   const originalLog = console.log;
   const originalErrorHandler = window.onerror;
-  
+
   // Aggressive console suppression
   const suppressConsole = () => {
     console.error = () => {};
     console.warn = () => {};
     console.log = (...args) => {
       // Allow our own log messages but suppress network errors
-      const message = args.join(' ');
-      if (message.includes('net::ERR_') || message.includes('ERR_CONNECTION_REFUSED')) {
+      const message = args.join(" ");
+
+      if (
+        message.includes("net::ERR_") ||
+        message.includes("ERR_CONNECTION_REFUSED")
+      ) {
         return;
       }
       originalLog.apply(console, args);
     };
-    
+
     // Suppress global error events for network issues
     window.onerror = (message, source, lineno, colno, error) => {
-      if (typeof message === 'string' && 
-          (message.includes('net::ERR_') || 
-           message.includes('ERR_CONNECTION_REFUSED') ||
-           message.includes('Failed to fetch'))) {
+      if (
+        typeof message === "string" &&
+        (message.includes("net::ERR_") ||
+          message.includes("ERR_CONNECTION_REFUSED") ||
+          message.includes("Failed to fetch"))
+      ) {
         return true; // Prevent default browser error logging
       }
-      return originalErrorHandler ? originalErrorHandler(message, source, lineno, colno, error) : false;
+
+      return originalErrorHandler
+        ? originalErrorHandler(message, source, lineno, colno, error)
+        : false;
     };
   };
-  
+
   // Restore console methods
   const restoreConsole = () => {
     console.error = originalError;
@@ -510,34 +576,37 @@ const silentFetch = async (url: string, options: RequestInit): Promise<Response>
     console.log = originalLog;
     window.onerror = originalErrorHandler;
   };
-  
+
   try {
     suppressConsole();
-    
+
     // ⚡ IMMEDIATE FETCH - No timeout delays!
     const controller = new AbortController();
-    
+
     const fetchOptions = {
       ...options,
-      signal: controller.signal
+      signal: controller.signal,
     };
-    
+
     const response = await fetch(url, fetchOptions);
-    
+
     updateConnectionState(true);
+
     return response;
   } catch (error) {
     updateConnectionState(false);
-    
+
     // Handle all connection-related errors silently
     if (error instanceof Error) {
-      if (error.name === 'AbortError' ||
-          error.message.includes('ERR_CONNECTION_REFUSED') || 
-          error.message.includes('Failed to fetch') ||
-          error.message.includes('net::ERR_') ||
-          error.message.includes('TypeError') ||
-          error.message.includes('NetworkError')) {
-        throw new Error('CONNECTION_FAILED');
+      if (
+        error.name === "AbortError" ||
+        error.message.includes("ERR_CONNECTION_REFUSED") ||
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("net::ERR_") ||
+        error.message.includes("TypeError") ||
+        error.message.includes("NetworkError")
+      ) {
+        throw new Error("CONNECTION_FAILED");
       }
     }
     throw error;
@@ -558,16 +627,18 @@ const withRetry = async <T>(
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
+
       // Handle connection errors immediately without retrying
-      if (lastError.message.includes('CONNECTION_FAILED') ||
-          lastError.message.includes('CONNECTION_FAILED_CACHED') ||
-          lastError.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
-          lastError.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
-          lastError.message.includes('CONNECTION_FAILED_OFFLINE') ||
-          lastError.message.includes('ERR_CONNECTION_REFUSED') || 
-          lastError.message.includes('Failed to fetch') ||
-          lastError.message.includes('fetch is not defined')) {
+      if (
+        lastError.message.includes("CONNECTION_FAILED") ||
+        lastError.message.includes("CONNECTION_FAILED_CACHED") ||
+        lastError.message.includes("CONNECTION_FAILED_AGGRESSIVE") ||
+        lastError.message.includes("CONNECTION_FAILED_INTERCEPTED") ||
+        lastError.message.includes("CONNECTION_FAILED_OFFLINE") ||
+        lastError.message.includes("ERR_CONNECTION_REFUSED") ||
+        lastError.message.includes("Failed to fetch") ||
+        lastError.message.includes("fetch is not defined")
+      ) {
         throw lastError; // Let the main error handler catch this
       }
 
@@ -673,8 +744,6 @@ export class FishFeederApiClient {
     this.corsIssue = checkCorsIssue().hasCorsIssue;
   }
 
-
-
   /**
    * Enhanced fetch with caching, retries, and proper error handling
    */
@@ -686,22 +755,29 @@ export class FishFeederApiClient {
   ): Promise<any> {
     // ตรวจสอบปัญหา CORS ก่อน
     if (this.corsIssue) {
-      console.warn(`🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`);
+      console.warn(
+        `🔐 CORS Issue: Cannot reach ${this.baseURL}${endpoint} from HTTPS site`,
+      );
+
       return {
-        status: 'offline',
+        status: "offline",
         message: `CORS/Mixed Content: HTTPS site cannot access HTTP localhost. Open http://localhost:3000 or setup ngrok.`,
         timestamp: new Date().toISOString(),
-        corsIssue: true
+        corsIssue: true,
       };
     }
 
     // Handle Firebase-only mode
     if (API_CONFIG.FIREBASE_ONLY_MODE) {
       console.log(`🔄 API Firebase-only Mode: Skipping ${endpoint}`);
-      throw new ApiError("Firebase-only mode - API not available", 503, endpoint);
+      throw new ApiError(
+        "Firebase-only mode - API not available",
+        503,
+        endpoint,
+      );
     }
     const baseURL = this.baseURL || API_CONFIG.BASE_URL;
-    
+
     // Get final URL - use ngrok if available, fallback to base URL
     const secureBaseURL = baseURL;
     const url = `${secureBaseURL}${endpoint}`;
@@ -755,29 +831,39 @@ export class FishFeederApiClient {
         if (error.name === "AbortError") {
           throw new ApiError("Request was cancelled", 0, endpoint);
         }
-        
+
         // Handle connection errors gracefully in production
-        if (error.message.includes('CONNECTION_FAILED') ||
-            error.message.includes('CONNECTION_FAILED_CACHED') ||
-            error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
-            error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
-            error.message.includes('CONNECTION_FAILED_OFFLINE') ||
-            error.message.includes('ERR_CONNECTION_REFUSED') || 
-            error.message.includes('Request timeout') ||
-            error.message.includes('Failed to fetch') ||
-            error.message.includes('fetch is not defined')) {
+        if (
+          error.message.includes("CONNECTION_FAILED") ||
+          error.message.includes("CONNECTION_FAILED_CACHED") ||
+          error.message.includes("CONNECTION_FAILED_AGGRESSIVE") ||
+          error.message.includes("CONNECTION_FAILED_INTERCEPTED") ||
+          error.message.includes("CONNECTION_FAILED_OFFLINE") ||
+          error.message.includes("ERR_CONNECTION_REFUSED") ||
+          error.message.includes("Request timeout") ||
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("fetch is not defined")
+        ) {
           // Only log once per connection state change to reduce noise
-          if (error.message.includes('CONNECTION_FAILED_CACHED') || 
-              error.message.includes('CONNECTION_FAILED_AGGRESSIVE') ||
-              error.message.includes('CONNECTION_FAILED_INTERCEPTED') ||
-              error.message.includes('CONNECTION_FAILED_OFFLINE')) {
+          if (
+            error.message.includes("CONNECTION_FAILED_CACHED") ||
+            error.message.includes("CONNECTION_FAILED_AGGRESSIVE") ||
+            error.message.includes("CONNECTION_FAILED_INTERCEPTED") ||
+            error.message.includes("CONNECTION_FAILED_OFFLINE")
+          ) {
             // Don't log for cached/aggressive/intercepted failures - completely silent
           } else {
-            console.log(`🔄 API connection failed for ${endpoint}, returning offline response`);
+            console.log(
+              `🔄 API connection failed for ${endpoint}, returning offline response`,
+            );
           }
-          throw new ApiError("Connection failed - no offline fallback", 503, endpoint);
+          throw new ApiError(
+            "Connection failed - no offline fallback",
+            503,
+            endpoint,
+          );
         }
-        
+
         throw new ApiError(error.message, 0, endpoint);
       }
       throw error;
@@ -857,7 +943,9 @@ export class FishFeederApiClient {
   }
 
   // Control methods
-  async controlBlower(request: BlowerControlRequest): Promise<ApiResponse<any>> {
+  async controlBlower(
+    request: BlowerControlRequest,
+  ): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.BLOWER_CONTROL,
       {
@@ -869,7 +957,9 @@ export class FishFeederApiClient {
     );
   }
 
-  async controlActuator(request: ActuatorControlRequest): Promise<ApiResponse<any>> {
+  async controlActuator(
+    request: ActuatorControlRequest,
+  ): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.ACTUATOR_CONTROL,
       {
@@ -950,8 +1040,6 @@ export class FishFeederApiClient {
     resetConnectionState();
   }
 
-
-
   // Legacy methods for backward compatibility
   async feedFish(request: FeedControlRequest): Promise<ApiResponse<any>> {
     return this.controlFeed(request);
@@ -1027,7 +1115,10 @@ export class FishFeederApiClient {
     );
   }
 
-  async setCameraResolution(width: number, height: number): Promise<ApiResponse<any>> {
+  async setCameraResolution(
+    width: number,
+    height: number,
+  ): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.CAMERA_RESOLUTION,
       {
@@ -1040,8 +1131,9 @@ export class FishFeederApiClient {
   }
 
   // Enhanced Relay Control (แก้ปัญหาติดกัน)
-  async controlLEDSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
-    const command = action === 'on' ? 'R:1' : 'R:4';  // Archive: R:1=LED ON, R:4=LED OFF
+  async controlLEDSafe(action: "on" | "off"): Promise<ApiResponse<any>> {
+    const command = action === "on" ? "R:1" : "R:4"; // Archive: R:1=LED ON, R:4=LED OFF
+
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
@@ -1053,8 +1145,9 @@ export class FishFeederApiClient {
     );
   }
 
-  async controlFanSafe(action: 'on' | 'off'): Promise<ApiResponse<any>> {
-    const command = action === 'on' ? 'R:2' : 'R:0';  // Archive: R:2=FAN ON, R:0=ALL OFF
+  async controlFanSafe(action: "on" | "off"): Promise<ApiResponse<any>> {
+    const command = action === "on" ? "R:2" : "R:0"; // Archive: R:2=FAN ON, R:0=ALL OFF
+
     return this.enhancedFetch(
       API_CONFIG.ENDPOINTS.FAN_CONTROL,
       {
@@ -1071,7 +1164,7 @@ export class FishFeederApiClient {
       API_CONFIG.ENDPOINTS.LED_CONTROL,
       {
         method: API_CONFIG.METHODS.POST,
-        body: JSON.stringify({ command: 'R:0' }),
+        body: JSON.stringify({ command: "R:0" }),
       },
       false,
       API_CONFIG.TIMEOUT,
@@ -1101,7 +1194,9 @@ export class FishFeederApiClient {
     );
   }
 
-  async calibrateWeight(request: { weight: number }): Promise<ApiResponse<any>> {
+  async calibrateWeight(request: {
+    weight: number;
+  }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       "/api/control/weight/calibrate",
       {
@@ -1131,7 +1226,10 @@ export class FishFeederApiClient {
     );
   }
 
-  async startAutoWeigh(request: { duration: number; interval: number }): Promise<ApiResponse<any>> {
+  async startAutoWeigh(request: {
+    duration: number;
+    interval: number;
+  }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       "/api/control/weight/auto-weigh",
       {
@@ -1143,7 +1241,10 @@ export class FishFeederApiClient {
     );
   }
 
-  async detectWeightChange(request: { threshold: number; duration: number }): Promise<ApiResponse<any>> {
+  async detectWeightChange(request: {
+    threshold: number;
+    duration: number;
+  }): Promise<ApiResponse<any>> {
     return this.enhancedFetch(
       "/api/control/weight/detect-change",
       {

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { FaLightbulb, FaFan } from "react-icons/fa";
 import { BsLightningFill } from "react-icons/bs";
 
-import { apiClient, RelayStatus, API_CONFIG } from "../config/api";
+import { RelayStatus } from "../config/api";
 
 interface RelayControlProps {
   className?: string;
@@ -39,7 +39,7 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
       abortControllerRef.current = new AbortController();
 
       // Get status from Firebase
-      const { firebaseClient } = await import('../config/firebase');
+      const { firebaseClient } = await import("../config/firebase");
       const response: any = await new Promise((resolve) => {
         const unsubscribe = firebaseClient.getSensorData((data) => {
           if (data?.status) {
@@ -47,12 +47,12 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
               status: "success",
               relay_status: {
                 led: data.control?.led === "on" || false,
-                fan: data.control?.fan === "on" || false
-              }
+                fan: data.control?.fan === "on" || false,
+              },
             });
           }
         });
-        
+
         // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
         // Cleanup happens when component unmounts or effect re-runs
         return () => unsubscribe();
@@ -98,18 +98,23 @@ const RelayControl: React.FC<RelayControlProps> = ({ className = "" }) => {
         console.log(`🎛️ Controlling ${type.toUpperCase()}: ${action}`);
 
         // Use Firebase control
-        const { firebaseClient } = await import('../config/firebase');
-        const success = type === "led"
-          ? await firebaseClient.controlLED(action)
-          : await firebaseClient.controlFan(action);
-        
-        const response = success ? { 
-          status: "success", 
-          relay_status: {
-            ...relayStatus,
-            [type]: action === "on" || (action === "toggle" && !relayStatus[type])
-          }
-        } : { status: "failed" };
+        const { firebaseClient } = await import("../config/firebase");
+        const success =
+          type === "led"
+            ? await firebaseClient.controlLED(action)
+            : await firebaseClient.controlFan(action);
+
+        const response = success
+          ? {
+              status: "success",
+              relay_status: {
+                ...relayStatus,
+                [type]:
+                  action === "on" ||
+                  (action === "toggle" && !relayStatus[type]),
+              },
+            }
+          : { status: "failed" };
 
         if (response?.status === "success" && response.relay_status) {
           // Update status immediately for better UX

@@ -1,36 +1,75 @@
 {
   "rules": {
-    "fish_feeder": {
-      ".read": true,
-      ".write": true,
-      "sensors": {
-        ".read": true,
-        ".write": true
-      },
-      "control": {
-        ".read": true,
-        ".write": true
-      },
-      "status": {
-        ".read": true,
-        ".write": true
-      },
-      "commands": {
-        ".read": true,
-        ".write": true
-      },
-      "logs": {
-        ".read": true,
-        ".write": true
-      },
-      "config": {
-        ".read": true,
-        ".write": true
-      },
-      "fan_control": {
-        ".read": true,
-        ".write": true
+    // Authentication required for all access
+    ".read": "auth != null",
+    ".write": "auth != null",
+    
+    // User-specific data access
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
       }
+    },
+    
+    // Fish feeder system - Role-based access
+    "fish_feeder": {
+      // Admin and operators can read all data
+      ".read": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'operator' || auth.token.role == 'viewer')",
+      
+      // Only admin and operators can write control commands
+      "control": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'operator')"
+      },
+      
+      // Sensors data - system can write, all authenticated users can read
+      "sensors": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'system')"
+      },
+      
+      // Status data - system and admin can write
+      "status": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'system')"
+      },
+      
+      // Commands - only admin and operators
+      "commands": {
+        ".read": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'operator')",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'operator')"
+      },
+      
+      // Logs - admin and system can write, all can read
+      "logs": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'system')"
+      },
+      
+      // Config - admin only
+      "config": {
+        ".read": "auth != null && auth.token.role == 'admin'",
+        ".write": "auth != null && auth.token.role == 'admin'"
+      },
+      
+      // Fan control - operators and admin
+      "fan_control": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'operator')"
+      }
+    },
+    
+    // System health monitoring - admin only
+    "system_health": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && auth.token.role == 'admin'"
+    },
+    
+    // Error logs - admin only
+    "error_logs": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'system')"
     }
   }
 } 

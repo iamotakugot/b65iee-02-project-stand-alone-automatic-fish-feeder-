@@ -1,22 +1,30 @@
-import React from 'react';
-import { FaFireAlt, FaGlobe, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
-import { FIREBASE_ONLY_CONFIG } from '../config/firebase-only';
+import React from "react";
+import {
+  FaFireAlt,
+  FaGlobe,
+  FaCheckCircle,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+
+import { FIREBASE_ONLY_CONFIG } from "../config/firebase-only";
 
 interface FirebaseOnlyBannerProps {
   className?: string;
   showDetails?: boolean;
 }
 
-export const FirebaseOnlyBanner: React.FC<FirebaseOnlyBannerProps> = ({ 
+export const FirebaseOnlyBanner: React.FC<FirebaseOnlyBannerProps> = ({
   className = "",
-  showDetails = true 
+  showDetails = true,
 }) => {
   const isFirebaseMode = FIREBASE_ONLY_CONFIG.isFirebaseHosting();
 
   if (!isFirebaseMode) return null;
 
   return (
-    <div className={`bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg ${className}`}>
+    <div
+      className={`bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg ${className}`}
+    >
       <div className="p-4">
         <div className="flex items-center gap-3 mb-3">
           <FaFireAlt className="text-2xl text-blue-500" />
@@ -57,11 +65,12 @@ export const FirebaseOnlyBanner: React.FC<FirebaseOnlyBannerProps> = ({
         <div className="bg-slate-800/50 rounded-lg p-3 mt-4">
           <p className="text-xs text-slate-400">
             <FaGlobe className="inline mr-1" />
-            <strong>Global Access:</strong> This web app uses Firebase Database for worldwide access. 
-            Commands are queued and will be processed when the Pi server comes online.
+            <strong>Global Access:</strong> This web app uses Firebase Database
+            for worldwide access. Commands are queued and will be processed when
+            the Pi server comes online.
           </p>
         </div>
       </div>
     </div>
   );
-}; 
+};

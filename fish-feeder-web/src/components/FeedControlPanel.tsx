@@ -8,16 +8,16 @@ import { FaWeight, FaPlay } from "react-icons/fa";
 import { useApi } from "../contexts/ApiContext";
 
 const FeedControl = () => {
-  const { 
-    controlLED, 
-    controlFan, 
+  const {
+    controlLED,
+    controlFan,
     controlFeeder,
     controlBlower,
     controlActuator,
     controlAuger,
     getSensors,
     getHealth,
-    connected
+    connected,
   } = useApi();
 
   const [connectionStatus, setConnectionStatus] = useState(
@@ -35,21 +35,48 @@ const FeedControl = () => {
   // Editable preset amounts
   const [presetAmounts, setPresetAmounts] = useState({
     small: "50",
-    medium: "100", 
+    medium: "100",
     large: "200",
-    xl: "1000"  // 1kg option
+    xl: "1000", // 1kg option
   });
 
   // Preset-specific timing controls
   const [presetTimings, setPresetTimings] = useState(() => {
-    const saved = localStorage.getItem('feedControl_presetTimings');
-    return saved ? JSON.parse(saved) : {
-      small: { actuator_up: "2", actuator_down: "1", auger_duration: "10", blower_duration: "5" },
-      medium: { actuator_up: "3", actuator_down: "2", auger_duration: "15", blower_duration: "10" },
-      large: { actuator_up: "3", actuator_down: "2", auger_duration: "20", blower_duration: "15" },
-      xl: { actuator_up: "5", actuator_down: "3", auger_duration: "30", blower_duration: "20" },
-      custom: { actuator_up: "3", actuator_down: "2", auger_duration: "20", blower_duration: "15" }
-    };
+    const saved = localStorage.getItem("feedControl_presetTimings");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          small: {
+            actuator_up: "2",
+            actuator_down: "1",
+            auger_duration: "10",
+            blower_duration: "5",
+          },
+          medium: {
+            actuator_up: "3",
+            actuator_down: "2",
+            auger_duration: "15",
+            blower_duration: "10",
+          },
+          large: {
+            actuator_up: "3",
+            actuator_down: "2",
+            auger_duration: "20",
+            blower_duration: "15",
+          },
+          xl: {
+            actuator_up: "5",
+            actuator_down: "3",
+            auger_duration: "30",
+            blower_duration: "20",
+          },
+          custom: {
+            actuator_up: "3",
+            actuator_down: "2",
+            auger_duration: "20",
+            blower_duration: "15",
+          },
+        };
   });
 
   // Current active timing controls (loaded from selected preset)
@@ -62,49 +89,49 @@ const FeedControl = () => {
   const [editingPreset, setEditingPreset] = useState<string | null>(null);
   const [tempTimings, setTempTimings] = useState({
     actuator_up: "3",
-    actuator_down: "2", 
+    actuator_down: "2",
     auger_duration: "20",
-    blower_duration: "15"
+    blower_duration: "15",
   });
 
   // Automatic feeding
   const [automaticFeeding, setAutomaticFeeding] = useState(false);
   const [newScheduleTime, setNewScheduleTime] = useState("");
   const [newScheduleAmount, setNewScheduleAmount] = useState("100");
-  
+
   // New schedule timing controls
   const [newActuatorUp, setNewActuatorUp] = useState("3");
   const [newActuatorDown, setNewActuatorDown] = useState("2");
   const [newAugerDuration, setNewAugerDuration] = useState("20");
   const [newBlowerDuration, setNewBlowerDuration] = useState("15");
-  
+
   const [schedules, setSchedules] = useState([
-    { 
-      time: "08:00", 
-      amount: "100", 
+    {
+      time: "08:00",
+      amount: "100",
       type: "breakfast",
       actuator_up: 3,
       actuator_down: 2,
       auger_duration: 20,
-      blower_duration: 15
+      blower_duration: 15,
     },
-    { 
-      time: "12:00", 
-      amount: "150", 
+    {
+      time: "12:00",
+      amount: "150",
       type: "lunch",
       actuator_up: 3,
       actuator_down: 2,
       auger_duration: 25,
-      blower_duration: 18
+      blower_duration: 18,
     },
-    { 
-      time: "18:00", 
-      amount: "100", 
+    {
+      time: "18:00",
+      amount: "100",
       type: "dinner",
       actuator_up: 3,
       actuator_down: 2,
       auger_duration: 20,
-      blower_duration: 15
+      blower_duration: 15,
     },
   ]);
 
@@ -114,7 +141,7 @@ const FeedControl = () => {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const initializeData = async () => {
       if (isMounted) {
         await checkConnection();
@@ -123,7 +150,7 @@ const FeedControl = () => {
         await fetchFeedStatistics();
       }
     };
-    
+
     initializeData();
 
     // ⚡ EVENT-DRIVEN UPDATES - No setTimeout loops!
@@ -135,7 +162,7 @@ const FeedControl = () => {
         });
       }
     };
-    
+
     const scheduleHistoryUpdate = () => {
       if (isMounted) {
         fetchFeedHistory().finally(() => {
@@ -144,7 +171,7 @@ const FeedControl = () => {
         });
       }
     };
-    
+
     const scheduleStatsUpdate = () => {
       if (isMounted) {
         fetchFeedStatistics().finally(() => {
@@ -153,7 +180,7 @@ const FeedControl = () => {
         });
       }
     };
-    
+
     // ⚡ IMMEDIATE INITIAL LOAD - No setTimeout delays!
     scheduleWeightUpdate();
     scheduleHistoryUpdate();
@@ -167,25 +194,32 @@ const FeedControl = () => {
 
   // Save preset timings to localStorage
   useEffect(() => {
-    localStorage.setItem('feedControl_presetTimings', JSON.stringify(presetTimings));
+    localStorage.setItem(
+      "feedControl_presetTimings",
+      JSON.stringify(presetTimings),
+    );
   }, [presetTimings]);
 
   // Load and save preset amounts
   useEffect(() => {
-    const saved = localStorage.getItem('feedControl_presetAmounts');
+    const saved = localStorage.getItem("feedControl_presetAmounts");
     if (saved) {
       setPresetAmounts(JSON.parse(saved));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('feedControl_presetAmounts', JSON.stringify(presetAmounts));
+    localStorage.setItem(
+      "feedControl_presetAmounts",
+      JSON.stringify(presetAmounts),
+    );
   }, [presetAmounts]);
 
   // Load timing for selected preset
   useEffect(() => {
     if (feedType && presetTimings[feedType as keyof typeof presetTimings]) {
       const timing = presetTimings[feedType as keyof typeof presetTimings];
+
       setActuatorUp(timing.actuator_up);
       setActuatorDown(timing.actuator_down);
       setAugerDuration(timing.auger_duration);
@@ -221,6 +255,7 @@ const FeedControl = () => {
         } else if (weightValue && weightValue.value !== undefined) {
           // Handle cases where value might be a string or other format
           const numericValue = parseFloat(String(weightValue.value));
+
           if (!isNaN(numericValue)) {
             setCurrentWeight(numericValue);
           }
@@ -268,24 +303,33 @@ const FeedControl = () => {
       setWeightBeforeFeed(currentWeight);
 
       // Take photo first (placeholder - implement camera function later)
-      console.log('📸 Taking photo before feeding...');
+      console.log("📸 Taking photo before feeding...");
 
       // Execute feeding command with correct preset type
-      let feedPreset: 'small' | 'medium' | 'large' | 'xl' = 'medium';
-      
-      if (feedType === 'small' || feedType === 'medium' || feedType === 'large' || feedType === 'xl') {
+      let feedPreset: "small" | "medium" | "large" | "xl" = "medium";
+
+      if (
+        feedType === "small" ||
+        feedType === "medium" ||
+        feedType === "large" ||
+        feedType === "xl"
+      ) {
         feedPreset = feedType;
-      } else if (feedType === 'custom') {
+      } else if (feedType === "custom") {
         // For custom amounts, choose closest preset
         const amount = parseInt(feedAmount);
-        if (amount <= 75) feedPreset = 'small';
-        else if (amount <= 150) feedPreset = 'medium';
-        else if (amount <= 500) feedPreset = 'large';
-        else feedPreset = 'xl';
+
+        if (amount <= 75) feedPreset = "small";
+        else if (amount <= 150) feedPreset = "medium";
+        else if (amount <= 500) feedPreset = "large";
+        else feedPreset = "xl";
       }
 
       const success = await controlFeeder(feedPreset);
-      console.log(`🍽️ Feed command sent: ${feedPreset} (amount: ${getPresetAmount(feedType)}g)`);
+
+      console.log(
+        `🍽️ Feed command sent: ${feedPreset} (amount: ${getPresetAmount(feedType)}g)`,
+      );
 
       if (success) {
         setLastFeedTime(new Date().toLocaleString());
@@ -335,26 +379,33 @@ const FeedControl = () => {
     if (type in presetAmounts) {
       return presetAmounts[type as keyof typeof presetAmounts];
     }
+
     return feedAmount;
   };
 
   // Format weight display with proper units and comma separation
-  const formatWeightDisplay = (grams: string | number, showName: boolean = false, name: string = '') => {
-    const gramValue = typeof grams === 'string' ? parseInt(grams) : grams;
-    
+  const formatWeightDisplay = (
+    grams: string | number,
+    showName: boolean = false,
+    name: string = "",
+  ) => {
+    const gramValue = typeof grams === "string" ? parseInt(grams) : grams;
+
     // Add comma for numbers >= 1000
     const formattedGrams = gramValue.toLocaleString();
-    
+
     // Convert to kg if >= 1000g
     if (gramValue >= 1000) {
       const kg = gramValue / 1000;
       // Show as whole kg if it's a round number, otherwise show decimal
       const kgDisplay = kg % 1 === 0 ? `${kg}kg` : `${kg.toFixed(1)}kg`;
       const weightText = `${kgDisplay} (${formattedGrams}g)`;
+
       return showName ? `${name} ${weightText}` : weightText;
     }
-    
+
     const weightText = `${formattedGrams}g`;
+
     return showName ? `${name} (${weightText})` : weightText;
   };
 
@@ -363,12 +414,14 @@ const FeedControl = () => {
     if (type === "xl") {
       return formatWeightDisplay(amount);
     }
+
     return formatWeightDisplay(amount, true, type);
   };
 
   // Handle preset timing editing
   const handleEditPresetTiming = (presetType: string) => {
-    const currentTiming = presetTimings[presetType as keyof typeof presetTimings];
+    const currentTiming =
+      presetTimings[presetType as keyof typeof presetTimings];
     if (currentTiming) {
       setTempTimings(currentTiming);
       setEditingPreset(presetType);
@@ -379,7 +432,7 @@ const FeedControl = () => {
     if (editingPreset) {
       setPresetTimings((prev: any) => ({
         ...prev,
-        [editingPreset]: tempTimings
+        [editingPreset]: tempTimings,
       }));
       setEditingPreset(null);
     }
@@ -392,16 +445,16 @@ const FeedControl = () => {
   // Update current timing when user changes controls manually
   const handleTimingChange = (field: string, value: string) => {
     switch (field) {
-      case 'actuator_up':
+      case "actuator_up":
         setActuatorUp(value);
         break;
-      case 'actuator_down':
+      case "actuator_down":
         setActuatorDown(value);
         break;
-      case 'auger_duration':
+      case "auger_duration":
         setAugerDuration(value);
         break;
-      case 'blower_duration':
+      case "blower_duration":
         setBlowerDuration(value);
         break;
     }
@@ -412,8 +465,8 @@ const FeedControl = () => {
         ...prev,
         [feedType]: {
           ...prev[feedType as keyof typeof prev],
-          [field]: value
-        }
+          [field]: value,
+        },
       }));
     }
   };
@@ -489,7 +542,7 @@ const FeedControl = () => {
                       {getPresetLabel(type, amount)}
                     </button>
                   ))}
-                  
+
                   {/* Custom option */}
                   <button
                     className={`p-3 rounded-lg font-medium text-sm transition-colors ${
@@ -512,6 +565,7 @@ const FeedControl = () => {
                     <div className="flex gap-2">
                       <button
                         className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                        title="Edit amount"
                         onClick={() => {
                           const currentAmount = presetAmounts[feedType as keyof typeof presetAmounts];
                           const newAmount = prompt(`Edit ${feedType} amount (grams):`, currentAmount);
@@ -523,15 +577,14 @@ const FeedControl = () => {
                             setFeedAmount(newAmount);
                           }
                         }}
-                        title="Edit amount"
                       >
                         <span>📏</span>
                         <span>Edit Amount</span>
                       </button>
                       <button
                         className="flex-1 px-3 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-                        onClick={() => handleEditPresetTiming(feedType)}
                         title="Edit timing"
+                        onClick={() => handleEditPresetTiming(feedType)}
                       >
                         <span>⏱</span>
                         <span>Edit Timing</span>
@@ -545,19 +598,22 @@ const FeedControl = () => {
             {/* Custom Amount Input */}
             {feedType === "custom" && (
               <div>
-                <label htmlFor="custom-feed-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label
+                  htmlFor="custom-feed-amount"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
                   Amount (grams)
                 </label>
                 <Input
+                  aria-label="Custom feed amount in grams"
                   id="custom-feed-amount"
-                  name="feedAmount"
                   max="2000"
                   min="10"
+                  name="feedAmount"
                   placeholder="Enter amount (e.g. 1500 for 1.5kg)"
                   type="number"
                   value={feedAmount}
                   onChange={(e) => setFeedAmount(e.target.value)}
-                  aria-label="Custom feed amount in grams"
                 />
                 {feedAmount && parseInt(feedAmount) > 0 && (
                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -600,71 +656,83 @@ const FeedControl = () => {
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="actuator-up-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="actuator-up-input"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Actuator Up (s)
                 </label>
                 <Input
+                  aria-label="Actuator up duration in seconds"
                   id="actuator-up-input"
-                  name="actuatorUp"
-                  type="number"
-                  size="sm"
-                  min="1"
                   max="30"
+                  min="1"
+                  name="actuatorUp"
+                  placeholder="3"
+                  size="sm"
+                  type="number"
                   value={actuatorUp}
                   onChange={(e) => handleTimingChange('actuator_up', e.target.value)}
-                  placeholder="3"
-                  aria-label="Actuator up duration in seconds"
                 />
               </div>
               <div>
-                <label htmlFor="actuator-down-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="actuator-down-input"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Actuator Down (s)
                 </label>
                 <Input
+                  aria-label="Actuator down duration in seconds"
                   id="actuator-down-input"
-                  name="actuatorDown"
-                  type="number"
-                  size="sm"
-                  min="1"
                   max="30"
+                  min="1"
+                  name="actuatorDown"
+                  placeholder="2"
+                  size="sm"
+                  type="number"
                   value={actuatorDown}
                   onChange={(e) => handleTimingChange('actuator_down', e.target.value)}
-                  placeholder="2"
-                  aria-label="Actuator down duration in seconds"
                 />
               </div>
               <div>
-                <label htmlFor="auger-duration-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="auger-duration-input"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Auger Duration (s)
                 </label>
                 <Input
+                  aria-label="Auger motor duration in seconds"
                   id="auger-duration-input"
-                  name="augerDuration"
-                  type="number"
-                  size="sm"
-                  min="1"
                   max="60"
+                  min="1"
+                  name="augerDuration"
+                  placeholder="20"
+                  size="sm"
+                  type="number"
                   value={augerDuration}
                   onChange={(e) => handleTimingChange('auger_duration', e.target.value)}
-                  placeholder="20"
-                  aria-label="Auger motor duration in seconds"
                 />
               </div>
               <div>
-                <label htmlFor="blower-duration-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="blower-duration-input"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
                   Blower Duration (s)
                 </label>
                 <Input
+                  aria-label="Blower fan duration in seconds"
                   id="blower-duration-input"
-                  name="blowerDuration"
-                  type="number"
-                  size="sm"
-                  min="1"
                   max="60"
+                  min="1"
+                  name="blowerDuration"
+                  placeholder="15"
+                  size="sm"
+                  type="number"
                   value={blowerDuration}
                   onChange={(e) => handleTimingChange('blower_duration', e.target.value)}
-                  placeholder="15"
-                  aria-label="Blower fan duration in seconds"
                 />
               </div>
             </div>
@@ -687,25 +755,27 @@ const FeedControl = () => {
               <div className="text-center text-gray-500 dark:text-gray-400">
                 <div className="text-3xl mb-2">📹</div>
                 <div className="text-sm font-medium">Camera Stream</div>
-                <div className="text-xs mt-1">Pi Server: rtsp://pi-server:8554/stream</div>
+                <div className="text-xs mt-1">
+                  Pi Server: rtsp://pi-server:8554/stream
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
               <Button
+                className="flex-1"
+                color="primary"
                 size="sm"
                 startContent={<BsCamera />}
-                color="primary"
                 variant="flat"
-                className="flex-1"
                 onPress={() => getSensors()}
               >
                 Take Photo
               </Button>
               <Button
-                size="sm"
-                color="secondary"
-                variant="flat"
                 className="flex-1"
+                color="secondary"
+                size="sm"
+                variant="flat"
                 onPress={() => window.open('http://pi-server:8080/stream', '_blank')}
               >
                 Open Stream
@@ -723,10 +793,15 @@ const FeedControl = () => {
               startContent={<FaPlay />}
               onPress={handleFeedNow}
             >
-              Feed Now ({feedType === "custom" ? `${feedAmount}g` : formatWeightDisplay(getPresetAmount(feedType))})
+              Feed Now (
+              {feedType === "custom"
+                ? `${feedAmount}g`
+                : formatWeightDisplay(getPresetAmount(feedType))}
+              )
             </Button>
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
-              ⚙️ actuator {actuatorUp}s↑ / {actuatorDown}s↓, auger {augerDuration}s, blower {blowerDuration}s
+              ⚙️ actuator {actuatorUp}s↑ / {actuatorDown}s↓, auger{" "}
+              {augerDuration}s, blower {blowerDuration}s
             </div>
           </div>
         </div>
@@ -736,16 +811,19 @@ const FeedControl = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center text-green-500 dark:text-green-400">
               <BsPlus className="mr-3 text-xl" />
-              <label id="automatic-feeding-switch-label" className="text-xl font-semibold cursor-pointer">
+              <label
+                id="automatic-feeding-switch-label"
+                className="text-xl font-semibold cursor-pointer"
+              >
                 Auto Schedule
               </label>
             </div>
             <Switch
-              name="automaticFeeding"
-              isSelected={automaticFeeding}
-              onValueChange={setAutomaticFeeding}
-              aria-labelledby="automatic-feeding-switch-label"
               aria-label="Enable automatic feeding schedule"
+              aria-labelledby="automatic-feeding-switch-label"
+              isSelected={automaticFeeding}
+              name="automaticFeeding"
+              onValueChange={setAutomaticFeeding}
             />
           </div>
 
@@ -774,7 +852,9 @@ const FeedControl = () => {
                   🍚 {schedule.amount}g • {schedule.type}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 rounded p-2">
-                  ⚙️ actuator {schedule.actuator_up}s↑ / {schedule.actuator_down}s↓, auger {schedule.auger_duration}s, blower {schedule.blower_duration}s
+                  ⚙️ actuator {schedule.actuator_up}s↑ /{" "}
+                  {schedule.actuator_down}s↓, auger {schedule.auger_duration}s,
+                  blower {schedule.blower_duration}s
                 </div>
               </div>
             ))}
@@ -813,7 +893,7 @@ const FeedControl = () => {
                   />
                 </div>
               </div>
-              
+
               {/* Timing Controls for New Schedule */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -821,13 +901,13 @@ const FeedControl = () => {
                     Actuator Up (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="30"
+                    min="1"
+                    placeholder="3"
+                    size="sm"
+                    type="number"
                     value={newActuatorUp}
                     onChange={(e) => setNewActuatorUp(e.target.value)}
-                    placeholder="3"
                   />
                 </div>
                 <div>
@@ -835,13 +915,13 @@ const FeedControl = () => {
                     Actuator Down (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="30"
+                    min="1"
+                    placeholder="2"
+                    size="sm"
+                    type="number"
                     value={newActuatorDown}
                     onChange={(e) => setNewActuatorDown(e.target.value)}
-                    placeholder="2"
                   />
                 </div>
                 <div>
@@ -849,13 +929,13 @@ const FeedControl = () => {
                     Auger Duration (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="60"
+                    min="1"
+                    placeholder="20"
+                    size="sm"
+                    type="number"
                     value={newAugerDuration}
                     onChange={(e) => setNewAugerDuration(e.target.value)}
-                    placeholder="20"
                   />
                 </div>
                 <div>
@@ -863,24 +943,24 @@ const FeedControl = () => {
                     Blower Duration (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="60"
+                    min="1"
+                    placeholder="15"
+                    size="sm"
+                    type="number"
                     value={newBlowerDuration}
                     onChange={(e) => setNewBlowerDuration(e.target.value)}
-                    placeholder="15"
                   />
                 </div>
               </div>
-              
+
               <Button
                 className="w-full"
                 color="success"
+                isDisabled={!newScheduleTime || !newScheduleAmount}
                 size="sm"
                 startContent={<BsPlus />}
                 onPress={handleAddSchedule}
-                isDisabled={!newScheduleTime || !newScheduleAmount}
               >
                 Add Schedule
               </Button>
@@ -933,7 +1013,10 @@ const FeedControl = () => {
                     Weight Change
                   </div>
                   <div className="text-lg font-bold text-yellow-900 dark:text-yellow-300">
-                    {((weightBeforeFeed || 0) - (currentWeight || 0)).toFixed(1)}g dispensed
+                    {((weightBeforeFeed || 0) - (currentWeight || 0)).toFixed(
+                      1,
+                    )}
+                    g dispensed
                   </div>
                 </div>
               )}
@@ -1013,16 +1096,18 @@ const FeedControl = () => {
                     <td className="py-3 text-sm">
                       {feed.video_url ? (
                         <Button
-                          size="sm"
-                          variant="bordered"
-                          startContent={<BsCamera />}
-                          onPress={() => window.open(feed.video_url, '_blank')}
                           className="text-xs"
+                          size="sm"
+                          startContent={<BsCamera />}
+                          variant="bordered"
+                          onPress={() => window.open(feed.video_url, '_blank')}
                         >
                           📹 Watch
                         </Button>
                       ) : (
-                        <span className="text-gray-400 text-xs">No recording</span>
+                        <span className="text-gray-400 text-xs">
+                          No recording
+                        </span>
                       )}
                     </td>
                     <td className="py-3 text-sm">
@@ -1054,7 +1139,7 @@ const FeedControl = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
               ⏱️ Edit Timing for {editingPreset.toUpperCase()}
             </h3>
-            
+
             <div className="space-y-4 mb-6">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1062,10 +1147,10 @@ const FeedControl = () => {
                     Actuator Up (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="30"
+                    min="1"
+                    size="sm"
+                    type="number"
                     value={tempTimings.actuator_up}
                     onChange={(e) => setTempTimings(prev => ({
                       ...prev,
@@ -1078,10 +1163,10 @@ const FeedControl = () => {
                     Actuator Down (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="30"
+                    min="1"
+                    size="sm"
+                    type="number"
                     value={tempTimings.actuator_down}
                     onChange={(e) => setTempTimings(prev => ({
                       ...prev,
@@ -1094,10 +1179,10 @@ const FeedControl = () => {
                     Auger Duration (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="60"
+                    min="1"
+                    size="sm"
+                    type="number"
                     value={tempTimings.auger_duration}
                     onChange={(e) => setTempTimings(prev => ({
                       ...prev,
@@ -1110,21 +1195,23 @@ const FeedControl = () => {
                     Blower Duration (s)
                   </label>
                   <Input
-                    type="number"
-                    size="sm"
-                    min="1"
                     max="60"
+                    min="1"
+                    size="sm"
+                    type="number"
                     value={tempTimings.blower_duration}
                     onChange={(e) => setTempTimings(prev => ({
                       ...prev,
                       blower_duration: e.target.value
                     }))}
+                    }
                   />
                 </div>
               </div>
-              
+
               <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                💡 These timing settings will be saved specifically for {editingPreset} preset
+                💡 These timing settings will be saved specifically for{" "}
+                {editingPreset} preset
               </div>
             </div>
 

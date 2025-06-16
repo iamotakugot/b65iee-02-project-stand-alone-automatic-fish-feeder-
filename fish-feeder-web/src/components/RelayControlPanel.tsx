@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Switch } from "@heroui/switch";
-import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 import { HiOutlineBolt, HiOutlinePower } from "react-icons/hi2";
+
+import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 
 const RelayControlPanel = () => {
   const { sendCommand } = useFirebaseSensorData();
@@ -15,7 +16,8 @@ const RelayControlPanel = () => {
   const handleRelay1Control = async (action: "on" | "off") => {
     try {
       setLoading(true);
-      const command = action === "on" ? "R:3" : "R:4";  // R:3=LED ON, R:4=LED OFF
+      const command = action === "on" ? "R:3" : "R:4"; // R:3=LED ON, R:4=LED OFF
+
       await sendCommand(command);
       setRelay1State(action === "on");
       setStatus(`✅ Relay IN1 ${action.toUpperCase()}`);
@@ -31,7 +33,8 @@ const RelayControlPanel = () => {
   const handleRelay2Control = async (action: "on" | "off") => {
     try {
       setLoading(true);
-      const command = action === "on" ? "R:1" : "R:2";  // R:1=FAN ON, R:2=FAN OFF
+      const command = action === "on" ? "R:1" : "R:2"; // R:1=FAN ON, R:2=FAN OFF
+
       await sendCommand(command);
       setRelay2State(action === "on");
       setStatus(`✅ Relay IN2 ${action.toUpperCase()}`);
@@ -47,7 +50,7 @@ const RelayControlPanel = () => {
   const handleEmergencyStop = async () => {
     try {
       setLoading(true);
-      await sendCommand("R:0");  // Emergency stop all relays
+      await sendCommand("R:0"); // Emergency stop all relays
       setRelay1State(false);
       setRelay2State(false);
       setStatus("🚨 EMERGENCY STOP - All relays OFF");
@@ -73,10 +76,9 @@ const RelayControlPanel = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Body */}
       <div className="p-6 space-y-6">
-        
         {/* Status Display */}
         {status && (
           <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -94,8 +96,8 @@ const RelayControlPanel = () => {
               </p>
             </div>
             <Switch
-              isSelected={relay1State}
               color="primary"
+              isSelected={relay1State}
               size="lg"
               thumbIcon={({ isSelected }: { isSelected: boolean }) =>
                 isSelected ? (
@@ -109,22 +111,22 @@ const RelayControlPanel = () => {
               }}
             />
           </div>
-          
+
           <div className="flex gap-2">
             <Button
               color="success"
-              variant="flat"
-              size="sm"
               isLoading={loading}
+              size="sm"
+              variant="flat"
               onPress={() => handleRelay1Control("on")}
             >
               IN1 ON
             </Button>
             <Button
               color="danger"
-              variant="flat"
-              size="sm"
               isLoading={loading}
+              size="sm"
+              variant="flat"
               onPress={() => handleRelay1Control("off")}
             >
               IN1 OFF
@@ -145,8 +147,8 @@ const RelayControlPanel = () => {
               </p>
             </div>
             <Switch
-              isSelected={relay2State}
               color="secondary"
+              isSelected={relay2State}
               size="lg"
               thumbIcon={({ isSelected }: { isSelected: boolean }) =>
                 isSelected ? (
@@ -160,22 +162,22 @@ const RelayControlPanel = () => {
               }}
             />
           </div>
-          
+
           <div className="flex gap-2">
             <Button
               color="success"
-              variant="flat"
-              size="sm"
               isLoading={loading}
+              size="sm"
+              variant="flat"
               onPress={() => handleRelay2Control("on")}
             >
               IN2 ON
             </Button>
             <Button
               color="danger"
-              variant="flat"
-              size="sm"
               isLoading={loading}
+              size="sm"
+              variant="flat"
               onPress={() => handleRelay2Control("off")}
             >
               IN2 OFF
@@ -188,15 +190,17 @@ const RelayControlPanel = () => {
 
         {/* Emergency Controls */}
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-red-600">Emergency Controls</h3>
-          
+          <h3 className="text-lg font-semibold text-red-600">
+            Emergency Controls
+          </h3>
+
           <Button
-            color="danger"
-            variant="solid"
-            size="lg"
             className="w-full"
+            color="danger"
             isLoading={loading}
+            size="lg"
             startContent={<HiOutlinePower />}
+            variant="solid"
             onPress={handleEmergencyStop}
           >
             🚨 EMERGENCY STOP - ALL RELAYS OFF
@@ -209,17 +213,29 @@ const RelayControlPanel = () => {
             📋 Technical Information
           </h4>
           <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-            <p>• <strong>Relay IN1 (Pin 50):</strong> LED Light Control (Active LOW)</p>
-            <p>• <strong>Relay IN2 (Pin 52):</strong> Fan Control (Active LOW)</p>
-            <p>• <strong>Commands:</strong> R:1=Fan ON, R:2=Fan OFF, R:3=LED ON, R:4=LED OFF</p>
-            <p>• <strong>Emergency:</strong> R:0 = All relays OFF</p>
-            <p>• <strong>Current State:</strong> IN1={relay1State ? "ON" : "OFF"}, IN2={relay2State ? "ON" : "OFF"}</p>
+            <p>
+              • <strong>Relay IN1 (Pin 50):</strong> LED Light Control (Active
+              LOW)
+            </p>
+            <p>
+              • <strong>Relay IN2 (Pin 52):</strong> Fan Control (Active LOW)
+            </p>
+            <p>
+              • <strong>Commands:</strong> R:1=Fan ON, R:2=Fan OFF, R:3=LED ON,
+              R:4=LED OFF
+            </p>
+            <p>
+              • <strong>Emergency:</strong> R:0 = All relays OFF
+            </p>
+            <p>
+              • <strong>Current State:</strong> IN1={relay1State ? "ON" : "OFF"}
+              , IN2={relay2State ? "ON" : "OFF"}
+            </p>
           </div>
         </div>
-
       </div>
     </div>
   );
 };
 
-export default RelayControlPanel; 
+export default RelayControlPanel;

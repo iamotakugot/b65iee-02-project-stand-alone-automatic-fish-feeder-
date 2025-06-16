@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 
-import {
-  FishFeederApiClient,
-  AllSensorsResponse,
-} from "../config/api";
+import { FishFeederApiClient, AllSensorsResponse } from "../config/api";
 
 interface UseSmartSensorDataReturn {
   data: AllSensorsResponse | null;

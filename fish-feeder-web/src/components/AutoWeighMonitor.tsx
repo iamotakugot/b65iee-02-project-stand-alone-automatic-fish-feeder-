@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { Button } from "@heroui/button";
 import { MdScale } from "react-icons/md";
+
 import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 
 interface AutoWeighMonitorProps {
@@ -15,16 +16,16 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
   onLowWeightAlert,
 }) => {
   const { sensorData } = useFirebaseSensorData();
-  
+
   const [currentWeight, setCurrentWeight] = useState<number>(0);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [lastAlert, setLastAlert] = useState<Date | null>(null);
   const [thresholds] = useState({
-    low: 100,     // 100g
-    critical: 50  // 50g
+    low: 100, // 100g
+    critical: 50, // 50g
   });
-  
-  const [lastUpdate, setLastUpdate] = useState<string>('');
+
+  const [lastUpdate, setLastUpdate] = useState<string>("");
 
   // ⚡ EVENT-DRIVEN WEIGHT MONITORING - Firebase listener only!
   useEffect(() => {
@@ -32,16 +33,25 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
 
     // ⚡ FIREBASE-DRIVEN WEIGHT UPDATES - No animation loops!
     const weightValue = sensorData.WEIGHT;
-    const realWeight = typeof weightValue === 'object' ? weightValue.weight?.value || 0 : weightValue || 0;
-    
-    const status = realWeight < thresholds.critical ? 'critical' :
-                  realWeight < thresholds.low ? 'low' : 'normal';
+    const realWeight =
+      typeof weightValue === "object"
+        ? weightValue.weight?.value || 0
+        : weightValue || 0;
+
+    const status =
+      realWeight < thresholds.critical
+        ? "critical"
+        : realWeight < thresholds.low
+          ? "low"
+          : "normal";
 
     setCurrentWeight(realWeight);
 
-    if (status === 'critical' || status === 'low') {
+    if (status === "critical" || status === "low") {
       const now = new Date();
-      if (!lastAlert || (now.getTime() - lastAlert.getTime()) > 300000) { // 5 minutes
+
+      if (!lastAlert || now.getTime() - lastAlert.getTime() > 300000) {
+        // 5 minutes
         setLastAlert(now);
         onLowWeightAlert?.(realWeight);
       }
@@ -50,23 +60,34 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
     // Trigger callback for weight changes
     onWeightChange?.(realWeight);
     setLastUpdate(new Date().toLocaleTimeString());
-    
-  }, [isMonitoring, sensorData, thresholds, lastAlert, onWeightChange, onLowWeightAlert]);
+  }, [
+    isMonitoring,
+    sensorData,
+    thresholds,
+    lastAlert,
+    onWeightChange,
+    onLowWeightAlert,
+  ]);
 
   const toggleMonitoring = () => {
     setIsMonitoring(!isMonitoring);
   };
 
   const getWeightStatus = (weight: number) => {
-    if (weight < thresholds.critical) return { level: 'critical', color: 'text-red-600' };
-    if (weight < thresholds.low) return { level: 'low', color: 'text-yellow-600' };
-    return { level: 'normal', color: 'text-green-600' };
+    if (weight < thresholds.critical)
+      return { level: "critical", color: "text-red-600" };
+    if (weight < thresholds.low)
+      return { level: "low", color: "text-yellow-600" };
+
+    return { level: "normal", color: "text-green-600" };
   };
 
   const status = getWeightStatus(currentWeight);
 
   return (
-    <div className={`w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${className}`}>
+    <div
+      className={`w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${className}`}
+    >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <MdScale className="h-6 w-6 text-blue-500" />
@@ -80,7 +101,7 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
           )}
         </div>
       </div>
-      
+
       <div className="space-y-6">
         {/* Current Weight Display */}
         <div className="text-center p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -100,9 +121,9 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
         {/* Control Buttons */}
         <div className="flex gap-3 justify-center">
           <Button
+            className="flex items-center gap-2"
             color={isMonitoring ? "danger" : "primary"}
             onPress={toggleMonitoring}
-            className="flex items-center gap-2"
           >
             <MdScale className="h-4 w-4" />
             {isMonitoring ? "Stop Monitoring" : "Start Monitoring"}
@@ -113,4 +134,4 @@ const AutoWeighMonitor: React.FC<AutoWeighMonitorProps> = ({
   );
 };
 
-export default AutoWeighMonitor; 
+export default AutoWeighMonitor;

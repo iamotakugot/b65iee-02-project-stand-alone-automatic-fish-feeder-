@@ -35,7 +35,7 @@ export interface SystemData {
   uptime: number;
   freeMemory: number;
   lastCommand: string;
-  status: 'active' | 'inactive' | 'error';
+  status: "active" | "inactive" | "error";
 }
 
 export interface CompleteArduinoData {
@@ -47,8 +47,8 @@ export interface CompleteArduinoData {
 }
 
 export interface ControlCommand {
-  command: 'control';
-  device: 'led' | 'fan' | 'auger' | 'blower' | 'actuator';
+  command: "control";
+  device: "led" | "fan" | "auger" | "blower" | "actuator";
   action: string;
   value?: number;
   timestamp: number;
@@ -58,34 +58,34 @@ export interface ControlCommand {
 export class DataValidator {
   static isValidSensorData(data: any): data is SensorData {
     return (
-      typeof data === 'object' &&
+      typeof data === "object" &&
       data !== null &&
-      typeof data.feedTemp === 'number' &&
-      typeof data.feedHumidity === 'number' &&
-      typeof data.boxTemp === 'number' &&
-      typeof data.boxHumidity === 'number' &&
-      typeof data.weight === 'number' &&
-      typeof data.timestamp === 'number'
+      typeof data.feedTemp === "number" &&
+      typeof data.feedHumidity === "number" &&
+      typeof data.boxTemp === "number" &&
+      typeof data.boxHumidity === "number" &&
+      typeof data.weight === "number" &&
+      typeof data.timestamp === "number"
     );
   }
 
   static isValidControlData(data: any): data is ControlData {
     return (
-      typeof data === 'object' &&
+      typeof data === "object" &&
       data !== null &&
-      typeof data.led === 'boolean' &&
-      typeof data.fan === 'boolean' &&
-      typeof data.augerSpeed === 'number' &&
-      typeof data.blowerSpeed === 'number'
+      typeof data.led === "boolean" &&
+      typeof data.fan === "boolean" &&
+      typeof data.augerSpeed === "number" &&
+      typeof data.blowerSpeed === "number"
     );
   }
 
   static isValidArduinoData(data: any): data is CompleteArduinoData {
     return (
-      typeof data === 'object' &&
+      typeof data === "object" &&
       data !== null &&
-      typeof data.status === 'string' &&
-      typeof data.timestamp === 'number' &&
+      typeof data.status === "string" &&
+      typeof data.timestamp === "number" &&
       this.isValidSensorData(data.sensors) &&
       this.isValidControlData(data.controls)
     );
@@ -115,13 +115,14 @@ export class SensorDataProcessor {
   }
 
   static formatBatteryPercent(percent: string | number): string {
-    return typeof percent === 'string' ? `${percent}%` : `${percent}%`;
+    return typeof percent === "string" ? `${percent}%` : `${percent}%`;
   }
 
   static formatUptime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+
     return `${hours}h ${minutes}m ${secs}s`;
   }
 
@@ -133,11 +134,11 @@ export class SensorDataProcessor {
     return {
       temperature: {
         feed: this.formatTemperature(data.feedTemp),
-        box: this.formatTemperature(data.boxTemp)
+        box: this.formatTemperature(data.boxTemp),
       },
       humidity: {
         feed: this.formatHumidity(data.feedHumidity),
-        box: this.formatHumidity(data.boxHumidity)
+        box: this.formatHumidity(data.boxHumidity),
       },
       weight: this.formatWeight(data.weight),
       soilMoisture: `${data.soilMoisture}`,
@@ -146,57 +147,63 @@ export class SensorDataProcessor {
         current: this.formatCurrent(data.batteryCurrent || data.loadCurrent),
         percent: this.formatBatteryPercent(data.batteryPercent),
         solarVoltage: this.formatVoltage(data.solarVoltage),
-        solarCurrent: this.formatCurrent(data.solarCurrent || 0)
-      }
+        solarCurrent: this.formatCurrent(data.solarCurrent || 0),
+      },
     };
   }
 }
 
 export class ControlCommandBuilder {
-  static buildLedCommand(action: 'on' | 'off'): ControlCommand {
+  static buildLedCommand(action: "on" | "off"): ControlCommand {
     return {
-      command: 'control',
-      device: 'led',
+      command: "control",
+      device: "led",
       action,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static buildFanCommand(action: 'on' | 'off'): ControlCommand {
+  static buildFanCommand(action: "on" | "off"): ControlCommand {
     return {
-      command: 'control',
-      device: 'fan',
+      command: "control",
+      device: "fan",
       action,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static buildAugerCommand(action: 'forward' | 'reverse' | 'stop', speed?: number): ControlCommand {
+  static buildAugerCommand(
+    action: "forward" | "reverse" | "stop",
+    speed?: number,
+  ): ControlCommand {
     return {
-      command: 'control',
-      device: 'auger',
+      command: "control",
+      device: "auger",
       action,
       value: speed,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static buildBlowerCommand(action: 'on' | 'off', speed?: number): ControlCommand {
+  static buildBlowerCommand(
+    action: "on" | "off",
+    speed?: number,
+  ): ControlCommand {
     return {
-      command: 'control',
-      device: 'blower',
+      command: "control",
+      device: "blower",
       action,
       value: speed || 255,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
-  static buildActuatorCommand(action: 'up' | 'down' | 'stop'): ControlCommand {
+  static buildActuatorCommand(action: "up" | "down" | "stop"): ControlCommand {
     return {
-      command: 'control',
-      device: 'actuator',
+      command: "control",
+      device: "actuator",
       action,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 }
@@ -204,15 +211,15 @@ export class ControlCommandBuilder {
 // Firebase Path Manager
 export class FirebasePathManager {
   static readonly PATHS = {
-    SENSORS: 'fish_feeder/sensors',
-    CONTROLS: 'fish_feeder/controls',
-    STATUS: 'fish_feeder/status',
-    LOGS: 'fish_feeder/logs',
-    CONTROL_LED: 'fish_feeder/control/led',
-    CONTROL_FAN: 'fish_feeder/control/fan',
-    CONTROL_AUGER: 'fish_feeder/control/auger',
-    CONTROL_BLOWER: 'fish_feeder/control/blower',
-    CONTROL_ACTUATOR: 'fish_feeder/control/actuator'
+    SENSORS: "fish_feeder/sensors",
+    CONTROLS: "fish_feeder/controls",
+    STATUS: "fish_feeder/status",
+    LOGS: "fish_feeder/logs",
+    CONTROL_LED: "fish_feeder/control/led",
+    CONTROL_FAN: "fish_feeder/control/fan",
+    CONTROL_AUGER: "fish_feeder/control/auger",
+    CONTROL_BLOWER: "fish_feeder/control/blower",
+    CONTROL_ACTUATOR: "fish_feeder/control/actuator",
   } as const;
 
   static getControlPath(device: string): string {
@@ -221,13 +228,13 @@ export class FirebasePathManager {
       fan: this.PATHS.CONTROL_FAN,
       auger: this.PATHS.CONTROL_AUGER,
       blower: this.PATHS.CONTROL_BLOWER,
-      actuator: this.PATHS.CONTROL_ACTUATOR
+      actuator: this.PATHS.CONTROL_ACTUATOR,
     };
-    
+
     return pathMap[device] || this.PATHS.CONTROLS;
   }
 
-  static getLogPath(logType: string = 'general'): string {
+  static getLogPath(logType: string = "general"): string {
     return `${this.PATHS.LOGS}/${logType}`;
   }
 }
@@ -241,52 +248,68 @@ export class DataHistoryManager {
   addSensorData(data: SensorData): void {
     this.sensorHistory.unshift({
       ...data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     if (this.sensorHistory.length > DataHistoryManager.MAX_HISTORY_SIZE) {
-      this.sensorHistory = this.sensorHistory.slice(0, DataHistoryManager.MAX_HISTORY_SIZE);
+      this.sensorHistory = this.sensorHistory.slice(
+        0,
+        DataHistoryManager.MAX_HISTORY_SIZE,
+      );
     }
   }
 
   addControlCommand(command: ControlCommand): void {
     this.controlHistory.unshift({
       ...command,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     if (this.controlHistory.length > DataHistoryManager.MAX_HISTORY_SIZE) {
-      this.controlHistory = this.controlHistory.slice(0, DataHistoryManager.MAX_HISTORY_SIZE);
+      this.controlHistory = this.controlHistory.slice(
+        0,
+        DataHistoryManager.MAX_HISTORY_SIZE,
+      );
     }
   }
 
-  getSensorHistory(count: number = 100): (SensorData & { timestamp: number })[] {
+  getSensorHistory(
+    count: number = 100,
+  ): (SensorData & { timestamp: number })[] {
     return this.sensorHistory.slice(0, count);
   }
 
-  getControlHistory(count: number = 100): (ControlCommand & { timestamp: number })[] {
+  getControlHistory(
+    count: number = 100,
+  ): (ControlCommand & { timestamp: number })[] {
     return this.controlHistory.slice(0, count);
   }
 
-  getTemperatureHistory(hours: number = 24): { timestamp: number; feedTemp: number; boxTemp: number }[] {
-    const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+  getTemperatureHistory(
+    hours: number = 24,
+  ): { timestamp: number; feedTemp: number; boxTemp: number }[] {
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+
     return this.sensorHistory
-      .filter(data => data.timestamp > cutoff)
-      .map(data => ({
+      .filter((data) => data.timestamp > cutoff)
+      .map((data) => ({
         timestamp: data.timestamp,
         feedTemp: data.feedTemp,
-        boxTemp: data.boxTemp
+        boxTemp: data.boxTemp,
       }));
   }
 
-  getBatteryHistory(hours: number = 24): { timestamp: number; voltage: number; percent: string }[] {
-    const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+  getBatteryHistory(
+    hours: number = 24,
+  ): { timestamp: number; voltage: number; percent: string }[] {
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+
     return this.sensorHistory
-      .filter(data => data.timestamp > cutoff)
-      .map(data => ({
+      .filter((data) => data.timestamp > cutoff)
+      .map((data) => ({
         timestamp: data.timestamp,
         voltage: data.batteryVoltage || data.loadVoltage,
-        percent: data.batteryPercent
+        percent: data.batteryPercent,
       }));
   }
 
@@ -298,7 +321,10 @@ export class DataHistoryManager {
 
 // Status Checker Utilities
 export class SystemStatusChecker {
-  static checkArduinoConnection(lastDataTime: number, maxDelay: number = 30000): boolean {
+  static checkArduinoConnection(
+    lastDataTime: number,
+    maxDelay: number = 30000,
+  ): boolean {
     return Date.now() - lastDataTime < maxDelay;
   }
 
@@ -310,42 +336,46 @@ export class SystemStatusChecker {
 
     // Check temperature ranges
     if (data.feedTemp < -10 || data.feedTemp > 60) {
-      issues.push('Feed temperature out of range');
+      issues.push("Feed temperature out of range");
     }
     if (data.boxTemp < -10 || data.boxTemp > 60) {
-      issues.push('Box temperature out of range');
+      issues.push("Box temperature out of range");
     }
 
     // Check humidity ranges
     if (data.feedHumidity < 0 || data.feedHumidity > 100) {
-      issues.push('Feed humidity out of range');
+      issues.push("Feed humidity out of range");
     }
     if (data.boxHumidity < 0 || data.boxHumidity > 100) {
-      issues.push('Box humidity out of range');
+      issues.push("Box humidity out of range");
     }
 
     // Check weight (negative values might indicate calibration issues)
     if (data.weight < -1) {
-      issues.push('Weight sensor calibration issue');
+      issues.push("Weight sensor calibration issue");
     }
 
     // Check battery voltage
     const voltage = data.batteryVoltage || data.loadVoltage;
+
     if (voltage < 10.5) {
-      issues.push('Low battery voltage');
+      issues.push("Low battery voltage");
     }
 
     return {
       isHealthy: issues.length === 0,
-      issues
+      issues,
     };
   }
 
-  static getBatteryStatus(voltage: number): 'critical' | 'low' | 'normal' | 'high' {
-    if (voltage < 11.0) return 'critical';
-    if (voltage < 11.8) return 'low';
-    if (voltage < 13.0) return 'normal';
-    return 'high';
+  static getBatteryStatus(
+    voltage: number,
+  ): "critical" | "low" | "normal" | "high" {
+    if (voltage < 11.0) return "critical";
+    if (voltage < 11.8) return "low";
+    if (voltage < 13.0) return "normal";
+
+    return "high";
   }
 }
 
@@ -372,7 +402,9 @@ export class JsonDataManager {
       return { isValid: false };
     }
 
-    const formatted = this.SensorProcessor.getFormattedSensorData(rawData.sensors);
+    const formatted = this.SensorProcessor.getFormattedSensorData(
+      rawData.sensors,
+    );
     const health = this.StatusChecker.checkSensorHealth(rawData.sensors);
 
     // Add to history
@@ -382,34 +414,42 @@ export class JsonDataManager {
       isValid: true,
       data: rawData,
       formatted,
-      health
+      health,
     };
   }
 
   // Convenience method for sending commands
   static async sendCommand(
-    device: 'led' | 'fan' | 'auger' | 'blower' | 'actuator',
+    device: "led" | "fan" | "auger" | "blower" | "actuator",
     action: string,
     value?: number,
-    sendFunction?: (path: string, data: any) => Promise<boolean>
+    sendFunction?: (path: string, data: any) => Promise<boolean>,
   ): Promise<boolean> {
     let command: ControlCommand;
 
     switch (device) {
-      case 'led':
-        command = this.CommandBuilder.buildLedCommand(action as 'on' | 'off');
+      case "led":
+        command = this.CommandBuilder.buildLedCommand(action as "on" | "off");
         break;
-      case 'fan':
-        command = this.CommandBuilder.buildFanCommand(action as 'on' | 'off');
+      case "fan":
+        command = this.CommandBuilder.buildFanCommand(action as "on" | "off");
         break;
-      case 'auger':
-        command = this.CommandBuilder.buildAugerCommand(action as 'forward' | 'reverse' | 'stop', value);
+      case "auger":
+        command = this.CommandBuilder.buildAugerCommand(
+          action as "forward" | "reverse" | "stop",
+          value,
+        );
         break;
-      case 'blower':
-        command = this.CommandBuilder.buildBlowerCommand(action as 'on' | 'off', value);
+      case "blower":
+        command = this.CommandBuilder.buildBlowerCommand(
+          action as "on" | "off",
+          value,
+        );
         break;
-      case 'actuator':
-        command = this.CommandBuilder.buildActuatorCommand(action as 'up' | 'down' | 'stop');
+      case "actuator":
+        command = this.CommandBuilder.buildActuatorCommand(
+          action as "up" | "down" | "stop",
+        );
         break;
       default:
         return false;
@@ -421,6 +461,7 @@ export class JsonDataManager {
     // Send command if send function provided
     if (sendFunction) {
       const path = this.FirebasePaths.getControlPath(device);
+
       return await sendFunction(path, action);
     }
 
@@ -429,4 +470,4 @@ export class JsonDataManager {
 }
 
 // Export default
-export default JsonDataManager; 
+export default JsonDataManager;

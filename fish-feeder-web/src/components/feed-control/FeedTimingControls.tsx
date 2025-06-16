@@ -19,7 +19,7 @@ export const FeedTimingControls = ({
   augerDuration,
   setAugerDuration,
   blowerDuration,
-  setBlowerDuration
+  setBlowerDuration,
 }: FeedTimingControlsProps) => {
   return (
     <div className="space-y-4">
@@ -33,57 +33,57 @@ export const FeedTimingControls = ({
             Actuator Up (seconds)
           </label>
           <Input
+            max="30"
+            min="1"
+            size="sm"
             type="number"
             value={actuatorUp}
             onChange={(e) => setActuatorUp(e.target.value)}
-            min="1"
-            max="30"
-            size="sm"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Actuator Down (seconds)
           </label>
           <Input
+            max="30"
+            min="1"
+            size="sm"
             type="number"
             value={actuatorDown}
             onChange={(e) => setActuatorDown(e.target.value)}
-            min="1"
-            max="30"
-            size="sm"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Auger Duration (seconds)
           </label>
           <Input
+            max="120"
+            min="1"
+            size="sm"
             type="number"
             value={augerDuration}
             onChange={(e) => setAugerDuration(e.target.value)}
-            min="1"
-            max="120"
-            size="sm"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Blower Duration (seconds)
           </label>
           <Input
+            max="60"
+            min="1"
+            size="sm"
             type="number"
             value={blowerDuration}
             onChange={(e) => setBlowerDuration(e.target.value)}
-            min="1"
-            max="60"
-            size="sm"
           />
         </div>
       </div>
     </div>
   );
-}; 
+};

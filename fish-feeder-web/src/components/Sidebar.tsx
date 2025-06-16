@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { MdSpaceDashboard, MdDining, MdSettings, MdMenu, MdClose } from "react-icons/md";
+import {
+  MdSpaceDashboard,
+  MdDining,
+  MdSettings,
+  MdMenu,
+  MdClose,
+} from "react-icons/md";
 import { FiBarChart } from "react-icons/fi";
 import { FaFan } from "react-icons/fa";
-
 import { MdChevronLeft, MdChevronRight } from "react-icons/md";
 
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -44,11 +49,11 @@ const Sidebar = () => {
   };
 
   const navItems = [
-    { 
-      path: "/", 
-      label: "Dashboard", 
+    {
+      path: "/",
+      label: "Dashboard",
       shortLabel: "Home",
-      icon: <MdSpaceDashboard className="w-5 h-5 sm:w-6 sm:h-6" /> 
+      icon: <MdSpaceDashboard className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
     {
       path: "/feed-control",
@@ -70,11 +75,11 @@ const Sidebar = () => {
       icon: <FiBarChart className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
 
-    { 
-      path: "/settings", 
-      label: "Settings", 
+    {
+      path: "/settings",
+      label: "Settings",
       shortLabel: "Settings",
-      icon: <MdSettings className="w-5 h-5 sm:w-6 sm:h-6" /> 
+      icon: <MdSettings className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
   ];
 
@@ -89,10 +94,14 @@ const Sidebar = () => {
           <div className="flex items-center gap-2">
             <ThemeSwitch />
             <button
-              onClick={toggleMobileMenu}
               className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={toggleMobileMenu}
             >
-              {mobileMenuOpen ? <MdClose className="w-6 h-6" /> : <MdMenu className="w-6 h-6" />}
+              {mobileMenuOpen ? (
+                <MdClose className="w-6 h-6" />
+              ) : (
+                <MdMenu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -108,20 +117,16 @@ const Sidebar = () => {
                   <NavLink
                     className={({ isActive }) =>
                       `flex items-center px-4 py-3 rounded-lg transition-all duration-200 font-inter ${
-                        isActive 
-                          ? "bg-blue-600 text-white shadow-lg" 
+                        isActive
+                          ? "bg-blue-600 text-white shadow-lg"
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                       }`
                     }
                     to={item.path}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <div className="flex-shrink-0 mr-3">
-                      {item.icon}
-                    </div>
-                    <span className="text-sm font-medium">
-                      {item.label}
-                    </span>
+                    <div className="flex-shrink-0 mr-3">{item.icon}</div>
+                    <span className="text-sm font-medium">{item.label}</span>
                   </NavLink>
                 </li>
               ))}
@@ -141,7 +146,11 @@ const Sidebar = () => {
           className="absolute right-0 top-6 translate-x-1/2 bg-gray-700 rounded-full p-2 text-white hover:bg-gray-600 z-10 transition-colors"
           onClick={toggleSidebar}
         >
-          {collapsed ? <MdChevronRight className="w-4 h-4" /> : <MdChevronLeft className="w-4 h-4" />}
+          {collapsed ? (
+            <MdChevronRight className="w-4 h-4" />
+          ) : (
+            <MdChevronLeft className="w-4 h-4" />
+          )}
         </button>
 
         {/* Header */}
@@ -161,17 +170,15 @@ const Sidebar = () => {
                 <NavLink
                   className={({ isActive }) =>
                     `flex items-center ${collapsed ? "justify-center px-2" : "px-4"} py-3 mx-2 rounded-lg transition-all duration-200 font-inter group ${
-                      isActive 
-                        ? "bg-blue-600 text-white shadow-lg" 
+                      isActive
+                        ? "bg-blue-600 text-white shadow-lg"
                         : "text-gray-300 hover:bg-gray-700 hover:text-white"
                     }`
                   }
                   title={collapsed ? item.label : ""}
                   to={item.path}
                 >
-                  <div className="flex-shrink-0">
-                    {item.icon}
-                  </div>
+                  <div className="flex-shrink-0">{item.icon}</div>
                   {!collapsed && (
                     <span className="ml-3 text-sm font-medium truncate">
                       {item.label}
@@ -184,7 +191,9 @@ const Sidebar = () => {
         </nav>
 
         {/* Theme switch at bottom */}
-        <div className={`absolute bottom-6 left-0 right-0 ${collapsed ? "flex justify-center" : "px-4"}`}>
+        <div
+          className={`absolute bottom-6 left-0 right-0 ${collapsed ? "flex justify-center" : "px-4"}`}
+        >
           <ThemeSwitch />
         </div>
       </div>
@@ -198,8 +207,8 @@ const Sidebar = () => {
                 key={item.path}
                 className={({ isActive }) =>
                   `flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-lg transition-all duration-200 font-inter relative ${
-                    isActive 
-                      ? "text-blue-600 dark:text-blue-400" 
+                    isActive
+                      ? "text-blue-600 dark:text-blue-400"
                       : "text-gray-600 dark:text-gray-400 active:text-blue-500"
                   }`
                 }
@@ -208,14 +217,18 @@ const Sidebar = () => {
                 {({ isActive }) => (
                   <>
                     {/* Icon */}
-                    <div className={`mb-1 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
+                    <div
+                      className={`mb-1 transition-transform duration-200 ${isActive ? "scale-110" : ""}`}
+                    >
                       {item.icon}
                     </div>
-                    
+
                     {/* Label - ปรับขนาดให้เหมาะสม */}
-                    <span className={`text-xs font-medium text-center leading-tight whitespace-nowrap ${
-                      isActive ? 'text-blue-600 dark:text-blue-400' : ''
-                    }`}>
+                    <span
+                      className={`text-xs font-medium text-center leading-tight whitespace-nowrap ${
+                        isActive ? "text-blue-600 dark:text-blue-400" : ""
+                      }`}
+                    >
                       {item.shortLabel}
                     </span>
 

@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@heroui/button";
 // import { Switch } from "@heroui/switch";
-import { 
-  IoMdCamera, 
-  IoMdRefresh, 
+import {
+  IoMdCamera,
+  IoMdRefresh,
   // IoMdDownload,
   IoMdVideocam,
   IoMdPlay,
-  IoMdPause
+  IoMdPause,
 } from "react-icons/io";
 import { FaExpand, FaCompress } from "react-icons/fa";
+
 import { API_CONFIG } from "../config/api";
 import { logger } from "../utils/logger";
 
@@ -19,18 +20,22 @@ interface CameraViewerProps {
   showControls?: boolean;
 }
 
-const CameraViewer: React.FC<CameraViewerProps> = ({ 
-  className = "", 
+const CameraViewer: React.FC<CameraViewerProps> = ({
+  className = "",
   autoRefresh = true,
-  showControls = true 
+  showControls = true,
 }) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<
+    "connected" | "disconnected" | "connecting"
+  >("disconnected");
   const [error, setError] = useState<string | null>(null);
   const [lastSnapshot, setLastSnapshot] = useState<string | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<'success' | 'error' | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<"success" | "error" | null>(
+    null,
+  );
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
 
   const imgRef = useRef<HTMLImageElement>(null);
@@ -40,61 +45,66 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
   const getCameraUrls = () => {
     // In Firebase hosting mode, disable camera functionality
     if (API_CONFIG.FIREBASE_ONLY_MODE) {
-      logger.info('CAMERA', 'DISABLED_FIREBASE_MODE', { 
-        reason: 'Camera disabled in Firebase hosting mode' 
+      logger.info("CAMERA", "DISABLED_FIREBASE_MODE", {
+        reason: "Camera disabled in Firebase hosting mode",
       });
+
       return {
-        stream: '',
-        snapshot: '',
-        status: ''
+        stream: "",
+        snapshot: "",
+        status: "",
       };
     }
 
     const baseUrl = API_CONFIG.BASE_URL;
+
     return {
       stream: `${baseUrl}/api/camera/stream`,
       snapshot: `${baseUrl}/api/camera/snapshot`,
-      status: `${baseUrl}/api/camera/status`
+      status: `${baseUrl}/api/camera/status`,
     };
   };
 
   // Start camera streaming
   const startStreaming = () => {
-    logger.buttonPress('CAMERA_START_STREAMING', 'CameraViewer');
-    
+    logger.buttonPress("CAMERA_START_STREAMING", "CameraViewer");
+
     setIsLoading(true);
-    setConnectionStatus('connecting');
+    setConnectionStatus("connecting");
     setError(null);
 
     const urls = getCameraUrls();
-    
+
     // Check if camera is disabled in Firebase mode
     if (!urls.stream) {
       setIsStreaming(false);
-      setConnectionStatus('disconnected');
+      setConnectionStatus("disconnected");
       setIsLoading(false);
-      setError('📷 Camera unavailable in Firebase hosting mode. Use local development mode for camera access.');
-      logger.warn('CAMERA', 'DISABLED_MODE', { mode: 'Firebase hosting' });
+      setError(
+        "📷 Camera unavailable in Firebase hosting mode. Use local development mode for camera access.",
+      );
+      logger.warn("CAMERA", "DISABLED_MODE", { mode: "Firebase hosting" });
+
       return;
     }
-    
+
     if (imgRef.current) {
       imgRef.current.src = urls.stream;
-      
+
       imgRef.current.onload = () => {
         setIsStreaming(true);
-        setConnectionStatus('connected');
+        setConnectionStatus("connected");
         setIsLoading(false);
         setError(null);
-        logger.info('CAMERA', 'STREAMING_STARTED', { url: urls.stream });
+        logger.info("CAMERA", "STREAMING_STARTED", { url: urls.stream });
       };
 
       imgRef.current.onerror = () => {
         setIsStreaming(false);
-        setConnectionStatus('disconnected');
+        setConnectionStatus("disconnected");
         setIsLoading(false);
-        setError('📷 Camera connection failed. Please check Pi server.');
-        logger.error('CAMERA', 'STREAMING_FAILED', { url: urls.stream });
+        setError("📷 Camera connection failed. Please check Pi server.");
+        logger.error("CAMERA", "STREAMING_FAILED", { url: urls.stream });
       };
     }
   };
@@ -103,50 +113,55 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
   const stopStreaming = () => {
     setIsLoading(true);
     if (imgRef.current) {
-      imgRef.current.src = '';
+      imgRef.current.src = "";
     }
     setIsStreaming(false);
-    setConnectionStatus('disconnected');
+    setConnectionStatus("disconnected");
     setIsLoading(false);
   };
 
   // Take snapshot
   const takeSnapshot = async () => {
-    logger.buttonPress('CAMERA_TAKE_SNAPSHOT', 'CameraViewer');
-    
+    logger.buttonPress("CAMERA_TAKE_SNAPSHOT", "CameraViewer");
+
     setIsLoading(true);
     try {
       const urls = getCameraUrls();
-      
+
       // Check if camera is disabled in Firebase mode
       if (!urls.snapshot) {
-        setError('❌ Snapshot unavailable in Firebase hosting mode.');
-        logger.warn('CAMERA', 'SNAPSHOT_DISABLED', { mode: 'Firebase hosting' });
+        setError("❌ Snapshot unavailable in Firebase hosting mode.");
+        logger.warn("CAMERA", "SNAPSHOT_DISABLED", {
+          mode: "Firebase hosting",
+        });
+
         return;
       }
-      
+
       const response = await fetch(urls.snapshot);
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const imageUrl = URL.createObjectURL(blob);
+
         setLastSnapshot(imageUrl);
-        
+
         // Auto-download snapshot
-        const link = document.createElement('a');
+        const link = document.createElement("a");
+
         link.href = imageUrl;
-        link.download = `fish-feeder-snapshot-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+        link.download = `fish-feeder-snapshot-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        logger.info('CAMERA', 'SNAPSHOT_SUCCESS', { filename: link.download });
+
+        logger.info("CAMERA", "SNAPSHOT_SUCCESS", { filename: link.download });
       } else {
-        throw new Error('Snapshot failed');
+        throw new Error("Snapshot failed");
       }
     } catch (error) {
-      setError('❌ Snapshot failed. Check camera connection.');
-      logger.error('CAMERA', 'SNAPSHOT_FAILED', { error });
+      setError("❌ Snapshot failed. Check camera connection.");
+      logger.error("CAMERA", "SNAPSHOT_FAILED", { error });
     } finally {
       setIsLoading(false);
     }
@@ -173,12 +188,12 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
       const urls = getCameraUrls();
       const response = await fetch(urls.status);
       const data = await response.json();
-      
+
       if (data.camera_active) {
-        setConnectionStatus('connected');
+        setConnectionStatus("connected");
       }
     } catch (error) {
-      console.log('Camera status check failed:', error);
+      console.log("Camera status check failed:", error);
     }
   };
 
@@ -187,19 +202,19 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
     if (autoRefresh) {
       startStreaming();
     }
-    
+
     // ⚡ EVENT-DRIVEN CAMERA STATUS - No setInterval polling!
     // Status checks are now triggered by streaming events
-    
+
     // Handle fullscreen changes
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       if (lastSnapshot) {
         URL.revokeObjectURL(lastSnapshot);
       }
@@ -210,49 +225,52 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
   const uploadToGoogleDrive = async (file: File) => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'camera_snapshot');
-      formData.append('timestamp', new Date().toISOString());
-      
+
+      formData.append("file", file);
+      formData.append("type", "camera_snapshot");
+      formData.append("timestamp", new Date().toISOString());
+
       // Integrated with actual Google Drive API
-      const response = await fetch('/api/drive/upload', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/drive/upload", {
+        method: "POST",
+        body: formData,
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
-        setUploadStatus('success');
+        setUploadStatus("success");
         setDriveFileId(result.fileId);
       } else {
-        setUploadStatus('error');
+        setUploadStatus("error");
       }
     } catch (error) {
-      setUploadStatus('error');
+      setUploadStatus("error");
       // Log to error reporting service instead of console
     }
   };
 
   return (
-    <div className={`w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}>
+    <div
+      className={`w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}
+    >
       <div className="flex gap-3 p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col">
           <p className="text-md font-semibold">📷 Pi Camera Live Stream</p>
           <p className="text-small text-gray-500 dark:text-gray-400">
-            {connectionStatus === 'connected' && '🟢 Connected via PageKite'} 
-            {connectionStatus === 'connecting' && '🟡 Connecting...'} 
-            {connectionStatus === 'disconnected' && '🔴 Disconnected'}
+            {connectionStatus === "connected" && "🟢 Connected via PageKite"}
+            {connectionStatus === "connecting" && "🟡 Connecting..."}
+            {connectionStatus === "disconnected" && "🔴 Disconnected"}
           </p>
         </div>
       </div>
-      
+
       <div className="px-3 py-3">
         {/* Camera Stream Container */}
-        <div 
+        <div
           ref={containerRef}
           className={`relative bg-black rounded-lg overflow-hidden ${
-            isFullscreen ? 'fixed inset-0 z-50' : 'aspect-video'
+            isFullscreen ? "fixed inset-0 z-50" : "aspect-video"
           }`}
         >
           {/* Main Camera Stream */}
@@ -260,17 +278,17 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
             ref={imgRef}
             alt="Fish Feeder Camera Stream"
             className={`w-full h-full object-contain ${
-              isStreaming ? 'block' : 'hidden'
+              isStreaming ? "block" : "hidden"
             }`}
             crossOrigin="anonymous"
           />
-          
+
           {/* Loading/Error States */}
           {!isStreaming && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
               {isLoading ? (
                 <div className="text-center text-white">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
                   <p>📡 Connecting to camera...</p>
                 </div>
               ) : error ? (
@@ -287,27 +305,31 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
               )}
             </div>
           )}
-          
+
           {/* Fullscreen Toggle */}
           {isStreaming && (
             <button
-              onClick={toggleFullscreen}
               className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-colors"
               title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              onClick={toggleFullscreen}
             >
               {isFullscreen ? <FaCompress /> : <FaExpand />}
             </button>
           )}
-          
+
           {/* Connection Status Indicator */}
-          <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-xs font-medium ${
-            connectionStatus === 'connected' ? 'bg-green-500/80 text-white' :
-            connectionStatus === 'connecting' ? 'bg-yellow-500/80 text-white' :
-            'bg-red-500/80 text-white'
-          }`}>
-            {connectionStatus === 'connected' && '🟢 LIVE'}
-            {connectionStatus === 'connecting' && '🟡 CONNECTING'}
-            {connectionStatus === 'disconnected' && '🔴 OFFLINE'}
+          <div
+            className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-xs font-medium ${
+              connectionStatus === "connected"
+                ? "bg-green-500/80 text-white"
+                : connectionStatus === "connecting"
+                  ? "bg-yellow-500/80 text-white"
+                  : "bg-red-500/80 text-white"
+            }`}
+          >
+            {connectionStatus === "connected" && "🟢 LIVE"}
+            {connectionStatus === "connecting" && "🟡 CONNECTING"}
+            {connectionStatus === "disconnected" && "🔴 OFFLINE"}
           </div>
         </div>
 
@@ -315,82 +337,85 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
         {showControls && (
           <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-3">
             <Button
+              className="bg-white/90 backdrop-blur-sm"
               color={isStreaming ? "danger" : "primary"}
+              isLoading={isLoading}
               startContent={isStreaming ? <IoMdPause /> : <IoMdPlay />}
               onPress={isStreaming ? stopStreaming : startStreaming}
-              isLoading={isLoading}
-              className="bg-white/90 backdrop-blur-sm"
             >
               {isStreaming ? "Stop" : "Start"} Stream
             </Button>
-            
+
             <Button
+              className="bg-white/90 backdrop-blur-sm"
               color="secondary"
+              isLoading={isLoading}
               startContent={<IoMdCamera />}
               onPress={takeSnapshot}
-              isLoading={isLoading}
-              className="bg-white/90 backdrop-blur-sm"
             >
               Snapshot
             </Button>
-            
+
             <Button
+              className="bg-white/90 backdrop-blur-sm"
               color="default"
+              isDisabled={isLoading}
               startContent={<IoMdRefresh />}
               onPress={() => {
                 stopStreaming();
                 setTimeout(startStreaming, 500);
               }}
-              isDisabled={isLoading}
-              className="bg-white/90 backdrop-blur-sm"
             >
               Refresh
             </Button>
 
             {/* Google Drive Upload Button */}
             <Button
+              className="bg-white/90 backdrop-blur-sm"
               color="success"
+              isLoading={isLoading}
               startContent={
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                 </svg>
               }
               onPress={async () => {
                 // Take snapshot and upload to Google Drive
-                logger.buttonPress('CAMERA_UPLOAD_DRIVE', 'CameraViewer');
-                
+                logger.buttonPress("CAMERA_UPLOAD_DRIVE", "CameraViewer");
+
                 try {
                   // First take a snapshot
                   await takeSnapshot();
-                  
+
                   // Simulate Google Drive upload
                   const uploadData = {
                     timestamp: new Date().toISOString(),
-                    type: 'camera_snapshot',
-                    filename: `fish_feeder_snapshot_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`
+                    type: "camera_snapshot",
+                    filename: `fish_feeder_snapshot_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.jpg`,
                   };
-                  
+
                   // TODO: Integrate with actual Google Drive API
-                  console.log('📤 Uploading to Google Drive:', uploadData);
-                  
+                  console.log("📤 Uploading to Google Drive:", uploadData);
+
                   // Show success message (you can add toast notification here)
-                  logger.info('CAMERA', 'DRIVE_UPLOAD_SUCCESS', uploadData);
-                  
+                  logger.info("CAMERA", "DRIVE_UPLOAD_SUCCESS", uploadData);
                 } catch (error) {
-                  logger.error('CAMERA', 'DRIVE_UPLOAD_FAILED', { error });
+                  logger.error("CAMERA", "DRIVE_UPLOAD_FAILED", { error });
                 }
               }}
-              isLoading={isLoading}
-              className="bg-white/90 backdrop-blur-sm"
             >
               📤 Drive
             </Button>
-            
+
             <Button
+              className="bg-white/90 backdrop-blur-sm"
               color="default"
               startContent={isFullscreen ? <FaCompress /> : <FaExpand />}
               onPress={toggleFullscreen}
-              className="bg-white/90 backdrop-blur-sm"
             >
               {isFullscreen ? "Exit" : "Full"}
             </Button>
@@ -415,4 +440,4 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
   );
 };
 
-export default CameraViewer; 
+export default CameraViewer;

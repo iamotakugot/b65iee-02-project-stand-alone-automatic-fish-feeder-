@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: UISettings = {
   },
   banners: {
     showFirebaseBanner: false, // Keep banners disabled
-    showApiStatus: false, 
+    showApiStatus: false,
     autoDismissTime: 5,
   },
   notifications: {
@@ -43,7 +43,7 @@ const DEFAULT_SETTINGS: UISettings = {
   },
 };
 
-const STORAGE_KEY = 'ui-settings';
+const STORAGE_KEY = "ui-settings";
 
 export class UISettingsManager {
   private static instance: UISettingsManager;
@@ -57,18 +57,21 @@ export class UISettingsManager {
     if (!UISettingsManager.instance) {
       UISettingsManager.instance = new UISettingsManager();
     }
+
     return UISettingsManager.instance;
   }
 
   private loadSettings(): UISettings {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+
       if (stored) {
         return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
       }
     } catch (error) {
-      console.warn('Failed to load UI settings:', error);
+      console.warn("Failed to load UI settings:", error);
     }
+
     return DEFAULT_SETTINGS;
   }
 
@@ -76,7 +79,7 @@ export class UISettingsManager {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
     } catch (error) {
-      console.warn('Failed to save UI settings:', error);
+      console.warn("Failed to save UI settings:", error);
     }
   }
 
@@ -110,20 +113,20 @@ export class UISettingsManager {
   enableSplash(): void {
     this.settings.splash.enabled = true;
     this.saveSettings();
-    localStorage.removeItem('splash-disabled');
-    localStorage.removeItem('splash-seen');
+    localStorage.removeItem("splash-disabled");
+    localStorage.removeItem("splash-seen");
   }
 
   disableSplash(): void {
     this.settings.splash.enabled = false;
     this.saveSettings();
-    localStorage.setItem('splash-disabled', 'true');
-    localStorage.setItem('splash-seen', 'true');
+    localStorage.setItem("splash-disabled", "true");
+    localStorage.setItem("splash-seen", "true");
   }
 
   resetSplash(): void {
-    localStorage.removeItem('splash-disabled');
-    localStorage.removeItem('splash-seen');
+    localStorage.removeItem("splash-disabled");
+    localStorage.removeItem("splash-seen");
     this.settings.splash.enabled = true;
     this.saveSettings();
   }
@@ -132,15 +135,19 @@ export class UISettingsManager {
   reset(): void {
     this.settings = { ...DEFAULT_SETTINGS };
     this.saveSettings();
-    localStorage.removeItem('splash-seen');
-    localStorage.removeItem('splash-disabled');
+    localStorage.removeItem("splash-seen");
+    localStorage.removeItem("splash-disabled");
   }
 
   // Quick disable all intrusive elements (except splash)
   disableAll(): void {
     this.settings = {
       ...this.settings,
-      banners: { ...this.settings.banners, showFirebaseBanner: false, showApiStatus: false },
+      banners: {
+        ...this.settings.banners,
+        showFirebaseBanner: false,
+        showApiStatus: false,
+      },
     };
     this.saveSettings();
   }
@@ -149,12 +156,20 @@ export class UISettingsManager {
   enableMinimalMode(): void {
     this.settings = {
       ...this.settings,
-      banners: { ...this.settings.banners, showFirebaseBanner: false, showApiStatus: false },
-      notifications: { ...this.settings.notifications, autoHide: true, hideTime: 2 }
+      banners: {
+        ...this.settings.banners,
+        showFirebaseBanner: false,
+        showApiStatus: false,
+      },
+      notifications: {
+        ...this.settings.notifications,
+        autoHide: true,
+        hideTime: 2,
+      },
     };
     this.saveSettings();
   }
 }
 
 // Export singleton instance
-export const uiSettings = UISettingsManager.getInstance(); 
+export const uiSettings = UISettingsManager.getInstance();

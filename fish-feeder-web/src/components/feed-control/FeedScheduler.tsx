@@ -22,7 +22,11 @@ interface FeedSchedulerProps {
   setNewScheduleTime: (time: string) => void;
   newScheduleAmount: string;
   setNewScheduleAmount: (amount: string) => void;
-  formatWeightDisplay: (grams: string | number, showName?: boolean, name?: string) => string;
+  formatWeightDisplay: (
+    grams: string | number,
+    showName?: boolean,
+    name?: string,
+  ) => string;
 }
 
 export const FeedScheduler = ({
@@ -34,7 +38,7 @@ export const FeedScheduler = ({
   setNewScheduleTime,
   newScheduleAmount,
   setNewScheduleAmount,
-  formatWeightDisplay
+  formatWeightDisplay,
 }: FeedSchedulerProps) => {
   const handleAddSchedule = () => {
     if (newScheduleTime && newScheduleAmount) {
@@ -45,9 +49,9 @@ export const FeedScheduler = ({
         actuator_up: 3,
         actuator_down: 2,
         auger_duration: 20,
-        blower_duration: 15
+        blower_duration: 15,
       };
-      
+
       setSchedules([...schedules, newSchedule]);
       setNewScheduleTime("");
       setNewScheduleAmount("100");
@@ -65,9 +69,9 @@ export const FeedScheduler = ({
           Automatic Feeding
         </h3>
         <Switch
+          color="primary"
           isSelected={automaticFeeding}
           onValueChange={setAutomaticFeeding}
-          color="primary"
         />
       </div>
 
@@ -88,15 +92,19 @@ export const FeedScheduler = ({
                       {schedule.time}
                     </span>
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {formatWeightDisplay(schedule.amount, true, schedule.type)}
+                      {formatWeightDisplay(
+                        schedule.amount,
+                        true,
+                        schedule.type,
+                      )}
                     </span>
                   </div>
                 </div>
                 <Button
-                  size="sm"
-                  color="danger"
-                  variant="light"
                   isIconOnly
+                  color="danger"
+                  size="sm"
+                  variant="light"
                   onPress={() => handleRemoveSchedule(index)}
                 >
                   <BsTrash />
@@ -109,40 +117,40 @@ export const FeedScheduler = ({
             <h4 className="text-md font-medium text-gray-700 dark:text-gray-300">
               Add New Schedule
             </h4>
-            
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Time
                 </label>
                 <Input
+                  size="sm"
                   type="time"
                   value={newScheduleTime}
                   onChange={(e) => setNewScheduleTime(e.target.value)}
-                  size="sm"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Amount (grams)
                 </label>
                 <Input
+                  max="5000"
+                  min="1"
+                  size="sm"
                   type="number"
                   value={newScheduleAmount}
                   onChange={(e) => setNewScheduleAmount(e.target.value)}
-                  min="1"
-                  max="5000"
-                  size="sm"
                 />
               </div>
             </div>
 
             <Button
               color="primary"
+              isDisabled={!newScheduleTime || !newScheduleAmount}
               startContent={<BsPlus />}
               onPress={handleAddSchedule}
-              isDisabled={!newScheduleTime || !newScheduleAmount}
             >
               Add Schedule
             </Button>
@@ -151,4 +159,4 @@ export const FeedScheduler = ({
       )}
     </div>
   );
-}; 
+};

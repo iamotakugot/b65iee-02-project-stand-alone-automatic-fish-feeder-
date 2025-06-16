@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Slider } from "@heroui/slider";
 import { Button } from "@heroui/button";
-import { FaSlidersH, FaArrowUp, FaArrowDown, FaPlay, FaStop } from "react-icons/fa";
+import {
+  FaSlidersH,
+  FaArrowUp,
+  FaArrowDown,
+  FaPlay,
+  FaStop,
+} from "react-icons/fa";
 import { RiBlazeFill } from "react-icons/ri";
 import { MdRotateRight, MdRotateLeft } from "react-icons/md";
 import { IoSpeedometer } from "react-icons/io5";
@@ -31,12 +37,12 @@ interface MotorControlRequest {
 
 const MotorPWMSettings = () => {
   // Use Firebase API Context
-  const { 
-    controlAuger, 
-    controlBlower, 
-    controlActuator, 
+  const {
+    controlAuger,
+    controlBlower,
+    controlActuator,
     setMotorPWM,
-    isConnected 
+    isConnected,
   } = useApi();
 
   // PWM control states
@@ -68,7 +74,7 @@ const MotorPWMSettings = () => {
   // Loading states
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(
-    isConnected ? "🔌 Connected to Firebase" : "❌ Disconnected"
+    isConnected ? "🔌 Connected to Firebase" : "❌ Disconnected",
   );
 
   // Define slider marks
@@ -107,9 +113,9 @@ const MotorPWMSettings = () => {
     }
 
     if (motorType === "auger") {
-      setAugerState(prev => ({ ...prev, ...newState }));
+      setAugerState((prev) => ({ ...prev, ...newState }));
     } else {
-      setBlowerState(prev => ({ ...prev, ...newState }));
+      setBlowerState((prev) => ({ ...prev, ...newState }));
     }
   };
 
@@ -122,27 +128,27 @@ const MotorPWMSettings = () => {
       switch (action.action) {
         case "speed":
           const speed = action.speed || Math.round(augerPWM * 2.55);
-          await setMotorPWM('auger', speed);
+
+          await setMotorPWM("auger", speed);
           updateMotorState("auger", `SPD:${speed}`, speed);
           setConnectionStatus(`✅ Auger speed: ${speed} via Firebase`);
           break;
         case "forward":
-          await controlAuger('forward');
+          await controlAuger("forward");
           updateMotorState("auger", "G:1");
           setConnectionStatus(`✅ Auger forward via Firebase`);
           break;
         case "reverse":
-          await controlAuger('reverse');
+          await controlAuger("reverse");
           updateMotorState("auger", "G:2");
           setConnectionStatus(`✅ Auger reverse via Firebase`);
           break;
         case "stop":
-          await controlAuger('stop');
+          await controlAuger("stop");
           updateMotorState("auger", "G:0");
           setConnectionStatus(`✅ Auger stop via Firebase`);
           break;
       }
-
     } catch (error) {
       console.error("Failed to control auger:", error);
       setConnectionStatus(`❌ Error: ${error}`);
@@ -160,7 +166,6 @@ const MotorPWMSettings = () => {
       await controlActuator(action);
       setConnectionStatus(`✅ Actuator ${action} via Firebase`);
       setActuatorMoving(action === "stop" ? null : action);
-
     } catch (error) {
       console.error(`Failed to control actuator:`, error);
       setConnectionStatus(`❌ Error: ${error}`);
@@ -177,8 +182,9 @@ const MotorPWMSettings = () => {
       </div>
 
       <div className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-        Control motors via <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | 
-        Status: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
+        Control motors via{" "}
+        <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | Status:{" "}
+        <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
           {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
         </code>
       </div>
@@ -219,35 +225,62 @@ const MotorPWMSettings = () => {
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-3 mb-4 border border-blue-200 dark:border-blue-700">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Speed (PWM)</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Speed (PWM)
+                </div>
                 <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {augerState.speed}/255 
-                  <span className="text-sm ml-1">({Math.round((augerState.speed / 255) * 100)}%)</span>
+                  {augerState.speed}/255
+                  <span className="text-sm ml-1">
+                    ({Math.round((augerState.speed / 255) * 100)}%)
+                  </span>
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Direction</div>
-                <div className={`text-sm font-semibold flex items-center ${
-                  augerState.direction === "forward" ? "text-green-600" :
-                  augerState.direction === "reverse" ? "text-orange-600" : "text-gray-600"
-                }`}>
-                  {augerState.direction === "forward" && <MdRotateRight className="mr-1" />}
-                  {augerState.direction === "reverse" && <MdRotateLeft className="mr-1" />}
-                  {augerState.direction === "stopped" && <FaStop className="mr-1" />}
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Direction
+                </div>
+                <div
+                  className={`text-sm font-semibold flex items-center ${
+                    augerState.direction === "forward"
+                      ? "text-green-600"
+                      : augerState.direction === "reverse"
+                        ? "text-orange-600"
+                        : "text-gray-600"
+                  }`}
+                >
+                  {augerState.direction === "forward" && (
+                    <MdRotateRight className="mr-1" />
+                  )}
+                  {augerState.direction === "reverse" && (
+                    <MdRotateLeft className="mr-1" />
+                  )}
+                  {augerState.direction === "stopped" && (
+                    <FaStop className="mr-1" />
+                  )}
                   {augerState.direction.toUpperCase()}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
-                <div className={`text-sm font-semibold flex items-center ${
-                  augerState.isRunning ? "text-green-600" : "text-gray-600"
-                }`}>
-                  {augerState.isRunning ? <FaPlay className="mr-1" /> : <FaStop className="mr-1" />}
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Status
+                </div>
+                <div
+                  className={`text-sm font-semibold flex items-center ${
+                    augerState.isRunning ? "text-green-600" : "text-gray-600"
+                  }`}
+                >
+                  {augerState.isRunning ? (
+                    <FaPlay className="mr-1" />
+                  ) : (
+                    <FaStop className="mr-1" />
+                  )}
                   {augerState.isRunning ? "RUNNING" : "STOPPED"}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Command</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Last Command
+                </div>
                 <div className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                   {augerState.lastCommand}
                 </div>
@@ -287,13 +320,17 @@ const MotorPWMSettings = () => {
                 isLoading={loading}
                 size="sm"
                 startContent={<IoSpeedometer />}
-                onPress={() => handleAugerControl({ 
-                  action: "speed", 
-                  speed: Math.round(augerPWM * 2.55) 
-                })}
+                onPress={() =>
+                  handleAugerControl({
+                    action: "speed",
+                    speed: Math.round(augerPWM * 2.55),
+                  })
+                }
               >
                 Set Speed
-                <div className="text-xs opacity-75">SPD:{Math.round(augerPWM * 2.55)}</div>
+                <div className="text-xs opacity-75">
+                  SPD:{Math.round(augerPWM * 2.55)}
+                </div>
               </Button>
               <Button
                 className="h-12"
@@ -343,23 +380,37 @@ const MotorPWMSettings = () => {
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-3 mb-4 border border-purple-200 dark:border-purple-700">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Speed (PWM)</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Speed (PWM)
+                </div>
                 <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                  {blowerState.speed}/255 
-                  <span className="text-sm ml-1">({Math.round((blowerState.speed / 255) * 100)}%)</span>
+                  {blowerState.speed}/255
+                  <span className="text-sm ml-1">
+                    ({Math.round((blowerState.speed / 255) * 100)}%)
+                  </span>
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
-                <div className={`text-sm font-semibold flex items-center ${
-                  blowerState.isRunning ? "text-green-600" : "text-gray-600"
-                }`}>
-                  {blowerState.isRunning ? <FaPlay className="mr-1" /> : <FaStop className="mr-1" />}
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Status
+                </div>
+                <div
+                  className={`text-sm font-semibold flex items-center ${
+                    blowerState.isRunning ? "text-green-600" : "text-gray-600"
+                  }`}
+                >
+                  {blowerState.isRunning ? (
+                    <FaPlay className="mr-1" />
+                  ) : (
+                    <FaStop className="mr-1" />
+                  )}
                   {blowerState.isRunning ? "RUNNING" : "STOPPED"}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Command</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Last Command
+                </div>
                 <div className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                   {blowerState.lastCommand}
                 </div>
@@ -371,7 +422,8 @@ const MotorPWMSettings = () => {
             <div className="px-2 mb-4">
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Set Blower Speed: {blowerPWM}% ({Math.round(blowerPWM * 2.55)}/255)
+                  Set Blower Speed: {blowerPWM}% ({Math.round(blowerPWM * 2.55)}
+                  /255)
                 </label>
                 <Slider
                   showTooltip
@@ -400,11 +452,14 @@ const MotorPWMSettings = () => {
                   try {
                     setLoading(true);
                     const speed = Math.round(blowerPWM * 2.55);
-                    await setMotorPWM('blower', speed);
-                    setConnectionStatus(`✅ Blower speed ${speed} via Firebase`);
+
+                    await setMotorPWM("blower", speed);
+                    setConnectionStatus(
+                      `✅ Blower speed ${speed} via Firebase`,
+                    );
                     updateMotorState("blower", `B:SPD:${speed}`, speed);
                   } catch (error) {
-                    console.error('Blower Speed failed:', error);
+                    console.error("Blower Speed failed:", error);
                     setConnectionStatus(`❌ Blower speed failed: ${error}`);
                   } finally {
                     setLoading(false);
@@ -421,11 +476,11 @@ const MotorPWMSettings = () => {
                 onPress={async () => {
                   try {
                     setLoading(true);
-                    await controlBlower('on');
+                    await controlBlower("on");
                     setConnectionStatus(`✅ Blower ON via Firebase`);
                     updateMotorState("blower", "B:1", 255);
                   } catch (error) {
-                    console.error('Blower ON failed:', error);
+                    console.error("Blower ON failed:", error);
                     setConnectionStatus(`❌ Blower ON failed: ${error}`);
                   } finally {
                     setLoading(false);
@@ -443,11 +498,11 @@ const MotorPWMSettings = () => {
                 onPress={async () => {
                   try {
                     setLoading(true);
-                    await controlBlower('off');
+                    await controlBlower("off");
                     setConnectionStatus(`✅ Blower OFF via Firebase`);
                     updateMotorState("blower", "B:0", 0);
                   } catch (error) {
-                    console.error('Blower OFF failed:', error);
+                    console.error("Blower OFF failed:", error);
                     setConnectionStatus(`❌ Blower OFF failed: ${error}`);
                   } finally {
                     setLoading(false);
@@ -468,7 +523,8 @@ const MotorPWMSettings = () => {
           </div>
 
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Control the linear actuator using Firebase commands. Commands sent via: 
+            Control the linear actuator using Firebase commands. Commands sent
+            via:
             <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded ml-1">
               Firebase → Pi Server → Arduino Serial
             </code>
@@ -544,4 +600,4 @@ const MotorPWMSettings = () => {
   );
 };
 
-export default MotorPWMSettings; 
+export default MotorPWMSettings;

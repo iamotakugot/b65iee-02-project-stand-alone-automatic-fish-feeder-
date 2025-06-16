@@ -1,7 +1,17 @@
 // ⚡ REAL FIREBASE REALTIME CLIENT - No mock data allowed!
-import { firebaseClient } from './firebase';
-import { getDatabase, ref, set, get, onValue, off, push } from 'firebase/database';
-import type { FirebaseData } from './firebase';
+import type { FirebaseData } from "./firebase";
+
+import {
+  getDatabase,
+  ref,
+  set,
+  get,
+  onValue,
+  off,
+  push,
+} from "firebase/database";
+
+import { firebaseClient } from "./firebase";
 
 // ⚡ FIREBASE REALTIME DATA - No mock data!
 export interface SensorData {
@@ -24,30 +34,33 @@ class FishFeederClient {
     try {
       // ⚡ FIREBASE REALTIME DATA - No mock data!
       return new Promise((resolve, reject) => {
-        const unsubscribe = firebaseClient.getSensorData((data: FirebaseData | null) => {
-          unsubscribe(); // Stop listening after first data
-          
-          if (data && data.sensors) {
-            resolve({
-              status: "success",
-              data: data.sensors,
-            });
-          } else {
-            reject(new Error('No sensor data available from Firebase'));
-          }
-        });
-        
+        const unsubscribe = firebaseClient.getSensorData(
+          (data: FirebaseData | null) => {
+            unsubscribe(); // Stop listening after first data
+
+            if (data && data.sensors) {
+              resolve({
+                status: "success",
+                data: data.sensors,
+              });
+            } else {
+              reject(new Error("No sensor data available from Firebase"));
+            }
+          },
+        );
+
         // Timeout after 10 seconds
         // ⚡ EVENT-DRIVEN TIMEOUT - No setTimeout!
         const timeoutId = performance.now() + 10000;
         const checkTimeout = () => {
           if (performance.now() >= timeoutId) {
             unsubscribe();
-            reject(new Error('Firebase data fetch timeout'));
+            reject(new Error("Firebase data fetch timeout"));
           } else {
             requestAnimationFrame(checkTimeout);
           }
         };
+
         requestAnimationFrame(checkTimeout);
       });
     } catch (error) {
@@ -80,74 +93,82 @@ class FirebaseRealtimeClient {
   async sendArduinoCommand(command: string): Promise<boolean> {
     try {
       const commandRef = ref(database, `controls/arduino_command`);
+
       await set(commandRef, {
         command,
         timestamp: Date.now(),
-        status: 'pending'
+        status: "pending",
       });
-      
+
       // ⚡ EVENT-DRIVEN RESPONSE WAITING - No setTimeout()!
       return new Promise((resolve) => {
         const statusRef = ref(database, `status/arduino_response`);
         let responseReceived = false;
         const startTime = performance.now();
         const timeout = 10000; // 10 seconds
-        
+
         const checkResponse = () => {
           if (responseReceived) return;
-          
-          get(statusRef).then((snapshot) => {
-            const response = snapshot.val();
-            if (response && response.timestamp > (startTime - 1000)) {
-              responseReceived = true;
-              resolve(response.status === 'success');
-            } else if (performance.now() - startTime > timeout) {
+
+          get(statusRef)
+            .then((snapshot) => {
+              const response = snapshot.val();
+
+              if (response && response.timestamp > startTime - 1000) {
+                responseReceived = true;
+                resolve(response.status === "success");
+              } else if (performance.now() - startTime > timeout) {
+                responseReceived = true;
+                resolve(false);
+              } else {
+                // Continue checking with requestAnimationFrame
+                requestAnimationFrame(checkResponse);
+              }
+            })
+            .catch(() => {
               responseReceived = true;
               resolve(false);
-            } else {
-              // Continue checking with requestAnimationFrame
-              requestAnimationFrame(checkResponse);
-            }
-          }).catch(() => {
-            responseReceived = true;
-            resolve(false);
-          });
+            });
         };
-        
+
         requestAnimationFrame(checkResponse);
       });
     } catch (error) {
-      console.error('Firebase command error:', error);
+      console.error("Firebase command error:", error);
+
       return false;
     }
   }
 
   subscribeToSensorData(callback: (data: SensorData) => void): () => void {
-    const sensorRef = ref(database, 'sensors/current');
-    
+    const sensorRef = ref(database, "sensors/current");
+
     const listener = (snapshot: any) => {
       const data = snapshot.val();
+
       if (data) {
         callback(data);
       }
     };
-    
+
     onValue(sensorRef, listener);
-    this.listeners['sensors/current'] = listener;
-    
+    this.listeners["sensors/current"] = listener;
+
     return () => {
-      off(sensorRef, 'value', listener);
-      delete this.listeners['sensors/current'];
+      off(sensorRef, "value", listener);
+      delete this.listeners["sensors/current"];
     };
   }
 
   async getSensorData(): Promise<SensorData | null> {
     try {
-      const sensorRef = ref(database, 'sensors/current');
+      const sensorRef = ref(database, "sensors/current");
       const snapshot = await get(sensorRef);
+
       return snapshot.val();
     } catch (error) {
-      console.error('Error getting sensor data:', error);
+      console.error("Error getting sensor data:", error);
+
       return null;
     }
   }
@@ -155,13 +176,16 @@ class FirebaseRealtimeClient {
   async sendControlCommand(type: string, value: any): Promise<boolean> {
     try {
       const controlRef = ref(database, `controls/${type}`);
+
       await set(controlRef, {
         value,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
+
       return true;
     } catch (error) {
-      console.error('Error sending control command:', error);
+      console.error("Error sending control command:", error);
+
       return false;
     }
   }
@@ -170,19 +194,21 @@ class FirebaseRealtimeClient {
   async logEvent(eventType: string, data: any): Promise<void> {
     try {
       const logsRef = ref(database, `logs/${eventType}`);
+
       await push(logsRef, {
         ...data,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error logging event:', error);
+      console.error("Error logging event:", error);
     }
   }
 
   cleanup(): void {
-    Object.keys(this.listeners).forEach(path => {
+    Object.keys(this.listeners).forEach((path) => {
       const pathRef = ref(database, path);
-      off(pathRef, 'value', this.listeners[path]);
+
+      off(pathRef, "value", this.listeners[path]);
     });
     this.listeners = {};
   }
