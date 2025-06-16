@@ -195,6 +195,41 @@ const Analytics = () => {
                 {range.toUpperCase()}
               </motion.button>
             ))}
+            
+            {/* Google Drive Export Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-2 rounded-xl font-medium bg-gradient-to-r from-green-500 to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+              onClick={() => {
+                // Export current chart data to Google Drive
+                const exportData = {
+                  timestamp: new Date().toISOString(),
+                  timeRange: timeRange,
+                  data: chartData,
+                  type: 'Fish Feeder Analytics Export'
+                };
+                
+                // Create download link for local backup
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `fish_feeder_analytics_${timeRange}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                // TODO: Integrate with Google Drive API
+                console.log('📤 Analytics exported:', exportData);
+              }}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+              Export to Drive
+            </motion.button>
           </div>
         </div>
       </motion.div>

@@ -8,10 +8,56 @@ requests==2.31.0
 # Firebase dependencies
 firebase-admin==6.2.0
 
+# Google Drive API dependencies
+google-api-python-client==2.108.0
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+
 # Optional dependencies for enhanced functionality
 python-dotenv==1.0.0
 schedule==1.2.0
 
 # Development dependencies (optional)
 pytest==7.4.2
-pytest-cov==4.1.0 
+pytest-cov==4.1.0
+
+# Firebase and Google Cloud dependencies
+google-cloud-firestore==2.11.1
+
+# Data processing
+pandas==2.0.3
+numpy==1.24.3
+
+# System monitoring
+psutil==5.9.5
+
+# Protobuf for high-performance communication
+protobuf==4.25.1
+
+# Optional: MessagePack as alternative
+msgpack==1.0.7
+
+# Advanced scheduling and task management
+apscheduler==3.10.4
+
+# File system monitoring
+watchdog==3.0.0
+
+# Beautiful console output and progress bars
+rich==13.7.0
+
+# Data validation and type checking
+pydantic==2.5.0
+
+# CBOR binary format support
+cbor2==5.4.6
+
+# Development tools
+black==23.12.1
+isort==5.13.2
+mypy==1.8.0
+
+# Performance monitoring
+memory-profiler==0.61.0
+line-profiler==4.1.1 

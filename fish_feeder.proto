@@ -1,0 +1,127 @@
+// Fish Feeder IoT System - Protocol Buffer Definitions
+// Generated: 2025-06-16
+// Compatible with: Arduino (nanopb) + Python (protobuf)
+
+syntax = "proto3";
+
+// ========================================
+// SENSOR DATA MESSAGES
+// ========================================
+
+message SensorData {
+  float feed_temperature = 1;      // DHT22 feed area
+  float feed_humidity = 2;         // DHT22 feed area
+  float box_temperature = 3;       // DHT22 box area
+  float box_humidity = 4;          // DHT22 box area
+  float weight = 5;                // HX711 load cell
+  float soil_moisture = 6;         // Soil moisture sensor
+  float solar_voltage = 7;         // Solar panel voltage
+  float load_voltage = 8;          // Load voltage
+  string battery_percent = 9;      // Battery percentage
+  uint32 timestamp = 10;           // Unix timestamp
+  string status = 11;              // System status
+}
+
+// ========================================
+// CONTROL COMMAND MESSAGES
+// ========================================
+
+message ControlCommand {
+  string command = 1;              // "control"
+  string device = 2;               // "led", "fan", "blower", "auger", "actuator"
+  string action = 3;               // "on", "off", "toggle"
+  int32 value = 4;                 // Optional value (speed, position, etc.)
+  uint32 timestamp = 5;            // Command timestamp
+  string source = 6;               // "web", "pi", "arduino", "test"
+}
+
+// ========================================
+// SYSTEM STATUS MESSAGES
+// ========================================
+
+message SystemStatus {
+  bool online = 1;                 // System online status
+  uint32 uptime = 2;               // System uptime in seconds
+  uint32 free_memory = 3;          // Free memory in bytes
+  repeated string errors = 4;       // Error messages
+  string version = 5;              // Firmware version
+  uint32 last_command_time = 6;    // Last command timestamp
+}
+
+// ========================================
+// DEVICE STATUS MESSAGES
+// ========================================
+
+message DeviceStatus {
+  bool led = 1;                    // LED status
+  bool fan = 2;                    // Fan status
+  int32 auger_speed = 3;           // Auger speed (0-255)
+  int32 blower_speed = 4;          // Blower speed (0-255)
+  int32 actuator_position = 5;     // Actuator position (0-100)
+  bool emergency_stop = 6;         // Emergency stop status
+  uint32 timestamp = 7;            // Status timestamp
+}
+
+// ========================================
+// CALIBRATION MESSAGES
+// ========================================
+
+message CalibrationCommand {
+  string device = 1;               // "hx711", "actuator"
+  string action = 2;               // "tare", "calibrate", "set_zero"
+  float known_weight = 3;          // Known weight for calibration
+  int32 raw_value = 4;             // Raw sensor value
+  uint32 timestamp = 5;            // Calibration timestamp
+}
+
+message CalibrationResponse {
+  string device = 1;               // Device being calibrated
+  bool success = 2;                // Calibration success
+  float scale_factor = 3;          // Calculated scale factor
+  int32 offset = 4;                // Calculated offset
+  string message = 5;              // Status message
+  uint32 timestamp = 6;            // Response timestamp
+}
+
+// ========================================
+// EMERGENCY MESSAGES
+// ========================================
+
+message EmergencyCommand {
+  string action = 1;               // "stop", "reset", "shutdown"
+  string reason = 2;               // Emergency reason
+  uint32 timestamp = 3;            // Emergency timestamp
+  string source = 4;               // Emergency source
+}
+
+// ========================================
+// HEARTBEAT MESSAGES
+// ========================================
+
+message HeartbeatMessage {
+  string device_id = 1;            // "arduino", "pi", "web"
+  uint32 timestamp = 2;            // Heartbeat timestamp
+  bool alive = 3;                  // Device alive status
+  uint32 sequence = 4;             // Heartbeat sequence number
+}
+
+// ========================================
+// UNIFIED MESSAGE WRAPPER
+// ========================================
+
+message FishFeederMessage {
+  oneof message_type {
+    SensorData sensor_data = 1;
+    ControlCommand control_command = 2;
+    SystemStatus system_status = 3;
+    DeviceStatus device_status = 4;
+    CalibrationCommand calibration_command = 5;
+    CalibrationResponse calibration_response = 6;
+    EmergencyCommand emergency_command = 7;
+    HeartbeatMessage heartbeat = 8;
+  }
+  
+  uint32 message_id = 9;           // Unique message ID
+  uint32 timestamp = 10;           // Message timestamp
+  string source = 11;              // Message source
+} 

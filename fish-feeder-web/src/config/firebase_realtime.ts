@@ -1,6 +1,6 @@
 // ⚡ REAL FIREBASE REALTIME CLIENT - No mock data allowed!
-import { database, auth } from './firebase';
-import { ref, set, get, onValue, off, push } from 'firebase/database';
+import { firebaseClient } from './firebase';
+import { getDatabase, ref, set, get, onValue, off, push } from 'firebase/database';
 import type { FirebaseData } from './firebase';
 
 // ⚡ FIREBASE REALTIME DATA - No mock data!
@@ -13,6 +13,9 @@ export interface SensorData {
   voltage: number;
   timestamp: number;
 }
+
+// Create database instance
+const database = getDatabase();
 
 // Fish Feeder API Client that uses Firebase Real-time Database
 class FishFeederClient {
@@ -72,7 +75,7 @@ export const fishFeederClient = new FishFeederClient();
 
 // ⚡ EVENT-DRIVEN FIREBASE CLIENT - No setTimeout delays!
 class FirebaseRealtimeClient {
-  private listeners: { [path: string]: (snapshot: any) => void } = {};
+  private listeners: { [path: string]: any } = {};
 
   async sendArduinoCommand(command: string): Promise<boolean> {
     try {
@@ -133,7 +136,7 @@ class FirebaseRealtimeClient {
     this.listeners['sensors/current'] = listener;
     
     return () => {
-      off(sensorRef, listener);
+      off(sensorRef, 'value', listener);
       delete this.listeners['sensors/current'];
     };
   }
@@ -179,7 +182,7 @@ class FirebaseRealtimeClient {
   cleanup(): void {
     Object.keys(this.listeners).forEach(path => {
       const pathRef = ref(database, path);
-      off(pathRef, this.listeners[path]);
+      off(pathRef, 'value', this.listeners[path]);
     });
     this.listeners = {};
   }

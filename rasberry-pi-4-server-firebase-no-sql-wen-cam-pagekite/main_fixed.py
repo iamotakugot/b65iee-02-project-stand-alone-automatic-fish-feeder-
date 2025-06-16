@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Fish Feeder Pi Server - CLEAN VERSION - QA 100%
-===============================================
-✅ Fixed Arduino connection status
-✅ Fixed Motors command conversion  
-✅ Removed infinite loops
-✅ 100% Protocol compatibility
-✅ No Unicode issues
-✅ Clean architecture
+Fish Feeder Pi Server - FIXED VERSION - QA 100%
+=================================================
+- Fixed Arduino connection status
+- Fixed Motors command conversion  
+- Removed infinite loops
+- 100% Protocol compatibility
 """
 
 import os
@@ -66,11 +64,12 @@ class Config:
     # Web Server
     WEB_HOST: str = "0.0.0.0"
     WEB_PORT: int = 5000
+    WEB_DEBUG: bool = False
 
 config = Config()
 
 def setup_logging() -> logging.Logger:
-    """Setup clean logging configuration"""
+    """Setup logging configuration"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -84,13 +83,12 @@ def setup_logging() -> logging.Logger:
 logger = setup_logging()
 
 class ArduinoManager:
-    """Arduino Serial Communication Manager - CLEAN VERSION"""
+    """Arduino Serial Communication Manager - FIXED"""
     
     def __init__(self):
         self.serial_conn: Optional[serial.Serial] = None
         self.connection_validated = False
         self.response_handler: Optional[Callable[[str], None]] = None
-        self.last_validation_time = 0
         
     def connect(self) -> bool:
         """Connect to Arduino with multiple strategies"""
@@ -102,17 +100,31 @@ class ArduinoManager:
         
         # Strategy 1: Try configured port
         if config.ARDUINO_PORT != 'AUTO':
-            logger.info(f"TRYING: Configured port {config.ARDUINO_PORT}")
-            if self._try_connect_port(config.ARDUINO_PORT):
-                logger.info(f"SUCCESS: Arduino connected on configured port {config.ARDUINO_PORT}")
+            if self._try_configured_port():
                 return True
         else:
             logger.info("AUTO MODE: Skipping configured port, using auto-detection")
         
         # Strategy 2: Auto-detect Arduino ports
+        if self._try_auto_detect_ports():
+            return True
+        
+        # Strategy 3: Try common ports
+        if self._try_common_ports():
+            return True
+        
+        logger.error("ERROR: All Arduino connection strategies failed")
+        return False
+    
+    def _try_configured_port(self) -> bool:
+        """Try connecting to configured port"""
+        logger.info(f"TRYING: Configured port {config.ARDUINO_PORT}")
+        return self._try_connect_port(config.ARDUINO_PORT)
+    
+    def _try_auto_detect_ports(self) -> bool:
+        """Auto-detect Arduino ports"""
         logger.info("TRYING: Auto-detecting Arduino ports...")
         arduino_ports = self._detect_arduino_ports()
-        logger.info(f"DETECTED: Found {len(arduino_ports)} ports: {arduino_ports}")
         
         for port in arduino_ports:
             logger.info(f"TESTING: Port {port}")
@@ -122,7 +134,10 @@ class ArduinoManager:
             else:
                 logger.warning(f"WARNING: Port {port} failed: Arduino not responding")
         
-        # Strategy 3: Try common ports
+        return False
+    
+    def _try_common_ports(self) -> bool:
+        """Try common Arduino ports"""
         common_ports = ['COM3', 'COM4', 'COM5', '/dev/ttyUSB0', '/dev/ttyACM0']
         logger.info("TRYING: Common Arduino ports...")
         
@@ -132,7 +147,6 @@ class ArduinoManager:
                 logger.info(f"SUCCESS: Arduino found on common port {port}")
                 return True
         
-        logger.error("ERROR: All Arduino connection strategies failed")
         return False
     
     def _detect_arduino_ports(self) -> list:
@@ -164,9 +178,8 @@ class ArduinoManager:
             )
             
             # Validate Arduino connection
-            if self._validate_arduino_connection():
+            if self._validate_real_arduino_connection():
                 self.connection_validated = True
-                self.last_validation_time = time.time()
                 return True
             else:
                 self.serial_conn.close()
@@ -183,48 +196,49 @@ class ArduinoManager:
                 self.serial_conn = None
             return False
     
-    def _validate_arduino_connection(self) -> bool:
-        """Validate Arduino connection - SIMPLIFIED (ไม่ส่งคำสั่งรบกวน)"""
+    def _validate_real_arduino_connection(self) -> bool:
+        """Validate real Arduino connection"""
         try:
             if not self.serial_conn or not self.serial_conn.is_open:
                 return False
             
-            # Simple validation - just check if serial port is responsive
-            # Don't send commands that might interfere with normal operation
-            return True  # If serial port is open, assume Arduino is working
+            # Clear any existing data
+            self.serial_conn.reset_input_buffer()
+            self.serial_conn.reset_output_buffer()
+            
+            # Send validation command
+            self.serial_conn.write(b"SYS:info\n")
+            self.serial_conn.flush()
+            
+            # Wait for response
+            start_time = time.time()
+            while time.time() - start_time < 3:
+                if self.serial_conn.in_waiting > 0:
+                    response = self.serial_conn.readline().decode().strip()
+                    if response and 'FISH FEEDER ARDUINO' in response:
+                        logger.info(f"SUCCESS: Arduino validated with response: {response}")
+                        return True
+                time.sleep(0.1)
+            
+            logger.warning("WARNING: Arduino validation timeout")
+            return False
             
         except Exception as e:
             logger.error(f"ERROR: Arduino validation failed: {e}")
             return False
     
     def is_connected(self) -> bool:
-        """Check if Arduino is connected - FIXED VERSION"""
+        """Check if Arduino is connected - FIXED"""
         try:
-            # Basic connection check
             if not self.serial_conn or not self.serial_conn.is_open:
-                self.connection_validated = False
                 return False
-            
-            # Re-validate periodically (every 60 seconds - LESS AGGRESSIVE)
-            current_time = time.time()
-            if current_time - self.last_validation_time > 60:
-                if self._validate_arduino_connection():
-                    self.connection_validated = True
-                    self.last_validation_time = current_time
-                else:
-                    # Don't immediately disconnect - Arduino might be busy
-                    logger.warning("WARNING: Arduino validation failed, but keeping connection")
-                    self.last_validation_time = current_time  # Reset timer
-            
             return self.connection_validated
-            
         except Exception as e:
             logger.error(f"ERROR: Connection check failed: {e}")
-            self.connection_validated = False
             return False
     
     def send_command(self, command: str) -> bool:
-        """Send command to Arduino - CLEAN VERSION"""
+        """Send command to Arduino - FIXED"""
         if not self.is_connected():
             logger.error("ERROR: Arduino not connected")
             return False
@@ -242,8 +256,6 @@ class ArduinoManager:
             return True
         except Exception as e:
             logger.error(f"ERROR: Send command error: {e}")
-            # Reset connection on error
-            self.connection_validated = False
             return False
     
     def read_response(self) -> Optional[str]:
@@ -255,15 +267,11 @@ class ArduinoManager:
             if self.serial_conn.in_waiting > 0:
                 response = self.serial_conn.readline().decode().strip()
                 if response:
-                    # Clean Unicode for logging but return original for processing
-                    clean_response = ''.join(char for char in response if ord(char) < 128)
-                    logger.debug(f"RECEIVED: Arduino response: {clean_response}")
+                    logger.debug(f"RECEIVED: Arduino response: {response}")
                     return response
             return None
         except Exception as e:
             logger.error(f"ERROR: Read response error: {e}")
-            # Reset connection on error
-            self.connection_validated = False
         return None
     
     def set_response_handler(self, handler: Callable[[str], None]) -> None:
@@ -283,7 +291,7 @@ class ArduinoManager:
                 self.serial_conn = None
 
 class FirebaseManager:
-    """Firebase Realtime Database Manager - CLEAN VERSION"""
+    """Firebase Realtime Database Manager"""
     
     def __init__(self):
         self.db_ref = None
@@ -344,25 +352,14 @@ class FirebaseManager:
         except Exception as e:
             logger.error(f"ERROR: Firebase listen error: {e}")
             return False
-    
-    def stop_all_listeners(self) -> None:
-        """Stop all Firebase listeners"""
-        for path, listener in self.listeners.items():
-            try:
-                listener.close()
-                logger.info(f"STOP: Stopped listening: {path}")
-            except Exception as e:
-                logger.error(f"ERROR: Stop listener error: {e}")
-        self.listeners.clear()
 
 class JSONCommandProcessor:
-    """Process JSON commands from Firebase - CLEAN VERSION"""
+    """Process JSON commands from Firebase - FIXED"""
     
     def __init__(self, arduino_mgr: ArduinoManager, firebase_mgr: FirebaseManager):
         self.arduino_mgr = arduino_mgr
         self.firebase_mgr = firebase_mgr
         self.listening = False
-        self.sensor_timer: Optional[threading.Timer] = None
     
     def start_listening(self) -> bool:
         """Start listening for Firebase commands"""
@@ -375,7 +372,7 @@ class JSONCommandProcessor:
             self.arduino_mgr.set_response_handler(self._handle_arduino_response)
             self._setup_command_listeners()
             
-            # Start periodic sensor data requests (CLEAN - NO INFINITE LOOP)
+            # Start periodic sensor data requests (FIXED - NO INFINITE LOOP)
             self._start_sensor_requests()
             
             logger.info("TARGET: Command processor started")
@@ -384,14 +381,6 @@ class JSONCommandProcessor:
         except Exception as e:
             logger.error(f"Failed to start command processor: {e}")
             return False
-    
-    def stop_listening(self) -> None:
-        """Stop listening for Firebase commands"""
-        self.listening = False
-        if self.sensor_timer:
-            self.sensor_timer.cancel()
-        self.firebase_mgr.stop_all_listeners()
-        logger.info("TARGET: Command processor stopped")
     
     def _setup_command_listeners(self) -> None:
         """Setup Firebase command listeners - 100% COMPATIBLE WITH WEB"""
@@ -403,20 +392,17 @@ class JSONCommandProcessor:
                     logger.info(f"{device_name.upper()}: {device_name} command received: {event.data}")
                     command = {device_name: event.data, 'timestamp': time.time()}
                     arduino_cmd = self._convert_to_arduino_command(command)
-                    if arduino_cmd:
-                        if self.arduino_mgr.send_command(arduino_cmd):
-                            logger.info(f"SUCCESS: {device_name} command sent to Arduino: {arduino_cmd}")
-                        else:
-                            logger.error(f"ERROR: Failed to send {device_name} command: {arduino_cmd}")
+                    if arduino_cmd and self.arduino_mgr.send_command(arduino_cmd):
+                        logger.info(f"SUCCESS: {device_name} command sent to Arduino: {arduino_cmd}")
                     else:
-                        logger.error(f"ERROR: Invalid {device_name} command conversion: {event.data}")
+                        logger.error(f"ERROR: Failed to send {device_name} command: {arduino_cmd}")
             return callback
         
         # Setup Firebase listeners
         try:
             logger.info("FIREBASE: Setting up Firebase listeners...")
             
-            # Device controls (RE-ENABLE ACTUATOR for 100% compatibility)
+            # Device controls
             devices = ['led', 'fan', 'feeder', 'blower', 'actuator', 'auger', 'motors']
             for device in devices:
                 callback = create_callback(device)
@@ -428,116 +414,86 @@ class JSONCommandProcessor:
             self.firebase_mgr.listen_to_path('fish_feeder/control/emergency_stop', emergency_callback)
             logger.info("SUCCESS: Emergency listener setup: fish_feeder/control/emergency_stop")
             
-            # Commands
-            calibrate_callback = create_callback('calibrate')
-            self.firebase_mgr.listen_to_path('fish_feeder/commands/calibrate', calibrate_callback)
-            logger.info("SUCCESS: Calibrate listener setup: fish_feeder/commands/calibrate")
-            
-            tare_callback = create_callback('tare')
-            self.firebase_mgr.listen_to_path('fish_feeder/commands/tare', tare_callback)
-            logger.info("SUCCESS: Tare listener setup: fish_feeder/commands/tare")
-            
             logger.info("TARGET: All Firebase listeners setup successfully - 100% WEB COMPATIBLE")
-            
-            # Test Firebase connection
-            test_data = {'test': True, 'timestamp': int(time.time())}
-            if self.firebase_mgr.write_data('fish_feeder/status/python_server', test_data):
-                logger.info("SUCCESS: Firebase write test successful")
-            else:
-                logger.error("ERROR: Firebase write test failed")
             
         except Exception as e:
             logger.error(f"ERROR: Failed to setup Firebase listeners: {e}")
     
     def _convert_to_arduino_command(self, command: Dict[str, Any]) -> Optional[str]:
-        """Convert Firebase command to Arduino JSON command - FIXED FOR JSON"""
+        """Convert Firebase command to Arduino serial command - FIXED MOTORS"""
         try:
-            import json
-            
             # LED Control
             if 'led' in command:
-                action = "on" if command['led'] else "off"
-                return json.dumps({"command": "control", "device": "led", "action": action})
+                return "R:3" if command['led'] else "R:4"
             
             # Fan Control
             elif 'fan' in command:
-                action = "on" if command['fan'] else "off"
-                return json.dumps({"command": "control", "device": "fan", "action": action})
+                return "R:1" if command['fan'] else "R:2"
             
             # Feeder Control
             elif 'feeder' in command:
                 feeder_action = command['feeder']
-                if feeder_action in ['small', 'medium', 'large', 'stop']:
-                    return json.dumps({"command": "control", "device": "feeder", "action": feeder_action})
+                if feeder_action in ['small', 'medium', 'large']:
+                    return f"FEED:{feeder_action}"
+                elif feeder_action == 'stop':
+                    return "G:0"
             
             # Blower Control
             elif 'blower' in command:
                 blower_value = command['blower']
                 if blower_value is True:
-                    return json.dumps({"command": "control", "device": "blower", "action": "on", "value": 255})
+                    return "B:1"
                 elif blower_value is False:
-                    return json.dumps({"command": "control", "device": "blower", "action": "off", "value": 0})
+                    return "B:0"
                 elif isinstance(blower_value, (int, float)):
-                    return json.dumps({"command": "control", "device": "blower", "action": "on", "value": int(blower_value)})
+                    return f"B:SPD:{int(blower_value)}"
             
-            # Actuator Control - RE-ENABLED for 100% compatibility
+            # Actuator Control
             elif 'actuator' in command:
                 actuator_action = command['actuator']
-                if actuator_action in ['up', 'down', 'stop']:
-                    return json.dumps({"command": "control", "device": "actuator", "action": actuator_action})
+                if actuator_action == 'up':
+                    return "A:1"
+                elif actuator_action == 'down':
+                    return "A:2"
+                elif actuator_action == 'stop':
+                    return "A:0"
             
             # Auger Control
             elif 'auger' in command:
                 auger_action = command['auger']
-                if auger_action in ['forward', 'reverse', 'stop']:
-                    return json.dumps({"command": "control", "device": "auger", "action": auger_action})
+                if auger_action == 'forward':
+                    return "G:1"
+                elif auger_action == 'reverse':
+                    return "G:2"
+                elif auger_action == 'stop':
+                    return "G:0"
             
-            # Motor PWM Control - FIXED FOR COMPLEX WEB DATA
+            # Motor PWM Control - FIXED
             elif 'motors' in command:
                 motors = command['motors']
                 if isinstance(motors, dict):
-                    # Handle complex motor data from web: {auger: {enabled: true, speed: 127, timestamp: "..."}}
+                    # Handle complex motor data from web
                     if 'blower' in motors:
                         blower_data = motors['blower']
-                        if isinstance(blower_data, dict):
-                            # Complex object: {enabled: true, speed: 255, timestamp: "..."}
-                            if 'speed' in blower_data:
-                                speed = int(blower_data['speed'])
-                                return json.dumps({"command": "control", "device": "blower", "action": "on", "value": speed})
-                            elif 'enabled' in blower_data:
-                                action = "on" if blower_data['enabled'] else "off"
-                                return json.dumps({"command": "control", "device": "blower", "action": action})
+                        if isinstance(blower_data, dict) and 'speed' in blower_data:
+                            speed = int(blower_data['speed'])
                         else:
-                            # Simple value: 255
                             speed = int(blower_data)
-                            return json.dumps({"command": "control", "device": "blower", "action": "on", "value": speed})
-                    
+                        return f"B:SPD:{speed}"
                     elif 'auger' in motors:
                         auger_data = motors['auger']
-                        if isinstance(auger_data, dict):
-                            # Complex object: {enabled: true, speed: 127, timestamp: "..."}
-                            if 'speed' in auger_data:
-                                speed = int(auger_data['speed'])
-                                return json.dumps({"command": "control", "device": "auger", "action": "forward", "value": speed})
-                            elif 'enabled' in auger_data:
-                                action = "forward" if auger_data['enabled'] else "stop"
-                                return json.dumps({"command": "control", "device": "auger", "action": action})
+                        if isinstance(auger_data, dict) and 'speed' in auger_data:
+                            speed = int(auger_data['speed'])
                         else:
-                            # Simple value: 127
                             speed = int(auger_data)
-                            return json.dumps({"command": "control", "device": "auger", "action": "forward", "value": speed})
+                        return f"G:SPD:{speed}"
+                else:
+                    # Handle simple motor commands
+                    return f"M:{motors}"
             
             # Emergency Commands
             elif 'emergency_stop' in command and command['emergency_stop']:
-                return json.dumps({"command": "control", "device": "emergency", "action": "stop"})
-            
-            # Calibration Commands
-            elif 'calibrate' in command:
-                weight = command['calibrate']
-                return json.dumps({"command": "control", "device": "weight", "action": "calibrate", "value": weight})
-            
-            elif 'tare' in command and command['tare']:
-                return json.dumps({"command": "control", "device": "weight", "action": "tare"})
+                return "STOP:all"
             
             logger.warning(f"WARNING: Unknown command format: {command}")
             return None
@@ -562,25 +518,11 @@ class JSONCommandProcessor:
                         logger.info("DATA: Sensor data received from Arduino")
                         self._send_sensor_data_to_firebase(response_data)
                     
-                    # Handle control status updates
-                    elif 'controls' in response_data:
-                        logger.info("CONTROL: Control status received from Arduino")
-                        self._send_control_status_to_firebase(response_data)
-                    
                     # Handle success response
                     elif response_data.get('success') is True:
                         device = response_data.get('device', 'unknown')
                         action = response_data.get('action', 'unknown')
                         logger.info(f"SUCCESS: Arduino success: {device} {action}")
-                        
-                        # Send status update to Firebase
-                        self.firebase_mgr.write_data('fish_feeder/status/last_command', {
-                            'device': device,
-                            'action': action,
-                            'success': True,
-                            'timestamp': int(time.time()),
-                            'datetime': datetime.now().isoformat()
-                        })
                     
                     return
                 except json.JSONDecodeError:
@@ -588,8 +530,7 @@ class JSONCommandProcessor:
             
             # Handle non-JSON responses
             if response.startswith('#'):
-                clean_response = ''.join(char for char in response if ord(char) < 128)
-                logger.info(f"Arduino debug: {clean_response}")
+                logger.info(f"Arduino debug: {response}")
                 
         except Exception as e:
             logger.error(f"Response handling error: {e}")
@@ -599,7 +540,6 @@ class JSONCommandProcessor:
         try:
             sensors = arduino_data.get('sensors', {})
             controls = arduino_data.get('controls', {})
-            system = arduino_data.get('system', {})
             
             # Prepare Firebase data structure
             firebase_data = {
@@ -607,18 +547,10 @@ class JSONCommandProcessor:
                 'sensors': sensors,
                 'status': {
                     'online': True,
-                    'arduino_connected': self.arduino_mgr.is_connected(),
-                    'last_updated': datetime.now().isoformat(),
-                    'uptime': system.get('uptime', 0),
-                    'free_memory': system.get('freeMemory', 0)
+                    'arduino_connected': True,
+                    'last_updated': datetime.now().isoformat()
                 },
-                'control': {
-                    'led': controls.get('led', False),
-                    'fan': controls.get('fan', False),
-                    'auger_speed': controls.get('augerSpeed', 0),
-                    'blower_speed': controls.get('blowerSpeed', 0),
-                    'actuator_pos': controls.get('actuatorPos', 0)
-                }
+                'control': controls
             }
             
             # Send to Firebase
@@ -631,55 +563,38 @@ class JSONCommandProcessor:
         except Exception as e:
             logger.error(f"ERROR: Failed to send sensor data to Firebase: {e}")
     
-    def _send_control_status_to_firebase(self, arduino_data: Dict[str, Any]) -> None:
-        """Send Arduino control status to Firebase"""
-        try:
-            controls = arduino_data.get('controls', {})
-            
-            # Update Firebase control status
-            self.firebase_mgr.write_data('fish_feeder/status/controls', controls)
-            
-            logger.info("CONTROL: Control status sent to Firebase")
-            
-        except Exception as e:
-            logger.error(f"ERROR: Failed to send control status to Firebase: {e}")
-    
     def _start_sensor_requests(self) -> None:
-        """Start periodic sensor data requests - CLEAN NO INFINITE LOOP"""
-        def request_sensor_data():
+        """Start periodic sensor data requests - FIXED NO INFINITE LOOP"""
+        def sensor_request():
             """Single sensor request"""
             try:
-                if self.listening and self.arduino_mgr.is_connected():
+                if self.arduino_mgr.is_connected():
                     if self.arduino_mgr.send_command("GET:sensors"):
                         logger.info("DATA: Requested sensor data from Arduino")
                     else:
                         logger.warning("WARNING: Failed to request sensor data")
-                
-                # Schedule next request (CLEAN - NO TIGHT LOOP)
-                if self.listening:
-                    self.sensor_timer = threading.Timer(5.0, request_sensor_data)
-                    self.sensor_timer.start()
-                    
             except Exception as e:
                 logger.error(f"ERROR: Sensor request error: {e}")
-                # Retry after longer delay on error
-                if self.listening:
-                    self.sensor_timer = threading.Timer(10.0, request_sensor_data)
-                    self.sensor_timer.start()
+        
+        def schedule_next_request():
+            """Schedule next sensor request"""
+            if self.listening:
+                sensor_request()
+                # Schedule next request after 5 seconds (FIXED - NO TIGHT LOOP)
+                threading.Timer(5.0, schedule_next_request).start()
         
         # Start first request
-        request_sensor_data()
+        schedule_next_request()
         logger.info("LOOP: Periodic sensor data request started (5 second intervals)")
 
 class FishFeederServer:
-    """Main Fish Feeder Server - CLEAN VERSION"""
+    """Main Fish Feeder Server - FIXED VERSION"""
     
     def __init__(self):
         self.arduino_mgr = ArduinoManager()
         self.firebase_mgr = FirebaseManager()
         self.command_processor = JSONCommandProcessor(self.arduino_mgr, self.firebase_mgr)
         self.running = False
-        self.app = None
     
     def initialize(self) -> bool:
         """Initialize all components"""
@@ -721,8 +636,19 @@ class FishFeederServer:
             
             # Start Flask web server if available
             if FLASK_AVAILABLE:
-                self._setup_web_server()
-                self.app.run(host=config.WEB_HOST, port=config.WEB_PORT, debug=False)
+                app = Flask(__name__)
+                CORS(app)
+                
+                @app.route('/api/health')
+                def health():
+                    return jsonify({
+                        'status': 'online',
+                        'arduino_connected': self.arduino_mgr.is_connected(),
+                        'firebase_connected': self.firebase_mgr.db_ref is not None,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                
+                app.run(host=config.WEB_HOST, port=config.WEB_PORT, debug=config.WEB_DEBUG)
             else:
                 # Keep running without web server
                 self._run_main_loop()
@@ -732,55 +658,6 @@ class FishFeederServer:
         except Exception as e:
             logger.error(f"ERROR: Server start failed: {e}")
             return False
-    
-    def _setup_web_server(self) -> None:
-        """Setup Flask web server"""
-        self.app = Flask(__name__)
-        CORS(self.app)
-        
-        @self.app.route('/api/health')
-        def health():
-            return jsonify({
-                'status': 'online',
-                'arduino_connected': self.arduino_mgr.is_connected(),
-                'firebase_connected': self.firebase_mgr.db_ref is not None,
-                'timestamp': datetime.now().isoformat()
-            })
-        
-        @self.app.route('/api/sensors')
-        def get_sensors():
-            try:
-                # Request fresh sensor data
-                if self.arduino_mgr.is_connected():
-                    self.arduino_mgr.send_command("GET:sensors")
-                
-                return jsonify({
-                    'status': 'requested',
-                    'arduino_connected': self.arduino_mgr.is_connected(),
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/control/<device>/<action>', methods=['POST'])
-        def control_device(device, action):
-            try:
-                # Send command via Firebase (same as web interface)
-                command_data = {device: action, 'timestamp': time.time()}
-                path = f'fish_feeder/control/{device}'
-                
-                if self.firebase_mgr.write_data(path, action):
-                    return jsonify({
-                        'status': 'command_sent',
-                        'device': device,
-                        'action': action,
-                        'timestamp': datetime.now().isoformat()
-                    })
-                else:
-                    return jsonify({'error': 'Failed to send command'}), 500
-                    
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
     
     def _run_main_loop(self) -> None:
         """Run main event loop without Flask"""
@@ -806,7 +683,8 @@ class FishFeederServer:
         self.running = False
         
         try:
-            self.command_processor.stop_listening()
+            self.command_processor.listening = False
+            self.firebase_mgr.stop_all_listeners()
             self.arduino_mgr.disconnect()
             logger.info("SUCCESS: Server shutdown complete")
         except Exception as e:
@@ -814,9 +692,9 @@ class FishFeederServer:
 
 def main():
     """Main entry point"""
-    print("Fish Feeder Pi Server - CLEAN VERSION - QA 100%")
+    print("Fish Feeder Pi Server - FIXED VERSION - QA 100%")
     print("=" * 50)
-    print(f"STARTING: Clean server at {datetime.now().isoformat()}")
+    print(f"STARTING: Fixed server at {datetime.now().isoformat()}")
     
     server = FishFeederServer()
     

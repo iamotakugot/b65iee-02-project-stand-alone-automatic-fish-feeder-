@@ -11,31 +11,33 @@
  * 5. Web App รับข้อมูลจาก Firebase แบบ Real-time
  */
 
-// ===== FISH FEEDER JSON PROTOCOL - 100% ARDUINO VALIDATED =====
-// Updated based on Interactive Interface Audit and Arduino Reference
+// ===== FISH FEEDER IoT JSON PROTOCOL =====
+// Complete JSON communication protocol for Web → Firebase → Pi → Arduino
 
-// ===== FIREBASE CONTROL COMMANDS (Web → Firebase) =====
+// ===== TYPE DEFINITIONS =====
+
+// Firebase Control Commands (Web → Firebase → Pi)
 export interface FirebaseControlCommands {
   // LED Control (R:3/R:4)
-  led: boolean | 'toggle';
+  led?: boolean | 'toggle';
   
   // Fan Control (R:1/R:2)
-  fan: boolean | 'toggle';
+  fan?: boolean | 'toggle';
   
   // Feeder Control (FEED:small/medium/large)
-  feeder: 'small' | 'medium' | 'large' | 'stop';
+  feeder?: 'small' | 'medium' | 'large' | 'stop';
   
   // Blower Control (B:1/B:0)
-  blower: boolean | number; // true/false or PWM speed 0-255
+  blower?: boolean | number; // true/false or PWM speed 0-255
   
   // Actuator Control (A:1/A:2/A:0)
-  actuator: 'up' | 'down' | 'stop';
+  actuator?: 'up' | 'down' | 'stop';
   
   // Auger Control (G:1/G:2/G:0)
-  auger: 'forward' | 'reverse' | 'stop';
+  auger?: 'forward' | 'reverse' | 'stop';
   
   // Motor PWM Control
-  motors: {
+  motors?: {
     blower?: number;    // 0-255 PWM
     auger?: number;     // 0-255 PWM
     feeder?: number;    // 0-255 PWM
@@ -46,7 +48,7 @@ export interface FirebaseControlCommands {
   relay_all_off?: boolean;   // R:0
 }
 
-// ===== ARDUINO SENSOR DATA (Arduino → Pi → Firebase) =====
+// Arduino Sensor Data (Arduino → Pi → Firebase → Web)
 export interface ArduinoSensorData {
   // Weight Sensor
   weight: {
@@ -56,44 +58,46 @@ export interface ArduinoSensorData {
     stable: boolean;     // Is reading stable?
   };
   
-  // Temperature Sensors
-  temperature: {
-    water: number;       // Water temperature °C
-    ambient: number;     // Ambient temperature °C
-    sensor_status: 'ok' | 'error' | 'disconnected';
-  };
+  // Temperature Sensors (DHT22 x2)
+  feedTemp: number;        // Feed tank temperature °C
+  feedHumidity: number;    // Feed tank humidity %
+  boxTemp: number;         // Control box temperature °C  
+  boxHumidity: number;     // Control box humidity %
   
-  // pH Sensor
-  ph: {
-    value: number;       // pH value 0-14
-    calibrated: boolean; // Is pH sensor calibrated?
-    sensor_status: 'ok' | 'error' | 'disconnected';
-  };
+  // Environment Sensors
+  soilMoisture: number;    // Soil moisture percentage
+  
+  // Power System
+  solarVoltage: number;    // Solar panel voltage
+  solarCurrent: number;    // Solar panel current
+  loadVoltage: number;     // Battery voltage
+  loadCurrent: number;     // Battery current
+  batteryPercent: string;  // Battery percentage
+  batteryVoltage: number;  // Battery voltage (duplicate for compatibility)
+  batteryCurrent: number;  // Battery current (duplicate for compatibility)
   
   // System Status
   system: {
-    uptime: number;      // Arduino uptime in milliseconds
-    free_memory: number; // Free RAM in bytes
-    last_command: string; // Last received command
-    command_count: number; // Total commands processed
+    uptime: number;        // Arduino uptime in milliseconds
+    freeMemory: number;    // Free RAM in bytes
+    lastCommand: string;   // Last received command
   };
   
-  // Hardware Status
-  hardware: {
-    led_status: boolean;      // LED relay state
-    fan_status: boolean;      // Fan relay state
-    blower_status: boolean;   // Blower state
-    actuator_position: 'up' | 'down' | 'moving' | 'stopped';
-    auger_status: 'forward' | 'reverse' | 'stopped';
-    feeder_status: 'feeding' | 'idle';
+  // Hardware Status (Controls)
+  controls: {
+    led: boolean;          // LED relay state
+    fan: boolean;          // Fan relay state
+    augerSpeed: number;    // Auger speed 0-100%
+    blowerSpeed: number;   // Blower PWM 0-255
+    actuatorPos: number;   // Actuator position 0-100%
   };
   
   // Timestamps
   timestamp: number;    // Unix timestamp
-  last_updated: string; // ISO string
+  status: string;       // System status "active"
 }
 
-// ===== ARDUINO COMMANDS (Pi → Arduino Serial) =====
+// Arduino Commands (Pi → Arduino Serial)
 export interface ArduinoCommands {
   // Relay Commands
   RELAY_FAN_ON: 'R:1';
@@ -231,7 +235,7 @@ export function validateFirebaseCommand(command: Partial<FirebaseControlCommands
 
 // Validate Arduino Sensor Data
 export function validateSensorData(data: Partial<ArduinoSensorData>): boolean {
-  const requiredFields = ['weight', 'temperature', 'ph', 'system', 'hardware', 'timestamp'];
+  const requiredFields = ['weight', 'feedTemp', 'feedHumidity', 'system', 'controls', 'timestamp'];
   
   for (const field of requiredFields) {
     if (!(field in data)) {
@@ -451,31 +455,13 @@ export interface InteractiveButtonMapping {
   };
 }
 
-// Export all types and functions
-export type {
-  FirebaseControlCommands,
-  ArduinoSensorData,
-  ArduinoCommands,
-  InteractiveButtonMapping
-};
-
-export {
-  WEB_TO_FIREBASE_MAPPING,
-  FIREBASE_TO_ARDUINO_MAPPING,
-  validateFirebaseCommand,
-  validateSensorData,
-  firebaseToArduinoCommand,
-  PROTOCOL_CONSTANTS
-};
-
 /**
  * 🎯 USAGE EXAMPLE:
  * 
  * // Web App sends command:
  * const command: Partial<FirebaseControlCommands> = {
  *   feeder: 'medium',
- *   timestamp: new Date().toISOString(),
- *   command_id: generateCommandId()
+ *   timestamp: Date.now()
  * };
  * 
  * // Pi Server receives and translates:

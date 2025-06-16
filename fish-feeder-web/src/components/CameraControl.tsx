@@ -4,14 +4,10 @@ import { logger } from '../utils/logger';
 
 interface CameraControlProps {
   className?: string;
-  onFeedingStart?: () => void;
-  onFeedingEnd?: () => void;
 }
 
 const CameraControl: React.FC<CameraControlProps> = ({ 
-  className = "",
-  onFeedingStart,
-  onFeedingEnd 
+  className = ""
 }) => {
   
   const handleCameraAction = (action: string) => {

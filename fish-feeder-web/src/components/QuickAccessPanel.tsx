@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useFirebaseSensorData } from '../hooks/useFirebaseSensorData';
 import { useApi } from '../contexts/ApiContext';
 import { logger } from '../utils/logger';

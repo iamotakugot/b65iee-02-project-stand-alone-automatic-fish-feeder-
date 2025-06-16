@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 import { firebaseClient } from "../config/firebase";
 import { Button } from "@heroui/button";

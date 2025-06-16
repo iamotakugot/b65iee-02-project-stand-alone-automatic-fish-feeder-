@@ -49,6 +49,11 @@ const SENSOR_CATEGORIES = {
 };
 
 const TIME_PERIODS = [
+  { key: '5s', label: '5 Seconds', minutes: 0.083, realTime: true },
+  { key: '30s', label: '30 Seconds', minutes: 0.5, realTime: true },
+  { key: '1m', label: '1 Minute', minutes: 1, realTime: true },
+  { key: '5m', label: '5 Minutes', minutes: 5 },
+  { key: '30m', label: '30 Minutes', minutes: 30 },
   { key: '1h', label: '1 Hour', minutes: 60 },
   { key: '6h', label: '6 Hours', minutes: 360 },
   { key: '24h', label: '24 Hours', minutes: 1440 },

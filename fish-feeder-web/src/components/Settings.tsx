@@ -158,21 +158,21 @@ const Settings: React.FC<SettingsProps> = ({ className = '' }) => {
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
-            onClick={() => controlLED(true)}
+            onClick={() => controlLED("on")}
             className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
           >
             เปิดไฟ LED
           </button>
           
           <button
-            onClick={() => controlFan(true)}
+            onClick={() => controlFan("on")}
             className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
           >
             เปิดพัดลม
           </button>
           
           <button
-            onClick={() => controlBlower(255)}
+            onClick={() => controlBlower("on")}
             className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
           >
             เปิดเครื่องเป่า

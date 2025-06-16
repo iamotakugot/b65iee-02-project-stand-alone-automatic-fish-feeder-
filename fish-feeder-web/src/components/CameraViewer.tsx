@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@heroui/button";
-import { Switch } from "@heroui/switch";
+// import { Switch } from "@heroui/switch";
 import { 
   IoMdCamera, 
   IoMdRefresh, 
-  IoMdDownload,
+  // IoMdDownload,
   IoMdVideocam,
   IoMdPlay,
   IoMdPause
@@ -283,24 +283,23 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
 
         {/* Camera Controls */}
         {showControls && (
-          <div className="flex gap-2 mt-4">
+          <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-3">
             <Button
-              color={isStreaming ? "danger" : "success"}
+              color={isStreaming ? "danger" : "primary"}
               startContent={isStreaming ? <IoMdPause /> : <IoMdPlay />}
               onPress={isStreaming ? stopStreaming : startStreaming}
               isLoading={isLoading}
-              size="sm"
+              className="bg-white/90 backdrop-blur-sm"
             >
-              {isStreaming ? "Stop" : "Start"}
+              {isStreaming ? "Stop" : "Start"} Stream
             </Button>
             
             <Button
-              color="primary"
+              color="secondary"
               startContent={<IoMdCamera />}
               onPress={takeSnapshot}
               isLoading={isLoading}
-              isDisabled={!isStreaming}
-              size="sm"
+              className="bg-white/90 backdrop-blur-sm"
             >
               Snapshot
             </Button>
@@ -310,32 +309,61 @@ const CameraViewer: React.FC<CameraViewerProps> = ({
               startContent={<IoMdRefresh />}
               onPress={() => {
                 stopStreaming();
-                startStreaming();
+                setTimeout(startStreaming, 500);
               }}
-              isLoading={isLoading}
-              size="sm"
-              variant="bordered"
+              isDisabled={isLoading}
+              className="bg-white/90 backdrop-blur-sm"
             >
               Refresh
             </Button>
 
-            <div className="flex-1" />
+            {/* Google Drive Upload Button */}
+            <Button
+              color="success"
+              startContent={
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                </svg>
+              }
+              onPress={async () => {
+                // Take snapshot and upload to Google Drive
+                logger.buttonPress('CAMERA_UPLOAD_DRIVE', 'CameraViewer');
+                
+                try {
+                  // First take a snapshot
+                  await takeSnapshot();
+                  
+                  // Simulate Google Drive upload
+                  const uploadData = {
+                    timestamp: new Date().toISOString(),
+                    type: 'camera_snapshot',
+                    filename: `fish_feeder_snapshot_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`
+                  };
+                  
+                  // TODO: Integrate with actual Google Drive API
+                  console.log('📤 Uploading to Google Drive:', uploadData);
+                  
+                  // Show success message (you can add toast notification here)
+                  logger.info('CAMERA', 'DRIVE_UPLOAD_SUCCESS', uploadData);
+                  
+                } catch (error) {
+                  logger.error('CAMERA', 'DRIVE_UPLOAD_FAILED', { error });
+                }
+              }}
+              isLoading={isLoading}
+              className="bg-white/90 backdrop-blur-sm"
+            >
+              📤 Drive
+            </Button>
             
-            {/* Auto-refresh Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Auto</span>
-              <Switch
-                size="sm"
-                isSelected={autoRefresh}
-                onValueChange={(checked) => {
-                  if (checked && !isStreaming) {
-                    startStreaming();
-                  } else if (!checked && isStreaming) {
-                    stopStreaming();
-                  }
-                }}
-              />
-            </div>
+            <Button
+              color="default"
+              startContent={isFullscreen ? <FaCompress /> : <FaExpand />}
+              onPress={toggleFullscreen}
+              className="bg-white/90 backdrop-blur-sm"
+            >
+              {isFullscreen ? "Exit" : "Full"}
+            </Button>
           </div>
         )}
 

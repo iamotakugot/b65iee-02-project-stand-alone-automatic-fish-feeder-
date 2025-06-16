@@ -4,7 +4,7 @@ import { Route, Routes } from "react-router-dom";
 import Layout from "@/components/Layout";
 import AppRouter from "@/components/AppRouter";
 import { ApiProvider, useApi } from "./contexts/ApiContext";
-import { FirebaseOnlyBanner } from "./components/FirebaseOnlyBanner";
+// import { FirebaseOnlyBanner } from "./components/FirebaseOnlyBanner";
 import { uiSettings } from "./utils/modalSettings";
 
 // Import components
@@ -14,7 +14,8 @@ import { Dashboard } from "./components/Dashboard";
 const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
 const SimpleControl = lazy(() => import("@/pages/SimpleControl"));
 const FeedControl = lazy(() => import("@/pages/FeedControlPanel"));
-const FanTempControl = lazy(() => import("@/pages/FanTempControl"));
+const FanControl = lazy(() => import("@/pages/FanControl"));
+
 
 const Settings = lazy(() => import("@/pages/Settings"));
 const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
@@ -34,7 +35,7 @@ const LoadingSpinner = () => (
 
 // Inner App component that uses API context
 const AppContent = () => {
-  const { isConnected, error } = useApi();
+  const { isConnected } = useApi();
   const [showFirebaseBanner, setShowFirebaseBanner] = useState(false);
   const [showApiStatus, setShowApiStatus] = useState(false);
 
@@ -151,9 +152,10 @@ const AppContent = () => {
             <Route element={<FirebaseDashboard />} path="dashboard" />
             <Route element={<Dashboard />} path="api-dashboard" />
             <Route element={<FirebaseDashboard />} path="firebase-dashboard" />
-            <Route element={<FeedControl />} path="feed-control" />
-            <Route element={<FanTempControl />} path="fan-temp-control" />
-    
+                        <Route element={<FeedControl />} path="feed-control" />
+            <Route element={<FanControl />} path="fan-control" />
+
+      
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
     

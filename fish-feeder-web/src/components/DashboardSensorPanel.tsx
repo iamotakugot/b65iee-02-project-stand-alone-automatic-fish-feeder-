@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FaTemperatureHigh, FaWeight, FaBatteryThreeQuarters, FaWifi, FaExclamationTriangle } from "react-icons/fa";
+import { MdWifiOff } from "react-icons/md";
 import { WiHumidity } from "react-icons/wi";
 import { IoWaterOutline } from "react-icons/io5";
 import { BsLightningCharge, BsSun } from "react-icons/bs";
@@ -176,12 +177,8 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
 }) => {
   const values = convertFirebaseToSensorValues(sensorData);
   
-  // Use example data if no real data available (for development)
-  // 🔥 NO MOCK DATA - Only use real Firebase data or show zeros
-  const displayValues = Object.values(values).some(v => v !== null) 
-    ? values 
-    : getEmptyData();
-
+  // 🔥 PRODUCTION READY - Only show real Firebase data or zeros
+  const displayValues = values;
   const hasRealData = Object.values(values).some(v => v !== null);
 
   return (
@@ -208,8 +205,8 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
             ข้อมูลแบบ Real-time
           </strong>
           {!hasRealData && (
-            <span className="ml-2 text-orange-600 dark:text-orange-400">
-              (ใช้ข้อมูลจำลองสำหรับทดสอบ)
+            <span className="ml-2 text-red-600 dark:text-red-400">
+              ⚠️ No sensor data available - Check Pi Server connection
             </span>
           )}
         </div>
@@ -219,16 +216,22 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
       </div>
 
       {/* Real-time Data Notice */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+      <div className={`${hasRealData ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'} rounded-lg p-4 mb-6`}>
         <div className="flex items-center gap-3">
+          {hasRealData ? (
           <FaWifi className="text-blue-500 text-xl" />
+          ) : (
+            <MdWifiOff className="text-orange-500 text-xl" />
+          )}
           <div>
-            <h3 className="font-semibold text-blue-700 dark:text-blue-300">
-              การอัพเดทข้อมูลอัตโนมัติ
+            <h3 className={`font-semibold ${hasRealData ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
+              {hasRealData ? 'การอัพเดทข้อมูลอัตโนมัติ' : 'รอการเชื่อมต่อ Pi Server'}
             </h3>
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              ระบบจะรับข้อมูลจาก Firebase อัตโนมัติทุก 5 วินาที โดยไม่ต้องรีเฟรชหน้า
-              {!hasRealData && " - ปัจจุบันแสดงข้อมูลจำลองเนื่องจากยังไม่ได้เชื่อมต่อกับ Pi Server"}
+            <p className={`text-sm ${hasRealData ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
+              {hasRealData 
+                ? 'ระบบจะรับข้อมูลจาก Firebase อัตโนมัติทุก 5 วินาที โดยไม่ต้องรีเฟรชหน้า'
+                : 'กรุณาตรวจสอบการเชื่อมต่อ Raspberry Pi Server และ Arduino'
+              }
             </p>
           </div>
         </div>

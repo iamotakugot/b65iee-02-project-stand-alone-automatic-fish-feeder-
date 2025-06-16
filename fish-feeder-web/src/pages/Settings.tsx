@@ -168,25 +168,56 @@ const Settings = () => {
   const loadSystemStatus = async () => {
     setLoading(prev => ({ ...prev, status: true }));
     try {
-      // Use Firebase to check system status
+      // ⚡ REAL CONNECTION CHECK - No hardcoded values!
       const { firebaseClient } = await import('../config/firebase');
-      const success = await firebaseClient.sendArduinoCommand("S:HEALTH");
+      
+      // Test Firebase connection
+      let firebaseConnected = false;
+      let arduinoConnected = false;
+      let piServerConnected = false;
+      
+      try {
+        // Test Firebase by trying to get sensor data
+        const testConnection = await new Promise((resolve) => {
+          const unsubscribe = firebaseClient.getSensorData((data) => {
+            unsubscribe();
+            resolve(data !== null);
+          });
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            unsubscribe();
+            resolve(false);
+          }, 5000);
+        });
+        
+        firebaseConnected = !!testConnection;
+        
+        // Test Arduino connection by sending health check
+        if (firebaseConnected) {
+          const arduinoResponse = await firebaseClient.sendArduinoCommand("S:HEALTH");
+          arduinoConnected = !!arduinoResponse;
+          piServerConnected = !!arduinoResponse; // Pi server needed for Arduino communication
+        }
+      } catch (error) {
+        console.warn("Connection test failed:", error);
+        firebaseConnected = false;
+        arduinoConnected = false;
+        piServerConnected = false;
+      }
       
       setSystemStatus({
-        arduino_connected: success,
-        firebase_connected: true, // Always true in web app
-        camera_active: false, // Would need camera status endpoint
-        websocket_enabled: success,
-        pi_server_connected: success,
+        arduino_connected: arduinoConnected,
+        firebase_connected: firebaseConnected,
+        camera_active: false, // Camera requires Pi server
+        websocket_enabled: piServerConnected,
+        pi_server_connected: piServerConnected,
       });
     } catch (error) {
-      // Only log non-connection errors
-      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
       console.error("Status check failed:", error);
-      }
       setSystemStatus({
         arduino_connected: false,
-        firebase_connected: true,
+        firebase_connected: false,
         camera_active: false,
         websocket_enabled: false,
         pi_server_connected: false,

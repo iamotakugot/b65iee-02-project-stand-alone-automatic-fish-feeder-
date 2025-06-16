@@ -1,21 +1,70 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { HiStatusOnline, HiStatusOffline } from "react-icons/hi";
+// import { HiStatusOnline, HiStatusOffline } from "react-icons/hi";
 import { FaDatabase, FaRaspberryPi } from "react-icons/fa";
 
 interface ConnectionStatusIndicatorProps {
-  firebaseConnected: boolean;
-  piServerConnected: boolean;
   className?: string;
   showDetails?: boolean;
 }
 
 const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
-  firebaseConnected,
-  piServerConnected,
   className = "",
   showDetails = true
 }) => {
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
+  const [piServerConnected, setPiServerConnected] = useState(false);
+  const [lastCheck, setLastCheck] = useState<Date>(new Date());
+
+  // ⚡ REAL CONNECTION CHECK - No hardcoded values!
+  const checkConnections = async () => {
+    try {
+      // Test Firebase connection
+      const { firebaseClient } = await import('../config/firebase');
+      
+      const firebaseTest = await new Promise((resolve) => {
+        const unsubscribe = firebaseClient.getSensorData((data) => {
+          unsubscribe();
+          resolve(data !== null);
+        });
+        
+        // Timeout after 3 seconds
+        setTimeout(() => {
+          unsubscribe();
+          resolve(false);
+        }, 3000);
+      });
+      
+      setFirebaseConnected(!!firebaseTest);
+      
+      // Test Pi Server/Arduino connection
+      if (firebaseTest) {
+        try {
+          const piTest = await firebaseClient.sendArduinoCommand("S:HEALTH");
+          setPiServerConnected(!!piTest);
+        } catch (error) {
+          setPiServerConnected(false);
+        }
+      } else {
+        setPiServerConnected(false);
+      }
+      
+      setLastCheck(new Date());
+    } catch (error) {
+      console.warn("Connection check failed:", error);
+      setFirebaseConnected(false);
+      setPiServerConnected(false);
+      setLastCheck(new Date());
+    }
+  };
+
+  // Check connections on mount and every 30 seconds
+  useEffect(() => {
+    checkConnections();
+    const interval = setInterval(checkConnections, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className={`space-y-3 ${className}`}>
       {/* Firebase Connection */}
@@ -66,48 +115,38 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <FaRaspberryPi className={`mr-3 text-lg ${piServerConnected ? 'text-green-500' : 'text-red-500'}`} />
+            <FaRaspberryPi className={`mr-3 text-lg ${piServerConnected ? 'text-green-500' : 'text-gray-400'}`} />
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Pi Server Connection
+                Pi Server + Arduino
               </div>
               <div className={`font-semibold ${
                 piServerConnected 
                   ? "text-green-600 dark:text-green-400" 
                   : "text-red-600 dark:text-red-400"
               }`}>
-                {piServerConnected ? "✅ Connected" : "❌ Offline"}
+                {piServerConnected ? "🤖 Connected" : "❌ Offline"}
               </div>
             </div>
           </div>
           <div className="flex items-center">
-            {piServerConnected ? (
+            {piServerConnected && (
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
                 className="w-3 h-3 bg-green-500 rounded-full"
               />
-            ) : (
-              <div className="w-3 h-3 bg-red-500 rounded-full opacity-50" />
             )}
           </div>
         </div>
-        {showDetails && (
-          <div className="mt-2">
-            {piServerConnected ? (
-              <div className="text-xs text-green-600 dark:text-green-400">
-                ✓ Hardware control available
-              </div>
-            ) : (
-              <div className="text-xs text-orange-600 dark:text-orange-400">
-                ⚠️ Commands queued in Firebase
-              </div>
-            )}
+        {showDetails && piServerConnected && (
+          <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+            ✓ Hardware control active
           </div>
         )}
       </motion.div>
 
-      {/* Overall Status Summary */}
+      {/* Overall Status */}
       {showDetails && (
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
@@ -121,23 +160,32 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
               : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300"
           }`}
         >
-          <div className="flex items-center">
-            {firebaseConnected && piServerConnected ? (
-              <>
-                <span className="mr-2">🟢</span>
-                <span className="font-medium">Full System Online</span>
-              </>
-            ) : firebaseConnected ? (
-              <>
-                <span className="mr-2">🟡</span>
-                <span className="font-medium">Firebase-Only Mode</span>
-              </>
-            ) : (
-              <>
-                <span className="mr-2">🔴</span>
-                <span className="font-medium">System Offline</span>
-              </>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {firebaseConnected && piServerConnected ? (
+                <>
+                  <span className="mr-2">🟢</span>
+                  <span className="font-medium">Full System Online</span>
+                </>
+              ) : firebaseConnected ? (
+                <>
+                  <span className="mr-2">🟡</span>
+                  <span className="font-medium">Firebase-Only Mode</span>
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">🔴</span>
+                  <span className="font-medium">System Offline</span>
+                </>
+              )}
+            </div>
+            <button 
+              onClick={checkConnections}
+              className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+              title="Refresh connection status"
+            >
+              🔄
+            </button>
           </div>
           <div className="mt-1 text-xs opacity-80">
             {firebaseConnected && piServerConnected
@@ -146,6 +194,9 @@ const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
               ? "Web interface active, hardware pending"
               : "Check internet connection"
             }
+          </div>
+          <div className="mt-1 text-xs opacity-60">
+            Last check: {lastCheck.toLocaleTimeString()}
           </div>
         </motion.div>
       )}

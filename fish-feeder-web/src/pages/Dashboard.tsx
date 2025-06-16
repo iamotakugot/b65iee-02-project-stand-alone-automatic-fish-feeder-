@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 import { hasSensorData } from "../utils/firebaseSensorUtils";
 import DashboardSensorPanel from "../components/DashboardSensorPanel";

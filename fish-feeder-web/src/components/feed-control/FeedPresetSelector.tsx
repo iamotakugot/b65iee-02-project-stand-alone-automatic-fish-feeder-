@@ -1,6 +1,6 @@
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-import { BsPlus, BsTrash } from "react-icons/bs";
+// import { BsPlus, BsTrash } from "react-icons/bs";
 
 interface FeedPresetSelectorProps {
   feedType: string;
