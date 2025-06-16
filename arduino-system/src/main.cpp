@@ -492,6 +492,12 @@ void processJsonCommand(String jsonStr) {
 void processSerialInput() {
   inputString.trim();
   
+  // 🔥 PI SERVER SENSOR REQUEST - ใหม่! รองรับคำสั่งจาก Pi
+  if (inputString.equals("GET:sensors")) {
+    sendSensorDataJSON();
+    return;
+  }
+  
   // Check if it's a JSON command
   if (inputString.startsWith("{") && inputString.endsWith("}")) {
     processJsonCommand(inputString);

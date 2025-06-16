@@ -1,454 +1,386 @@
 import React, { useState, useEffect } from 'react';
-import { JsonDataManager, SensorData, ControlData, SystemData } from '../lib/jsonDataManager';
-import { useFirebaseSensorData } from '../hooks/useFirebaseSensorData';
+import { ref, onValue, off, get, getDatabase } from 'firebase/database';
+import { firebaseClient } from '../config/firebase';
+import { JsonDataOrganizer, SensorDataGroup, ControlDataGroup, SystemStatusGroup } from '../utils/jsonDataOrganizer';
 
-// Clean Data Dashboard Components
-const SensorCard: React.FC<{
-  title: string;
-  value: string | number;
-  unit?: string;
-  status?: 'normal' | 'warning' | 'critical';
-  icon?: string;
-}> = ({ title, value, unit, status = 'normal', icon }) => {
-  const statusColors = {
-    normal: 'bg-green-50 text-green-800 border-green-200',
-    warning: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-    critical: 'bg-red-50 text-red-800 border-red-200'
-  };
+interface FirebaseData {
+  commands?: any;
+  control?: any;
+  motors?: any;
+  status?: any;
+  sensors?: any;
+}
 
-  return (
-    <div className={`p-4 rounded-lg border-2 ${statusColors[status]} transition-all`}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        {icon && <span className="text-lg">{icon}</span>}
-      </div>
-      <div className="text-2xl font-bold">
-        {value} {unit && <span className="text-sm font-normal">{unit}</span>}
+const DataDashboard: React.FC = () => {
+  const [firebaseData, setFirebaseData] = useState<FirebaseData | null>(null);
+  const [organizedSensorData, setOrganizedSensorData] = useState<SensorDataGroup | null>(null);
+  const [organizedControlData, setOrganizedControlData] = useState<ControlDataGroup | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const [lastUpdate, setLastUpdate] = useState<string>('Never');
+
+  useEffect(() => {
+    // Listen to fish_feeder root path based on Firebase screenshot
+    const database = getDatabase();
+    const fishFeederRef = ref(database, 'fish_feeder');
+    
+    const unsubscribe = onValue(fishFeederRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        console.log('Firebase data received:', data);
+        
+        setFirebaseData(data);
+        setConnectionStatus('connected');
+        setLastUpdate(new Date().toLocaleTimeString());
+        
+        // Organize data using our library
+        if (data.sensors || data.control || data.motors) {
+          // Combine sensors and other data for organization
+          const combinedData = {
+            ...data.sensors,
+            ...data.control,
+            ...data.motors?.auger,
+            ...data.motors?.blower,
+            timestamp: new Date().toISOString()
+          };
+          
+          const organized = JsonDataOrganizer.organizeSensorData(combinedData);
+          setOrganizedSensorData(organized);
+        }
+        
+        if (data.control || data.motors) {
+          const controlData = {
+            ...data.control,
+            motors: data.motors,
+            timestamp: new Date().toISOString()
+          };
+          
+          const organizedControl = JsonDataOrganizer.organizeControlData(controlData);
+          setOrganizedControlData(organizedControl);
+        }
+      } else {
+        setConnectionStatus('disconnected');
+        console.log('No data available');
+      }
+    }, (error) => {
+      console.error('Firebase error:', error);
+      setConnectionStatus('disconnected');
+    });
+
+    return () => {
+      off(fishFeederRef);
+      unsubscribe();
+    };
+  }, []);
+
+  const renderFirebaseRawData = () => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+        Raw Firebase Data
+      </h3>
+      <div className="bg-gray-100 dark:bg-gray-700 rounded p-4 overflow-auto max-h-64">
+        <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+          {JSON.stringify(firebaseData, null, 2)}
+        </pre>
       </div>
     </div>
   );
-};
 
-const ControlButton: React.FC<{
-  device: string;
-  action: string;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-}> = ({ device, action, label, isActive, onClick, disabled }) => {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 rounded-lg font-medium transition-all ${
-        isActive
-          ? 'bg-blue-600 text-white shadow-lg'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      {label}
-    </button>
-  );
-};
-
-const DataHistoryChart: React.FC<{ data: any[]; title: string }> = ({ data, title }) => {
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold mb-4">{title}</h3>
-      <div className="h-48 bg-gray-50 rounded-lg flex items-center justify-center">
-        <div className="text-gray-500">
-          Historical data: {data.length} entries
-          <br />
-          <small>Chart visualization would go here</small>
+  const renderConnectionStatus = () => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+        Connection Status
+      </h3>
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600 dark:text-gray-400">Firebase Status</span>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            connectionStatus === 'connected' 
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : connectionStatus === 'connecting'
+              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+          }`}>
+            {connectionStatus.toUpperCase()}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600 dark:text-gray-400">Last Update</span>
+          <span className="text-gray-900 dark:text-white font-mono">{lastUpdate}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600 dark:text-gray-400">Data Available</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData ? 'Yes' : 'No'}
+          </span>
         </div>
       </div>
     </div>
   );
-};
 
-const SystemStatusPanel: React.FC<{ 
-  systemData?: SystemData; 
-  isConnected: boolean; 
-  lastUpdate: number 
-}> = ({ systemData, isConnected, lastUpdate }) => {
-  const connectionStatus = JsonDataManager.StatusChecker.checkArduinoConnection(lastUpdate);
-  
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold mb-4">System Status</h3>
-      
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SensorCard
-          title="Connection"
-          value={connectionStatus ? "Online" : "Offline"}
-          status={connectionStatus ? 'normal' : 'critical'}
-          icon="🔌"
-        />
-        
-        <SensorCard
-          title="Status"
-          value={systemData?.status || 'Unknown'}
-          status={systemData?.status === 'active' ? 'normal' : 'warning'}
-          icon="⚡"
-        />
-        
-        {systemData && (
-          <>
-            <SensorCard
-              title="Uptime"
-              value={JsonDataManager.SensorProcessor.formatUptime(systemData.uptime)}
-              icon="⏱️"
-            />
-            
-            <SensorCard
-              title="Memory"
-              value={JsonDataManager.SensorProcessor.formatMemory(systemData.freeMemory)}
-              icon="💾"
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
+  const renderOrganizedSensorData = () => {
+    if (!organizedSensorData) return null;
 
-const SensorDataPanel: React.FC<{ sensorData?: SensorData }> = ({ sensorData }) => {
-  if (!sensorData || !JsonDataManager.Validator.isValidSensorData(sensorData)) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-4">Sensor Data</h3>
-        <div className="text-gray-500 text-center py-8">
-          No valid sensor data available
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Temperature */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            Temperature
+          </h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Feeder</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.temperature.feeder, '°C')}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">System</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.temperature.system, '°C')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Humidity */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            Humidity
+          </h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Feeder</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.humidity.feeder, '%')}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">System</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.humidity.system, '%')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Electrical */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            Electrical
+          </h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Battery</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.electrical.batteryVoltage, 'V')}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Solar</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.electrical.solarVoltage, 'V')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mechanical */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+            Mechanical
+          </h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Weight</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.mechanical.feederWeight, 'g')}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Soil</span>
+              <span className="font-mono text-gray-900 dark:text-white">
+                {JsonDataOrganizer.formatValue(organizedSensorData.mechanical.soilMoisture)}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     );
-  }
+  };
 
-  const formatted = JsonDataManager.SensorProcessor.getFormattedSensorData(sensorData);
-  const health = JsonDataManager.StatusChecker.checkSensorHealth(sensorData);
-  const batteryStatus = JsonDataManager.StatusChecker.getBatteryStatus(
-    sensorData.batteryVoltage || sensorData.loadVoltage
-  );
+  const renderOrganizedControlData = () => {
+    if (!organizedControlData) return null;
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Sensor Data</h3>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          health.isHealthy 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {health.isHealthy ? 'Healthy' : 'Issues'}
-        </span>
-      </div>
-
-      {/* Temperature & Humidity */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <SensorCard
-          title="Feed Temp"
-          value={formatted.temperature.feed}
-          icon="🌡️"
-          status={sensorData.feedTemp > 40 ? 'warning' : 'normal'}
-        />
-        
-        <SensorCard
-          title="Box Temp"
-          value={formatted.temperature.box}
-          icon="🌡️"
-          status={sensorData.boxTemp > 40 ? 'warning' : 'normal'}
-        />
-        
-        <SensorCard
-          title="Feed Humidity"
-          value={formatted.humidity.feed}
-          icon="💧"
-          status={sensorData.feedHumidity > 80 ? 'warning' : 'normal'}
-        />
-        
-        <SensorCard
-          title="Box Humidity"
-          value={formatted.humidity.box}
-          icon="💧"
-          status={sensorData.boxHumidity > 80 ? 'warning' : 'normal'}
-        />
-      </div>
-
-      {/* Weight & Environment */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <SensorCard
-          title="Feed Weight"
-          value={formatted.weight}
-          icon="⚖️"
-          status={sensorData.weight < 0.1 ? 'warning' : 'normal'}
-        />
-        
-        <SensorCard
-          title="Soil Moisture"
-          value={formatted.soilMoisture}
-          icon="🌱"
-        />
-        
-        <SensorCard
-          title="Solar Power"
-          value={formatted.battery.solarVoltage}
-          icon="☀️"
-          status={sensorData.solarVoltage > 0 ? 'normal' : 'warning'}
-        />
-      </div>
-
-      {/* Battery Information */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h4 className="font-medium mb-3">Battery System</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <SensorCard
-            title="Voltage"
-            value={formatted.battery.voltage}
-            icon="🔋"
-            status={batteryStatus === 'critical' ? 'critical' : batteryStatus === 'low' ? 'warning' : 'normal'}
-          />
-          
-          <SensorCard
-            title="Current"
-            value={formatted.battery.current}
-            icon="⚡"
-          />
-          
-          <SensorCard
-            title="Charge Level"
-            value={formatted.battery.percent}
-            icon="📊"
-            status={parseInt(sensorData.batteryPercent) < 20 ? 'critical' : 'normal'}
-          />
-          
-          <SensorCard
-            title="Solar Current"
-            value={formatted.battery.solarCurrent}
-            icon="☀️"
-          />
-        </div>
-      </div>
-
-      {/* Health Issues */}
-      {!health.isHealthy && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <h4 className="text-red-800 font-medium mb-2">System Issues:</h4>
-          <ul className="text-red-700 text-sm space-y-1">
-            {health.issues.map((issue, index) => (
-              <li key={index}>• {issue}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DeviceControlPanel: React.FC<{ 
-  controlData?: ControlData;
-  onDeviceControl: (device: string, action: string, value?: number) => void;
-}> = ({ controlData, onDeviceControl }) => {
-  const [selectedAugerSpeed, setSelectedAugerSpeed] = useState(255);
-  const [selectedBlowerSpeed, setSelectedBlowerSpeed] = useState(179);
-
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold mb-4">Device Controls</h3>
-      
-      {/* LED & Fan Controls */}
-      <div className="mb-6">
-        <h4 className="font-medium mb-3">Relay Controls</h4>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">LED:</span>
-            <ControlButton
-              device="led"
-              action="on"
-              label="ON"
-              isActive={controlData?.led}
-              onClick={() => onDeviceControl('led', controlData?.led ? 'off' : 'on')}
-            />
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm">Fan:</span>
-            <ControlButton
-              device="fan"
-              action="on"
-              label="ON"
-              isActive={controlData?.fan}
-              onClick={() => onDeviceControl('fan', controlData?.fan ? 'off' : 'on')}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Auger Controls */}
-      <div className="mb-6">
-        <h4 className="font-medium mb-3">Auger Motor (Feed Dispenser)</h4>
-        <div className="flex items-center gap-4 mb-3">
-          <label className="text-sm">Speed:</label>
-          <input
-            type="range"
-            min="0"
-            max="255"
-            value={selectedAugerSpeed}
-            onChange={(e) => setSelectedAugerSpeed(parseInt(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-sm font-mono w-12">{selectedAugerSpeed}</span>
-        </div>
-        <div className="flex gap-2">
-          <ControlButton
-            device="auger"
-            action="forward"
-            label="Forward"
-            onClick={() => onDeviceControl('auger', 'forward', selectedAugerSpeed)}
-          />
-          <ControlButton
-            device="auger"
-            action="reverse"
-            label="Reverse"
-            onClick={() => onDeviceControl('auger', 'reverse', selectedAugerSpeed)}
-          />
-          <ControlButton
-            device="auger"
-            action="stop"
-            label="Stop"
-            onClick={() => onDeviceControl('auger', 'stop')}
-          />
-        </div>
-      </div>
-
-      {/* Blower Controls */}
-      <div className="mb-6">
-        <h4 className="font-medium mb-3">Blower Motor (Ventilation)</h4>
-        <div className="flex items-center gap-4 mb-3">
-          <label className="text-sm">Speed:</label>
-          <input
-            type="range"
-            min="0"
-            max="255"
-            value={selectedBlowerSpeed}
-            onChange={(e) => setSelectedBlowerSpeed(parseInt(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-sm font-mono w-12">{selectedBlowerSpeed}</span>
-        </div>
-        <div className="flex gap-2">
-          <ControlButton
-            device="blower"
-            action="on"
-            label="Start"
-            onClick={() => onDeviceControl('blower', 'on', selectedBlowerSpeed)}
-          />
-          <ControlButton
-            device="blower"
-            action="off"
-            label="Stop"
-            onClick={() => onDeviceControl('blower', 'off')}
-          />
-        </div>
-      </div>
-
-      {/* Actuator Controls */}
-      <div>
-        <h4 className="font-medium mb-3">Linear Actuator</h4>
-        <div className="flex gap-2">
-          <ControlButton
-            device="actuator"
-            action="up"
-            label="Up"
-            onClick={() => onDeviceControl('actuator', 'up')}
-          />
-          <ControlButton
-            device="actuator"
-            action="down"
-            label="Down"
-            onClick={() => onDeviceControl('actuator', 'down')}
-          />
-          <ControlButton
-            device="actuator"
-            action="stop"
-            label="Stop"
-            onClick={() => onDeviceControl('actuator', 'stop')}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Main Data Dashboard Component
-const DataDashboard: React.FC = () => {
-  const { sensorData, isConnected } = useFirebaseSensorData();
-  const [processedData, setProcessedData] = useState<any>(null);
-
-  useEffect(() => {
-    if (sensorData) {
-      const processed = JsonDataManager.processCompleteData(sensorData);
-      setProcessedData(processed);
-    }
-  }, [sensorData]);
-
-  return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Clean JSON Data Dashboard</h1>
-        
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Processed Data</h2>
-          
-          {processedData?.isValid ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h3 className="font-medium">Feed Temperature</h3>
-                  <p className="text-2xl font-bold">
-                    {JsonDataManager.SensorProcessor.formatTemperature(processedData.data.sensors.feedTemp)}
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h3 className="font-medium">Battery</h3>
-                  <p className="text-2xl font-bold">
-                    {JsonDataManager.SensorProcessor.formatBatteryPercent(processedData.data.sensors.batteryPercent)}
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <h3 className="font-medium">Weight</h3>
-                  <p className="text-2xl font-bold">
-                    {JsonDataManager.SensorProcessor.formatWeight(processedData.data.sensors.weight)}
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <h3 className="font-medium">Connection</h3>
-                  <p className="text-2xl font-bold">
-                    {isConnected ? '✅ Online' : '❌ Offline'}
-                  </p>
-                </div>
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+          Control Status (Organized)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Auger */}
+          <div>
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Auger</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Direction:</span>
+                <span className="font-mono">{organizedControlData.auger.direction}</span>
               </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-medium mb-2">System Health</h3>
-                <p className="text-lg">
-                  Status: {processedData.health?.isHealthy ? '✅ Healthy' : '⚠️ Issues Found'}
-                </p>
-                {processedData.health?.issues?.length > 0 && (
-                  <ul className="mt-2 text-red-600">
-                    {processedData.health.issues.map((issue: string, index: number) => (
-                      <li key={index}>• {issue}</li>
-                    ))}
-                  </ul>
-                )}
+              <div className="flex justify-between">
+                <span>Speed:</span>
+                <span className="font-mono">{organizedControlData.auger.speed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Enabled:</span>
+                <span className={`font-mono ${organizedControlData.auger.enabled ? 'text-green-600' : 'text-red-600'}`}>
+                  {organizedControlData.auger.enabled ? 'YES' : 'NO'}
+                </span>
               </div>
             </div>
-          ) : (
-            <p className="text-gray-500">No valid data available</p>
-          )}
+          </div>
+
+          {/* Blower */}
+          <div>
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Blower</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>State:</span>
+                <span className={`font-mono ${organizedControlData.blower.state ? 'text-green-600' : 'text-red-600'}`}>
+                  {organizedControlData.blower.state ? 'ON' : 'OFF'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Speed:</span>
+                <span className="font-mono">{organizedControlData.blower.speed}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actuator */}
+          <div>
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Actuator</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Position:</span>
+                <span className="font-mono">{organizedControlData.actuator.position}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Enabled:</span>
+                <span className={`font-mono ${organizedControlData.actuator.enabled ? 'text-green-600' : 'text-red-600'}`}>
+                  {organizedControlData.actuator.enabled ? 'YES' : 'NO'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Relays */}
+          <div>
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Relays</h4>
+            <div className="space-y-1 text-sm">
+              {Object.entries(organizedControlData.relays).map(([relay, state]) => (
+                <div key={relay} className="flex justify-between">
+                  <span>{relay.toUpperCase()}:</span>
+                  <span className={`font-mono ${state ? 'text-green-600' : 'text-red-600'}`}>
+                    {state ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCurrentFirebaseStructure = () => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+        Current Firebase Structure
+      </h3>
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Commands Available</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData?.commands ? 'Yes' : 'No'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Control Data</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData?.control ? 'Yes' : 'No'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Motors Data</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData?.motors ? 'Yes' : 'No'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Status Data</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData?.status ? 'Yes' : 'No'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Sensor Data</span>
+          <span className="text-gray-900 dark:text-white">
+            {firebaseData?.sensors ? 'Yes' : 'No'}
+          </span>
+        </div>
+        
+        {/* Data Quality */}
+        <div className="border-t pt-3 mt-3">
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Data Quality</span>
+            <span className={`${JsonDataOrganizer.getStatusClass(organizedSensorData?.quality || 'offline')}`}>
+              {organizedSensorData?.quality?.toUpperCase() || 'OFFLINE'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Fish Feeder Data Dashboard
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Real-time Firebase data with organized JSON structure
+          </p>
+        </div>
+
+        {/* Status Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {renderConnectionStatus()}
+          {renderCurrentFirebaseStructure()}
+        </div>
+
+        {/* Organized Sensor Data */}
+        {organizedSensorData && (
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Organized Sensor Data
+            </h2>
+            {renderOrganizedSensorData()}
+          </div>
+        )}
+
+        {/* Organized Control Data */}
+        {organizedControlData && (
+          <div className="mb-6">
+            {renderOrganizedControlData()}
+          </div>
+        )}
+
+        {/* Raw Firebase Data */}
+        <div className="mb-6">
+          {renderFirebaseRawData()}
         </div>
       </div>
     </div>

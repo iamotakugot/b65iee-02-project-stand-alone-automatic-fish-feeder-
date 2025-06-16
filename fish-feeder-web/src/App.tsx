@@ -16,6 +16,7 @@ const SimpleControl = lazy(() => import("@/pages/SimpleControl"));
 const FeedControl = lazy(() => import("@/pages/FeedControlPanel"));
 const FanControl = lazy(() => import("@/pages/FanControl"));
 const DataManagement = lazy(() => import("@/pages/DataManagement"));
+const DataDashboard = lazy(() => import("@/pages/DataDashboard"));
 
 const Settings = lazy(() => import("@/pages/Settings"));
 const SystemStatus = lazy(() => import("@/pages/SystemStatus"));
@@ -156,6 +157,7 @@ const AppContent = () => {
             <Route element={<FeedControl />} path="feed-control" />
             <Route element={<FanControl />} path="fan-control" />
             <Route element={<DataManagement />} path="data-management" />
+            <Route element={<DataDashboard />} path="data-dashboard" />
       
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
