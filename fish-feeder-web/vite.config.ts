@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   optimizeDeps: {
     // Pre-bundle these dependencies to ensure proper loading order
-    include: ["react", "react-dom", "react/jsx-runtime"],
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+    ],
     // Force rebuild to ensure clean dependencies
     force: true,
   },
@@ -15,7 +19,7 @@ export default defineConfig({
     // Ignore TypeScript errors during build for deployment
     rollupOptions: {
       onwarn(warning, warn) {
-        if (warning.code === "UNUSED_EXTERNAL_IMPORT") return;
+        if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return;
         warn(warning);
       },
       output: {
@@ -25,8 +29,8 @@ export default defineConfig({
       },
     },
     // Use esbuild for faster builds
-    minify: "esbuild",
-    target: "esnext",
+    minify: 'esbuild',
+    target: 'esnext',
     chunkSizeWarningLimit: 1000,
   },
   server: {

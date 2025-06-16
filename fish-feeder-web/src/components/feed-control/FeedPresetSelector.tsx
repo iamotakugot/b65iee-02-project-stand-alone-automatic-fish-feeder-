@@ -1,6 +1,6 @@
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-// import { BsPlus, BsTrash } from "react-icons/bs";
+import { BsPlus, BsTrash } from "react-icons/bs";
 
 interface FeedPresetSelectorProps {
   feedType: string;
@@ -10,11 +10,7 @@ interface FeedPresetSelectorProps {
   presetAmounts: Record<string, string>;
   setPresetAmounts: (amounts: Record<string, string>) => void;
   getPresetLabel: (type: string, amount: string) => string;
-  formatWeightDisplay: (
-    grams: string | number,
-    showName?: boolean,
-    name?: string,
-  ) => string;
+  formatWeightDisplay: (grams: string | number, showName?: boolean, name?: string) => string;
 }
 
 export const FeedPresetSelector = ({
@@ -25,12 +21,12 @@ export const FeedPresetSelector = ({
   presetAmounts,
   setPresetAmounts,
   getPresetLabel,
-  formatWeightDisplay,
+  formatWeightDisplay
 }: FeedPresetSelectorProps) => {
   const handlePresetAmountChange = (type: string, value: string) => {
     setPresetAmounts({
       ...presetAmounts,
-      [type]: value,
+      [type]: value
     });
   };
 
@@ -43,15 +39,15 @@ export const FeedPresetSelector = ({
       <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
         Feed Amount Presets
       </h3>
-
+      
       {/* Preset Buttons */}
       <div className="grid grid-cols-2 gap-3">
         {Object.entries(presetAmounts).map(([type, amount]) => (
           <Button
             key={type}
-            className="h-16 flex flex-col justify-center"
-            color={feedType === type ? "primary" : "default"}
             variant={feedType === type ? "solid" : "bordered"}
+            color={feedType === type ? "primary" : "default"}
+            className="h-16 flex flex-col justify-center"
             onPress={() => {
               setFeedType(type);
               setFeedAmount(getPresetAmount(type));
@@ -73,13 +69,13 @@ export const FeedPresetSelector = ({
           Custom Amount (grams)
         </label>
         <Input
-          className="w-full"
-          max="5000"
-          min="1"
-          placeholder="Enter amount in grams"
           type="number"
           value={feedAmount}
           onChange={(e) => setFeedAmount(e.target.value)}
+          placeholder="Enter amount in grams"
+          min="1"
+          max="5000"
+          className="w-full"
         />
       </div>
 
@@ -90,15 +86,17 @@ export const FeedPresetSelector = ({
         </h4>
         {Object.entries(presetAmounts).map(([type, amount]) => (
           <div key={type} className="flex items-center gap-2">
-            <span className="w-16 text-sm font-medium capitalize">{type}:</span>
+            <span className="w-16 text-sm font-medium capitalize">
+              {type}:
+            </span>
             <Input
-              className="flex-1"
-              max="5000"
-              min="1"
-              size="sm"
               type="number"
               value={amount}
               onChange={(e) => handlePresetAmountChange(type, e.target.value)}
+              className="flex-1"
+              size="sm"
+              min="1"
+              max="5000"
             />
             <span className="text-xs text-gray-500 w-16">
               {formatWeightDisplay(amount)}
@@ -108,4 +106,4 @@ export const FeedPresetSelector = ({
       </div>
     </div>
   );
-};
+}; 

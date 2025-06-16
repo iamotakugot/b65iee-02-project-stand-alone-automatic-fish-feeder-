@@ -3,7 +3,7 @@
  * Provides comprehensive error tracking, success/failure feedback, and system health monitoring
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from 'react';
 // Using a simple toast implementation instead of react-hot-toast
 const toast = {
   success: (message: string, options?: any) => {
@@ -13,7 +13,7 @@ const toast = {
   error: (message: string, options?: any) => {
     console.error(`❌ ${message}`);
     // You can replace this with your preferred toast library
-  },
+  }
 };
 
 // Error types
@@ -22,7 +22,7 @@ export interface ErrorEntry {
   command: string;
   error: string;
   responseTime: number;
-  type: "command_failure" | "network_error" | "timeout" | "validation_error";
+  type: 'command_failure' | 'network_error' | 'timeout' | 'validation_error';
   retryCount?: number;
 }
 
@@ -31,7 +31,7 @@ export interface SystemHealth {
   totalCommands: number;
   recentErrors: ErrorEntry[];
   averageResponseTime: number;
-  status: "excellent" | "good" | "fair" | "poor" | "critical";
+  status: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
   lastUpdate: Date;
 }
 
@@ -68,23 +68,14 @@ export class CompleteErrorHandler {
       showToast?: boolean;
       retryOnFailure?: boolean;
       timeout?: number;
-    } = {},
+    } = {}
   ): Promise<CommandResult> {
-    const {
-      onSuccess,
-      onError,
-      showToast = true,
-      retryOnFailure = true,
-      timeout = 10000,
-    } = options;
+    const { onSuccess, onError, showToast = true, retryOnFailure = true, timeout = 10000 } = options;
     const startTime = performance.now();
-
     this.totalCommands++;
 
     // ⚡ SIMPLE RECURSIVE RETRY - Back to setTimeout for stability
-    const executeWithRetry = async (
-      retryCount: number = 0,
-    ): Promise<CommandResult> => {
+    const executeWithRetry = async (retryCount: number = 0): Promise<CommandResult> => {
       try {
         // ⚡ SIMPLE TIMEOUT - Back to setTimeout for stability
         const timeoutPromise = new Promise((_, reject) => {
@@ -96,54 +87,53 @@ export class CompleteErrorHandler {
         const result = await Promise.race([apiCall(), timeoutPromise]);
         const responseTime = performance.now() - startTime;
 
-        if (result?.status === "success" || result?.success === true) {
+        if (result?.status === 'success' || result?.success === true) {
           this.successfulCommands++;
           this.logSuccess(commandName, responseTime, retryCount);
-
+          
           if (showToast) {
             this.showSuccessToast(commandName, responseTime);
           }
-
+          
           onSuccess?.(result);
           this.updateSuccessRate();
           this.saveToStorage();
-
+          
           return {
             success: true,
             data: result,
-            responseTime,
+            responseTime
           };
         } else {
-          throw new Error(result?.message || result?.error || "Command failed");
+          throw new Error(result?.message || result?.error || 'Command failed');
         }
       } catch (error: any) {
         // ⚡ SIMPLE RETRY - Back to setTimeout for stability
         if (retryCount < this.maxRetries && retryOnFailure) {
-          await new Promise((resolve) => {
+          await new Promise(resolve => {
             setTimeout(resolve, 1000 * (retryCount + 1));
           });
-
+          
           // Recursive retry instead of while loop
           return executeWithRetry(retryCount + 1);
         }
-
+        
         // Final failure
         const responseTime = performance.now() - startTime;
-
         this.logError(commandName, error, responseTime, retryCount);
-
+        
         if (showToast) {
           this.showErrorToast(commandName, error.message, responseTime);
         }
-
+        
         onError?.(error);
         this.updateSuccessRate();
         this.saveToStorage();
-
+        
         return {
           success: false,
           error: error.message,
-          responseTime,
+          responseTime
         };
       }
     };
@@ -154,91 +144,82 @@ export class CompleteErrorHandler {
   /**
    * Log successful command
    */
-  private logSuccess(
-    command: string,
-    responseTime: number,
-    retryCount: number,
-  ) {
-    const retryText = retryCount > 0 ? ` (after ${retryCount} retries)` : "";
-
+  private logSuccess(command: string, responseTime: number, retryCount: number) {
+    const retryText = retryCount > 0 ? ` (after ${retryCount} retries)` : '';
     console.log(`✅ ${command} - ${responseTime.toFixed(1)}ms${retryText}`);
   }
 
   /**
    * Log failed command
    */
-  private logError(
-    command: string,
-    error: any,
-    responseTime: number,
-    retryCount: number,
-  ) {
+  private logError(command: string, error: any, responseTime: number, retryCount: number) {
     const errorEntry: ErrorEntry = {
       timestamp: new Date(),
       command,
       error: error.message || error.toString(),
       responseTime,
       type: this.categorizeError(error),
-      retryCount,
+      retryCount
     };
-
+    
     this.errorLog.push(errorEntry);
-
+    
     // Keep only recent errors
     if (this.errorLog.length > this.maxLogSize) {
       this.errorLog = this.errorLog.slice(-this.maxLogSize);
     }
-
-    const retryText = retryCount > 0 ? ` (after ${retryCount} retries)` : "";
-
-    console.error(
-      `❌ ${command} - ${error.message} (${responseTime.toFixed(1)}ms)${retryText}`,
-    );
+    
+    const retryText = retryCount > 0 ? ` (after ${retryCount} retries)` : '';
+    console.error(`❌ ${command} - ${error.message} (${responseTime.toFixed(1)}ms)${retryText}`);
   }
 
   /**
    * Categorize error type
    */
-  private categorizeError(error: any): ErrorEntry["type"] {
-    const message = error.message?.toLowerCase() || "";
-
-    if (message.includes("timeout")) return "timeout";
-    if (message.includes("network") || message.includes("fetch"))
-      return "network_error";
-    if (message.includes("validation") || message.includes("invalid"))
-      return "validation_error";
-
-    return "command_failure";
+  private categorizeError(error: any): ErrorEntry['type'] {
+    const message = error.message?.toLowerCase() || '';
+    
+    if (message.includes('timeout')) return 'timeout';
+    if (message.includes('network') || message.includes('fetch')) return 'network_error';
+    if (message.includes('validation') || message.includes('invalid')) return 'validation_error';
+    
+    return 'command_failure';
   }
 
   /**
    * Show success toast notification
    */
   private showSuccessToast(command: string, responseTime: number) {
-    toast.success(`✅ ${command} completed (${responseTime.toFixed(1)}ms)`, {
-      duration: 2000,
-      position: "top-right",
-      style: {
-        background: "#10B981",
-        color: "white",
-        fontSize: "14px",
-      },
-    });
+    toast.success(
+      `✅ ${command} completed (${responseTime.toFixed(1)}ms)`,
+      {
+        duration: 2000,
+        position: 'top-right',
+        style: {
+          background: '#10B981',
+          color: 'white',
+          fontSize: '14px'
+        }
+      }
+    );
   }
 
   /**
    * Show error toast notification
    */
   private showErrorToast(command: string, error: string, responseTime: number) {
-    toast.error(`❌ ${command} failed: ${error}`, {
-      duration: 4000,
-      position: "top-right",
-      style: {
-        background: "#EF4444",
-        color: "white",
-        fontSize: "14px",
-      },
-    });
+    toast.error(
+      `❌ ${command} failed: ${error}`,
+      {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#EF4444',
+          color: 'white',
+          fontSize: '14px'
+        }
+      }
+    );
   }
 
   /**
@@ -256,18 +237,15 @@ export class CompleteErrorHandler {
    * Get system health status
    */
   getSystemHealth(): SystemHealth {
-    const averageResponseTime =
-      this.responseTimeHistory.length > 0
-        ? this.responseTimeHistory.reduce((a, b) => a + b, 0) /
-          this.responseTimeHistory.length
-        : 0;
+    const averageResponseTime = this.responseTimeHistory.length > 0
+      ? this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length
+      : 0;
 
-    let status: SystemHealth["status"] = "excellent";
-
-    if (this.successRate < 50) status = "critical";
-    else if (this.successRate < 70) status = "poor";
-    else if (this.successRate < 85) status = "fair";
-    else if (this.successRate < 95) status = "good";
+    let status: SystemHealth['status'] = 'excellent';
+    if (this.successRate < 50) status = 'critical';
+    else if (this.successRate < 70) status = 'poor';
+    else if (this.successRate < 85) status = 'fair';
+    else if (this.successRate < 95) status = 'good';
 
     return {
       successRate: this.successRate,
@@ -275,7 +253,7 @@ export class CompleteErrorHandler {
       recentErrors: this.errorLog.slice(-10),
       averageResponseTime,
       status,
-      lastUpdate: new Date(),
+      lastUpdate: new Date()
     };
   }
 
@@ -283,22 +261,16 @@ export class CompleteErrorHandler {
    * Get error statistics by type
    */
   getErrorStatistics() {
-    const errorsByType = this.errorLog.reduce(
-      (acc, error) => {
-        acc[error.type] = (acc[error.type] || 0) + 1;
-
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
+    const errorsByType = this.errorLog.reduce((acc, error) => {
+      acc[error.type] = (acc[error.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
       totalErrors: this.errorLog.length,
       errorsByType,
       recentErrors: this.errorLog.slice(-5),
-      averageRetryCount:
-        this.errorLog.reduce((sum, err) => sum + (err.retryCount || 0), 0) /
-        Math.max(this.errorLog.length, 1),
+      averageRetryCount: this.errorLog.reduce((sum, err) => sum + (err.retryCount || 0), 0) / Math.max(this.errorLog.length, 1)
     };
   }
 
@@ -323,12 +295,11 @@ export class CompleteErrorHandler {
         errorLog: this.errorLog.slice(-100), // Keep only last 100 errors
         totalCommands: this.totalCommands,
         successfulCommands: this.successfulCommands,
-        responseTimeHistory: this.responseTimeHistory.slice(-50), // Keep only last 50 response times
+        responseTimeHistory: this.responseTimeHistory.slice(-50) // Keep only last 50 response times
       };
-
-      localStorage.setItem("fishFeederErrorHandler", JSON.stringify(data));
+      localStorage.setItem('fishFeederErrorHandler', JSON.stringify(data));
     } catch (error) {
-      console.warn("Failed to save error handler data to localStorage:", error);
+      console.warn('Failed to save error handler data to localStorage:', error);
     }
   }
 
@@ -337,11 +308,9 @@ export class CompleteErrorHandler {
    */
   private loadFromStorage() {
     try {
-      const data = localStorage.getItem("fishFeederErrorHandler");
-
+      const data = localStorage.getItem('fishFeederErrorHandler');
       if (data) {
         const parsed = JSON.parse(data);
-
         this.errorLog = parsed.errorLog || [];
         this.totalCommands = parsed.totalCommands || 0;
         this.successfulCommands = parsed.successfulCommands || 0;
@@ -349,10 +318,7 @@ export class CompleteErrorHandler {
         this.updateSuccessRate();
       }
     } catch (error) {
-      console.warn(
-        "Failed to load error handler data from localStorage:",
-        error,
-      );
+      console.warn('Failed to load error handler data from localStorage:', error);
     }
   }
 }
@@ -378,7 +344,7 @@ export const useCompleteErrorHandling = () => {
     updateHealth();
     // Health updates are now triggered by command executions
     // No polling intervals - fully event-driven
-
+    
     return () => {
       // No intervals to clear
     };
@@ -386,13 +352,9 @@ export const useCompleteErrorHandling = () => {
 
   const executeCommand = useCallback(
     (commandName: string, apiCall: () => Promise<any>, options?: any) => {
-      return errorHandlerRef.current!.executeCommand(
-        commandName,
-        apiCall,
-        options,
-      );
+      return errorHandlerRef.current!.executeCommand(commandName, apiCall, options);
     },
-    [],
+    []
   );
 
   const getErrorStatistics = useCallback(() => {
@@ -408,9 +370,9 @@ export const useCompleteErrorHandling = () => {
     executeCommand,
     systemHealth,
     getErrorStatistics,
-    resetStatistics,
+    resetStatistics
   };
 };
 
 // Export default hook
-export default useCompleteErrorHandling;
+export default useCompleteErrorHandling; 

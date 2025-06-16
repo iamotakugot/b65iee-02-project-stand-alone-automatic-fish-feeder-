@@ -15,7 +15,7 @@ const SimpleControl = () => {
 
     setLastFeedTime(now.toLocaleTimeString());
     // Add feed logic here
-    // Manual feed triggered - logging removed for production
+    console.log("Manual feed triggered at", now.toLocaleTimeString());
   };
 
   return (

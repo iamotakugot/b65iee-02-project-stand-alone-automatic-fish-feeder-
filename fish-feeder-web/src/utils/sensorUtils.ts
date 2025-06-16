@@ -10,18 +10,16 @@ export const getSensorValue = (
   sensorData: any,
   sensorName: string,
   measurementType: string,
-  defaultValue: number = 0,
+  defaultValue: number = 0
 ): number => {
   // New enhanced format: {SENSOR_NAME: {measurement: {value, unit, timestamp}}}
   const enhancedValue = sensorData?.[sensorName]?.[measurementType]?.value;
-
   if (isValidNumber(enhancedValue)) {
     return enhancedValue;
   }
 
   // Fallback to old format: {SENSOR_NAME: {measurement: value}}
   const legacyValue = sensorData?.[sensorName]?.[measurementType];
-
   if (isValidNumber(legacyValue)) {
     return legacyValue;
   }
@@ -33,30 +31,28 @@ export const getSensorUnit = (
   sensorData: any,
   sensorName: string,
   measurementType: string,
-  defaultUnit: string = "",
+  defaultUnit: string = ""
 ): string => {
   // New enhanced format
   const unit = sensorData?.[sensorName]?.[measurementType]?.unit;
-
   if (typeof unit === "string") {
     return unit;
   }
-
+  
   return defaultUnit;
 };
 
 export const getSensorTimestamp = (
   sensorData: any,
   sensorName: string,
-  measurementType: string,
+  measurementType: string
 ): string | null => {
   // New enhanced format
   const timestamp = sensorData?.[sensorName]?.[measurementType]?.timestamp;
-
   if (typeof timestamp === "string") {
     return timestamp;
   }
-
+  
   return null;
 };
 
@@ -88,7 +84,6 @@ export const getSensorsFromResponse = (
   if (response.timestamp && (response as any).arduino_connected !== undefined) {
     // Remove metadata properties and return sensor data
     const { timestamp, arduino_connected, ...sensors } = response as any;
-
     return sensors;
   }
 
@@ -117,84 +112,64 @@ export const getCurrentSensorValues = (
 
   return {
     // Temperature sensors - support both old and new sensor names
-    feederTemp:
+    feederTemp: 
       getSensorValue(sensors, "FEED_TEMPERATURE", "temperature") ||
-      getSensorValue(
-        sensors,
-        API_CONFIG.SENSOR_NAMES.DHT22_FEEDER,
-        "temperature",
-      ),
-
-    feederHumidity:
+      getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.DHT22_FEEDER, "temperature"),
+    
+    feederHumidity: 
       getSensorValue(sensors, "FEED_HUMIDITY", "humidity") ||
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.DHT22_FEEDER, "humidity"),
-
-    systemTemp:
+    
+    systemTemp: 
       getSensorValue(sensors, "CONTROL_TEMPERATURE", "temperature") ||
-      getSensorValue(
-        sensors,
-        API_CONFIG.SENSOR_NAMES.DHT22_SYSTEM,
-        "temperature",
-      ),
-
-    systemHumidity:
+      getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.DHT22_SYSTEM, "temperature"),
+    
+    systemHumidity: 
       getSensorValue(sensors, "CONTROL_HUMIDITY", "humidity") ||
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.DHT22_SYSTEM, "humidity"),
-
-    waterTemp:
+    
+    waterTemp: 
       getSensorValue(sensors, "WATER_TEMPERATURE", "temperature") ||
-      getSensorValue(
-        sensors,
-        API_CONFIG.SENSOR_NAMES.DS18B20_WATER_TEMP,
-        "temperature",
-      ),
+      getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.DS18B20_WATER_TEMP, "temperature"),
 
     // Weight sensor
-    weight:
+    weight: 
       getSensorValue(sensors, "WEIGHT", "weight") ||
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.HX711_FEEDER, "weight"),
 
     // Power sensors - enhanced battery status
-    loadVoltage:
+    loadVoltage: 
       getSensorValue(sensors, "BATTERY_STATUS", "voltage") ||
       getSensorValue(sensors, "LOAD_VOLTAGE", "voltage") ||
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.LOAD_VOLTAGE, "voltage"),
-
-    loadCurrent:
+    
+    loadCurrent: 
       getSensorValue(sensors, "BATTERY_STATUS", "current") ||
       getSensorValue(sensors, "LOAD_CURRENT", "current") ||
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.LOAD_CURRENT, "current"),
 
     // Solar sensors (NEW)
-    solarVoltage:
+    solarVoltage: 
       getSensorValue(sensors, "SOLAR_VOLTAGE", "voltage") ||
       getSensorValue(sensors, "SOLAR_POWER", "voltage"),
-
-    solarCurrent:
+    
+    solarCurrent: 
       getSensorValue(sensors, "SOLAR_CURRENT", "current") ||
       getSensorValue(sensors, "SOLAR_POWER", "current"),
 
     // Battery status
-    batteryPercentage:
+    batteryPercentage: 
       getSensorValue(sensors, "BATTERY_STATUS", "soc") ||
       getSensorValue(sensors, "BATTERY_STATUS", "percentage") ||
-      getSensorValue(
-        sensors,
-        API_CONFIG.SENSOR_NAMES.BATTERY_STATUS,
-        "percentage",
-      ),
-
-    batteryCharging:
+      getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.BATTERY_STATUS, "percentage"),
+    
+    batteryCharging: 
       getSensorValue(sensors, "BATTERY_STATUS", "charging") ||
-      getSensorValue(
-        sensors,
-        API_CONFIG.SENSOR_NAMES.BATTERY_STATUS,
-        "charging",
-      ),
+      getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.BATTERY_STATUS, "charging"),
 
     // Additional sensors
     soilMoisture: getSensorValue(sensors, "SOIL_MOISTURE", "moisture"),
-
+    
     // System health
     systemOk: getSensorValue(sensors, "SYSTEM_HEALTH", "system_ok", 1),
     tempOk: getSensorValue(sensors, "SYSTEM_HEALTH", "temp_ok", 1),
@@ -206,10 +181,9 @@ export const getCurrentSensorValues = (
 export const getEnhancedSensorData = (
   sensorsData: AllSensorsResponse | null,
   sensorName: string,
-  measurementType: string,
+  measurementType: string
 ) => {
   const sensors = getSensorsFromResponse(sensorsData);
-
   if (!sensors) return null;
 
   return {
@@ -237,11 +211,7 @@ export const formatEnhancedSensorValue = (
   sensorData: { value: number; unit: string; timestamp: string | null } | null,
   decimals: number = 1,
 ): string => {
-  if (
-    !sensorData ||
-    sensorData.value === null ||
-    sensorData.value === undefined
-  ) {
+  if (!sensorData || sensorData.value === null || sensorData.value === undefined) {
     return "—";
   }
 
@@ -281,20 +251,15 @@ export const isSensorDataFresh = (
 };
 
 // **NEW: Helper to check if sensor uses enhanced format**
-export const isEnhancedFormat = (
-  sensorData: any,
-  sensorName: string,
-): boolean => {
+export const isEnhancedFormat = (sensorData: any, sensorName: string): boolean => {
   const sensor = sensorData?.[sensorName];
-
   if (!sensor || typeof sensor !== "object") return false;
-
+  
   // Check if any measurement has the enhanced structure
-  return Object.values(sensor).some(
-    (measurement: any) =>
-      measurement &&
-      typeof measurement === "object" &&
-      "value" in measurement &&
-      "unit" in measurement,
+  return Object.values(sensor).some((measurement: any) => 
+    measurement && 
+    typeof measurement === "object" && 
+    "value" in measurement && 
+    "unit" in measurement
   );
 };

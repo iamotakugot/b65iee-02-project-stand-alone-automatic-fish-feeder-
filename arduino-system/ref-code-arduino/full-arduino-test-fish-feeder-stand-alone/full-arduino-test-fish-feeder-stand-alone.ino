@@ -27,8 +27,8 @@
 // ===== PIN DEFINITIONS =====
 // Sensors
 #define SOIL_PIN A2
-#define DHT_FEED_PIN 46        // DHT22 ในถังอาหาร (PIN MAP CORRECTED)
-#define DHT_BOX_PIN 48         // DHT22 ในกล่องควบคุม (PIN MAP CORRECTED)
+#define DHT_FEED_PIN 48        // DHT22 ในถังอาหาร
+#define DHT_BOX_PIN 46         // DHT22 ในกล่องควบคุม
 #define SOLAR_VOLTAGE_PIN A3   // แรงดันโซลาร์
 #define SOLAR_CURRENT_PIN A4   // กระแสโซลาร์
 #define LOAD_VOLTAGE_PIN A1    // แรงดันโหลด
@@ -36,9 +36,9 @@
 #define LOADCELL_DOUT_PIN 28
 #define LOADCELL_SCK_PIN 26
 
-// Controls - ตามต้นฉบับ PIN MAP REFERENCE
-#define LED_RELAY_PIN 50       // Relay IN2 (LED) - PIN MAP CORRECTED
-#define FAN_RELAY_PIN 52       // Relay IN1 (FAN) - PIN MAP CORRECTED
+// Controls - ตามต้นฉบับ
+#define LED_RELAY_PIN 50       // Relay IN1 (LED)
+#define FAN_RELAY_PIN 52       // Relay IN2 (FAN)
 #define BLOWER_RPWM_PIN 5      // Blower RPWM
 #define BLOWER_LPWM_PIN 6      // Blower LPWM
 #define AUGER_ENA_PIN 8        // Auger PWM Enable
@@ -89,40 +89,20 @@ int actuatorPosition = 0;
 
 void setup() {
   Serial.begin(115200);
-  delay(2000); // รอให้ Serial Monitor เชื่อมต่อ
-  
-  Serial.println();
+  Serial.println("FULL ARDUINO TEST - FISH FEEDER STAND-ALONE");
   Serial.println("========================================");
-  Serial.println("🐟 FULL ARDUINO TEST - FISH FEEDER STAND-ALONE");
-  Serial.println("========================================");
-  Serial.println("🚀 Starting System Initialization...");
   
   // Initialize Sensors
-  Serial.println("📡 เริ่มอ่านค่า DHT22 ที่ขา 48 และ 46...");
   dhtFeed.begin();
   dhtBox.begin();
-  
-  Serial.println("🌱 เริ่มระบบอ่านค่าความชื้นในดิน...");
-  // Soil sensor is analog, no initialization needed
-  
-  Serial.println("📦 เริ่มต้นระบบชั่งน้ำหนัก...");
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   
   // Load HX711 calibration from EEPROM
   EEPROM.get(EEPROM_SCALE_ADDR, scaleFactor);
   EEPROM.get(EEPROM_OFFSET_ADDR, offset);
-  Serial.print("📥 scaleFactor: ");
-  Serial.println(scaleFactor, 6);
-  Serial.print("📥 offset: ");
-  Serial.println(offset);
-  
   if (scaleFactor <= 0 || scaleFactor > 100000) scaleFactor = 1.0;
   scale.set_scale(scaleFactor);
   scale.set_offset(offset);
-  Serial.println("📌 เริ่มวัดน้ำหนัก...");
-  
-  Serial.println("⚡ เริ่มวัดกระแสไฟฟ้า...");
-  Serial.println("🔍 เริ่มวัดแรงดันไฟฟ้า...");
   
   // Initialize Control Pins - ตามต้นฉบับ
   pinMode(LED_RELAY_PIN, OUTPUT);
@@ -148,15 +128,6 @@ void setup() {
   digitalWrite(ACTUATOR_IN1_PIN, LOW);
   digitalWrite(ACTUATOR_IN2_PIN, LOW);
   
-  Serial.println("[ACTUATOR] Actuator motor initialized");
-  Serial.println("[AUGER] Auger motor initialized");
-  Serial.println("[RELAY] Relay control initialized");
-  
-  Serial.println();
-  Serial.println("✅ System Initialization Complete!");
-  Serial.println("🎮 Menu System Active - Select Option Below:");
-  Serial.println();
-  
   showMainMenu();
 }
 
@@ -171,13 +142,6 @@ void loop() {
   // Update sensor readings for global variables
   updateSolarBatteryGlobals();
   
-  // ⚡ AUTO SEND SENSOR DATA TO PI SERVER (Every 10 seconds)
-  static unsigned long lastAutoSensorSend = 0;
-  if (millis() - lastAutoSensorSend >= 10000) {  // 10 seconds
-    sendJsonSensorData();  // Send sensor data automatically
-    lastAutoSensorSend = millis();
-  }
-  
   // Display sensors if active
   if (sensorDisplayActive && (millis() - lastSensorRead >= 3000)) {
     displayAllSensors();
@@ -187,26 +151,6 @@ void loop() {
 
 void processSerialInput() {
   inputString.trim();
-  
-  // ⚡ JSON COMMAND PROCESSING - สำหรับ Pi Server Communication
-  if (inputString.startsWith("{") && inputString.endsWith("}")) {
-    processJsonCommand(inputString);
-    return;
-  }
-  
-  // ⚡ FIREBASE COMMAND PROCESSING - สำหรับ Pi → Arduino Commands
-  if (inputString.startsWith("GET:sensors")) {
-    sendJsonSensorData();
-    return;
-  }
-  
-  if (inputString.startsWith("R:") || inputString.startsWith("FEED:") || 
-      inputString.startsWith("B:") || inputString.startsWith("A:") ||
-      inputString.startsWith("G:")) {
-    processFirebaseCommand(inputString);
-    return;
-  }
-  
   int input = inputString.toInt();
   
   if (!inSubMenu) {
@@ -369,22 +313,22 @@ void handleRelayControl(int input) {
     case 1: // LED ON - ตามต้นฉบับ (Active Low)
       digitalWrite(LED_RELAY_PIN, LOW);
       ledState = true;
-      Serial.println("รีเลย์ IN2 เปิด (ไฟ LED ส่องบ่อน้ำ)");
+      Serial.println("รีเลย์ IN1 เปิด (ไฟ LED ส่องบ่อน้ำ)");
       break;
     case 2: // FAN ON - ตามต้นฉบับ (Active Low)
       digitalWrite(FAN_RELAY_PIN, LOW);
       fanState = true;
-      Serial.println("รีเลย์ IN1 เปิด (พัดลมตู้คอนโทรล)");
+      Serial.println("รีเลย์ IN2 เปิด (พัดลมตู้คอนโทรล)");
       break;
     case 3: // LED OFF - ตามต้นฉบับ (Active Low)
       digitalWrite(LED_RELAY_PIN, HIGH);
       ledState = false;
-      Serial.println("รีเลย์ IN2 ปิด (ไฟ LED ส่องบ่อน้ำ)");
+      Serial.println("รีเลย์ IN1 ปิด (ไฟ LED ส่องบ่อน้ำ)");
       break;
     case 4: // FAN OFF - ตามต้นฉบับ (Active Low)
       digitalWrite(FAN_RELAY_PIN, HIGH);
       fanState = false;
-      Serial.println("รีเลย์ IN1 ปิด (พัดลมตู้คอนโทรล)");
+      Serial.println("รีเลย์ IN2 ปิด (พัดลมตู้คอนโทรล)");
       break;
     case 0: // Emergency Stop - ตามต้นฉบับ
       digitalWrite(LED_RELAY_PIN, HIGH);
@@ -408,27 +352,30 @@ void handleBlowerControl(int input) {
   switch (input) {
     case 1: // OFF - ตามต้นฉบับ
       analogWrite(BLOWER_RPWM_PIN, 0);
-      digitalWrite(BLOWER_LPWM_PIN, LOW);
       blowerPWM = 0;
       Serial.println("พัดลมหยุดทำงาน");
       break;
-    case 2: // ON - ตามต้นฉบับ (PWM 250 - MINIMUM WORKING)
-      analogWrite(BLOWER_RPWM_PIN, 250);
+    case 2: // ON - ตามต้นฉบับ (PWM 250)
+      if (blowerPWM < 230) {
+        blowerPWM = 250; // ปรับเป็นค่าขั้นต่ำที่ทำงานได้
+        Serial.println("⚠️ ปรับ PWM เป็น 250 (ค่าขั้นต่ำที่มอเตอร์หมุนได้)");
+      }
+      analogWrite(BLOWER_RPWM_PIN, blowerPWM);
       digitalWrite(BLOWER_LPWM_PIN, LOW);
-      blowerPWM = 250;
-      Serial.println("พัดลมเริ่มทำงานที่ความเร็ว PWM 250 (ค่าขั้นต่ำที่มอเตอร์หมุนได้)");
+      Serial.print("พัดลมเริ่มทำงานที่ความเร็ว PWM ");
+      Serial.println(blowerPWM);
       break;
-    case 3: // Manual PWM 230 - MINIMUM THRESHOLD
+    case 3: // Manual PWM 230
       analogWrite(BLOWER_RPWM_PIN, 230);
       digitalWrite(BLOWER_LPWM_PIN, LOW);
       blowerPWM = 230;
-      Serial.println("พัดลม PWM 230 (ขั้นต่ำสุด)");
+      Serial.println("พัดลม PWM 230");
       break;
-    case 4: // Manual PWM 255 - MAXIMUM
+    case 4: // Manual PWM 255
       analogWrite(BLOWER_RPWM_PIN, 255);
       digitalWrite(BLOWER_LPWM_PIN, LOW);
       blowerPWM = 255;
-      Serial.println("พัดลม PWM 255 (เต็มกำลัง)");
+      Serial.println("พัดลม PWM 255");
       break;
     case 9: // Back to main menu
       inSubMenu = false;
@@ -856,272 +803,3 @@ void serialEvent() {
 // - Arduino → Pi: {"menu_status": "sensor_active", "current_data": {...}, "timestamp": 12345}
 // - Pi Serial Commands: 115200 baud, newline terminated
 // - Bi-directional communication สำหรับ complete system control และ monitoring
-
-// ⚡ JSON SENSOR DATA SENDER - สำหรับ Pi Server
-void sendJsonSensorData() {
-  Serial.print("{");
-  Serial.print("\"timestamp\":");
-  Serial.print(millis());
-  Serial.print(",\"sensors\":{");
-  
-  // Temperature & Humidity
-  float feedTemp = dhtFeed.readTemperature();
-  float feedHum = dhtFeed.readHumidity();
-  float boxTemp = dhtBox.readTemperature();
-  float boxHum = dhtBox.readHumidity();
-  
-  Serial.print("\"feedTemp\":");
-  Serial.print(isnan(feedTemp) ? 0 : feedTemp, 1);
-  Serial.print(",\"feedHumidity\":");
-  Serial.print(isnan(feedHum) ? 0 : feedHum, 1);
-  Serial.print(",\"boxTemp\":");
-  Serial.print(isnan(boxTemp) ? 0 : boxTemp, 1);
-  Serial.print(",\"boxHumidity\":");
-  Serial.print(isnan(boxHum) ? 0 : boxHum, 1);
-  
-  // Weight
-  float weight = scale.get_units(5);
-  Serial.print(",\"weight\":");
-  Serial.print(weight, 2);
-  
-  // Soil Moisture
-  int soilRaw = analogRead(SOIL_PIN);
-  float soilPct = map(soilRaw, 300, 1023, 100, 0);
-  soilPct = constrain(soilPct, 0, 100);
-  Serial.print(",\"soilMoisture\":");
-  Serial.print(soilPct, 1);
-  
-  // Battery & Solar
-  Serial.print(",\"solarVoltage\":");
-  Serial.print(currentSolarVoltage, 2);
-  Serial.print(",\"solarCurrent\":");
-  Serial.print(currentSolarCurrent, 3);
-  Serial.print(",\"loadVoltage\":");
-  Serial.print(currentLoadVoltage, 2);
-  Serial.print(",\"loadCurrent\":");
-  Serial.print(currentLoadCurrent, 3);
-  Serial.print(",\"batteryPercent\":\"");
-  Serial.print(currentBatteryPercent);
-  Serial.print("\"");
-  
-  Serial.print("},\"controls\":{");
-  Serial.print("\"led\":");
-  Serial.print(ledState ? "true" : "false");
-  Serial.print(",\"fan\":");
-  Serial.print(fanState ? "true" : "false");
-  Serial.print(",\"augerSpeed\":");
-  Serial.print(augerSpeed);
-  Serial.print(",\"blowerSpeed\":");
-  Serial.print(blowerPWM);
-  Serial.print(",\"actuatorPos\":");
-  Serial.print(actuatorPosition);
-  
-  Serial.print("},\"system\":{");
-  Serial.print("\"uptime\":");
-  Serial.print(millis());
-  Serial.print(",\"freeMemory\":2048");
-  Serial.print(",\"lastCommand\":\"OK\"");
-  
-  Serial.print("},\"status\":\"active\"");
-  Serial.println("}");
-}
-
-// ⚡ JSON COMMAND PROCESSOR - สำหรับ Pi Server Commands
-void processJsonCommand(String jsonStr) {
-  // Simple JSON parsing without library
-  if (jsonStr.indexOf("\"command\":\"get_sensors\"") > 0) {
-    sendJsonSensorData();
-    return;
-  }
-  
-  if (jsonStr.indexOf("\"device\":\"led\"") > 0) {
-    if (jsonStr.indexOf("\"action\":\"on\"") > 0) {
-      digitalWrite(LED_RELAY_PIN, LOW);
-      ledState = true;
-      Serial.println("{\"device\":\"led\",\"action\":\"on\",\"success\":true}");
-    } else if (jsonStr.indexOf("\"action\":\"off\"") > 0) {
-      digitalWrite(LED_RELAY_PIN, HIGH);
-      ledState = false;
-      Serial.println("{\"device\":\"led\",\"action\":\"off\",\"success\":true}");
-    }
-    return;
-  }
-  
-  if (jsonStr.indexOf("\"device\":\"fan\"") > 0) {
-    if (jsonStr.indexOf("\"action\":\"on\"") > 0) {
-      digitalWrite(FAN_RELAY_PIN, LOW);
-      fanState = true;
-      Serial.println("{\"device\":\"fan\",\"action\":\"on\",\"success\":true}");
-    } else if (jsonStr.indexOf("\"action\":\"off\"") > 0) {
-      digitalWrite(FAN_RELAY_PIN, HIGH);
-      fanState = false;
-      Serial.println("{\"device\":\"fan\",\"action\":\"off\",\"success\":true}");
-    }
-    return;
-  }
-  
-  Serial.println("{\"error\":\"Unknown JSON command\"}");
-}
-
-// ⚡ FIREBASE COMMAND PROCESSOR - สำหรับ Web → Pi → Arduino Commands
-void processFirebaseCommand(String cmd) {
-  cmd.trim();
-  bool success = false;
-  String message = "";
-  
-  // Relay Commands: R:1 (Fan ON), R:2 (Fan OFF), R:3 (LED ON), R:4 (LED OFF)
-  if (cmd.equals("R:1")) {
-    digitalWrite(FAN_RELAY_PIN, LOW);
-    fanState = true;
-    success = true;
-    message = "FAN ON";
-    Serial.println("{\"device\":\"fan\",\"action\":\"on\",\"success\":true}");
-  }
-  else if (cmd.equals("R:2")) {
-    digitalWrite(FAN_RELAY_PIN, HIGH);
-    fanState = false;
-    success = true;
-    message = "FAN OFF";
-    Serial.println("{\"device\":\"fan\",\"action\":\"off\",\"success\":true}");
-  }
-  else if (cmd.equals("R:3")) {
-    digitalWrite(LED_RELAY_PIN, LOW);
-    ledState = true;
-    success = true;
-    message = "LED ON";
-    Serial.println("{\"device\":\"led\",\"action\":\"on\",\"success\":true}");
-  }
-  else if (cmd.equals("R:4")) {
-    digitalWrite(LED_RELAY_PIN, HIGH);
-    ledState = false;
-    success = true;
-    message = "LED OFF";
-    Serial.println("{\"device\":\"led\",\"action\":\"off\",\"success\":true}");
-  }
-  
-  // Blower Commands: B:1 (ON), B:0 (OFF)
-  else if (cmd.equals("B:1")) {
-    analogWrite(BLOWER_RPWM_PIN, 250);
-    digitalWrite(BLOWER_LPWM_PIN, LOW);
-    blowerPWM = 250;
-    success = true;
-    message = "BLOWER ON";
-    Serial.println("{\"device\":\"blower\",\"action\":\"on\",\"success\":true}");
-  }
-  else if (cmd.equals("B:0")) {
-    analogWrite(BLOWER_RPWM_PIN, 0);
-    digitalWrite(BLOWER_LPWM_PIN, LOW);
-    blowerPWM = 0;
-    success = true;
-    message = "BLOWER OFF";
-    Serial.println("{\"device\":\"blower\",\"action\":\"off\",\"success\":true}");
-  }
-  // Blower Speed Control: B:SPD:xxx
-  else if (cmd.startsWith("B:SPD:")) {
-    int speed = cmd.substring(6).toInt();  // Remove "B:SPD:"
-    speed = constrain(speed, 0, 255);
-    if (speed > 0 && speed < 230) speed = 230;  // Minimum working PWM
-    analogWrite(BLOWER_RPWM_PIN, speed);
-    digitalWrite(BLOWER_LPWM_PIN, LOW);
-    blowerPWM = speed;
-    success = true;
-    message = "BLOWER SPEED " + String(speed);
-    Serial.println("{\"device\":\"blower\",\"action\":\"speed\",\"speed\":" + String(speed) + ",\"success\":true}");
-  }
-  
-  // Auger Commands: G:1 (Forward), G:2 (Reverse), G:0 (Stop)
-  else if (cmd.equals("G:1")) {
-    digitalWrite(AUGER_IN1_PIN, HIGH);
-    digitalWrite(AUGER_IN2_PIN, LOW);
-    analogWrite(AUGER_ENA_PIN, 200);
-    augerSpeed = 78;
-    success = true;
-    message = "AUGER FORWARD";
-    Serial.println("{\"device\":\"auger\",\"action\":\"forward\",\"success\":true}");
-  }
-  else if (cmd.equals("G:2")) {
-    digitalWrite(AUGER_IN1_PIN, LOW);
-    digitalWrite(AUGER_IN2_PIN, HIGH);
-    analogWrite(AUGER_ENA_PIN, 200);
-    augerSpeed = 78;
-    success = true;
-    message = "AUGER REVERSE";
-    Serial.println("{\"device\":\"auger\",\"action\":\"reverse\",\"success\":true}");
-  }
-  else if (cmd.equals("G:0")) {
-    analogWrite(AUGER_ENA_PIN, 0);
-    augerSpeed = 0;
-    success = true;
-    message = "AUGER STOP";
-    Serial.println("{\"device\":\"auger\",\"action\":\"stop\",\"success\":true}");
-  }
-  
-  // Actuator Commands: A:1 (Up), A:2 (Down), A:0 (Stop)
-  else if (cmd.equals("A:1")) {
-    digitalWrite(ACTUATOR_IN1_PIN, HIGH);
-    digitalWrite(ACTUATOR_IN2_PIN, LOW);
-    analogWrite(ACTUATOR_ENA_PIN, 255);
-    success = true;
-    message = "ACTUATOR UP";
-    Serial.println("{\"device\":\"actuator\",\"action\":\"up\",\"success\":true}");
-  }
-  else if (cmd.equals("A:2")) {
-    digitalWrite(ACTUATOR_IN1_PIN, LOW);
-    digitalWrite(ACTUATOR_IN2_PIN, HIGH);
-    analogWrite(ACTUATOR_ENA_PIN, 255);
-    success = true;
-    message = "ACTUATOR DOWN";
-    Serial.println("{\"device\":\"actuator\",\"action\":\"down\",\"success\":true}");
-  }
-  else if (cmd.equals("A:0")) {
-    analogWrite(ACTUATOR_ENA_PIN, 0);
-    success = true;
-    message = "ACTUATOR STOP";
-    Serial.println("{\"device\":\"actuator\",\"action\":\"stop\",\"success\":true}");
-  }
-  
-  // Feed Commands: FEED:small, FEED:medium, FEED:large
-  else if (cmd.equals("FEED:small")) {
-    // Small feed - run auger for short time
-    digitalWrite(AUGER_IN1_PIN, HIGH);
-    digitalWrite(AUGER_IN2_PIN, LOW);
-    analogWrite(AUGER_ENA_PIN, 150);
-    delay(1000);  // 1 second
-    analogWrite(AUGER_ENA_PIN, 0);
-    success = true;
-    message = "FEED SMALL";
-    Serial.println("{\"device\":\"feeder\",\"action\":\"small\",\"success\":true}");
-  }
-  else if (cmd.equals("FEED:medium")) {
-    // Medium feed
-    digitalWrite(AUGER_IN1_PIN, HIGH);
-    digitalWrite(AUGER_IN2_PIN, LOW);
-    analogWrite(AUGER_ENA_PIN, 200);
-    delay(2000);  // 2 seconds
-    analogWrite(AUGER_ENA_PIN, 0);
-    success = true;
-    message = "FEED MEDIUM";
-    Serial.println("{\"device\":\"feeder\",\"action\":\"medium\",\"success\":true}");
-  }
-  else if (cmd.equals("FEED:large")) {
-    // Large feed
-    digitalWrite(AUGER_IN1_PIN, HIGH);
-    digitalWrite(AUGER_IN2_PIN, LOW);
-    analogWrite(AUGER_ENA_PIN, 255);
-    delay(3000);  // 3 seconds
-    analogWrite(AUGER_ENA_PIN, 0);
-    success = true;
-    message = "FEED LARGE";
-    Serial.println("{\"device\":\"feeder\",\"action\":\"large\",\"success\":true}");
-  }
-  
-  else {
-    success = false;
-    message = "UNKNOWN COMMAND: " + cmd;
-    Serial.println("{\"error\":\"Unknown command\",\"command\":\"" + cmd + "\",\"success\":false}");
-  }
-  
-  if (success) {
-    Serial.println("✅ " + message);
-  }
-}

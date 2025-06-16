@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Switch } from "@heroui/switch";
@@ -8,25 +9,30 @@ import { Divider } from "@heroui/divider";
 import {
   // IoMdSettings,
   IoMdWifi,
+  IoMdNotifications,
   IoMdSave,
   IoMdRefresh,
   IoMdTrash,
+  IoMdDownload,
+  IoMdCloudUpload,
 } from "react-icons/io";
 import {
   // FaTemperatureHigh,
   FaWeight,
   FaClock,
+  FaDatabase,
+  FaCog,
+  FaShieldAlt,
   FaArrowUp,
   FaArrowDown,
   FaTabletAlt,
+  FaSlidersH,
 } from "react-icons/fa";
-import { MdInfo, MdScale } from "react-icons/md";
-
-import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
-import { FishFeederApiClient } from "../config/api";
+import { MdInfo, MdAutoDelete, MdBackup, MdScale, MdTune } from "react-icons/md";
+import { FishFeederApiClient, API_CONFIG } from "../config/api";
+import { useApi } from "../contexts/ApiContext";
 import MotorPWMSettings from "../components/MotorPWMSettings";
 import JsonDebugSettings from "../components/JsonDebugSettings";
-import RelayControlPanel from "../components/RelayControlPanel";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -36,9 +42,7 @@ const Settings = () => {
   const [apiClient] = useState(new FishFeederApiClient());
 
   // HX711 Calibration State
-  const [calibrationMode, setCalibrationMode] = useState<
-    "idle" | "calibrating" | "tare"
-  >("idle");
+  const [calibrationMode, setCalibrationMode] = useState<"idle" | "calibrating" | "tare">("idle");
   const [currentWeight, setCurrentWeight] = useState<number>(0);
   const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
   const [calibrationStep, setCalibrationStep] = useState<number>(0);
@@ -66,10 +70,10 @@ const Settings = () => {
       auto_feed_schedule: [] as Array<{ time: string; amount: number }>,
     },
     display: {
-      mode: "desktop" as "desktop" | "7inch",
+      mode: 'desktop' as 'desktop' | '7inch',
       touchOptimized: false,
-      fontSize: "normal" as "small" | "normal" | "large",
-      buttonSize: "normal" as "small" | "normal" | "large",
+      fontSize: 'normal' as 'small' | 'normal' | 'large',
+      buttonSize: 'normal' as 'small' | 'normal' | 'large',
       showAdvancedControls: true,
     },
   });
@@ -94,37 +98,39 @@ const Settings = () => {
 
     // 🎯 ON-DEMAND MODE: No auto-refresh intervals!
     // Use manual refresh button for updates
+    console.log('🎯 Settings: ON-DEMAND MODE - Use refresh button for updates');
+
+    // No setInterval polling for better performance!
   }, []);
 
   // Load system configuration
   const loadConfiguration = async () => {
-    setLoading((prev) => ({ ...prev, config: true }));
+    setLoading(prev => ({ ...prev, config: true }));
     try {
+      console.log("🔄 Loading configuration data...");
+      
       // Use Firebase instead of API client
       // For now, use default config since Firebase doesn't have getConfig
       const data = null; // await firebaseClient.getConfig() - not implemented
-
+      
       if (data && (data as any).config) {
         const configData = (data as any).config;
-
         setConfig({
           timing: {
             sensor_read_interval: configData.sensor_read_interval || 5,
             firebase_sync_interval: configData.firebase_sync_interval || 10,
-            websocket_broadcast_interval:
-              configData.websocket_broadcast_interval || 3,
+            websocket_broadcast_interval: configData.websocket_broadcast_interval || 3,
           },
           feeding: {
             auto_feed_enabled: configData.auto_feed_enabled || false,
             auto_feed_schedule: configData.auto_feed_schedule || [],
           },
           display: {
-            mode: configData.display?.mode || "desktop",
+            mode: configData.display?.mode || 'desktop',
             touchOptimized: configData.display?.touchOptimized || false,
-            fontSize: configData.display?.fontSize || "normal",
-            buttonSize: configData.display?.buttonSize || "normal",
-            showAdvancedControls:
-              configData.display?.showAdvancedControls !== false,
+            fontSize: configData.display?.fontSize || 'normal',
+            buttonSize: configData.display?.buttonSize || 'normal',
+            showAdvancedControls: configData.display?.showAdvancedControls !== false,
           },
         });
         showMessage("success", "⚙️ โหลดการตั้งค่าสำเร็จ");
@@ -132,6 +138,7 @@ const Settings = () => {
         throw new Error("No config data received");
       }
     } catch (error) {
+      console.log("Config load failed, using defaults:", error);
       // Fallback to default config
       setConfig({
         timing: {
@@ -144,79 +151,48 @@ const Settings = () => {
           auto_feed_schedule: [],
         },
         display: {
-          mode: "desktop",
+          mode: 'desktop',
           touchOptimized: false,
-          fontSize: "normal",
-          buttonSize: "normal",
+          fontSize: 'normal',
+          buttonSize: 'normal',
           showAdvancedControls: true,
         },
       });
       showMessage("info", "⚙️ ใช้การตั้งค่าเริ่มต้น (ออฟไลน์)");
     } finally {
-      setLoading((prev) => ({ ...prev, config: false }));
+      setLoading(prev => ({ ...prev, config: false }));
     }
   };
 
   // Load system status via Firebase
   const loadSystemStatus = async () => {
-    setLoading((prev) => ({ ...prev, status: true }));
+    setLoading(prev => ({ ...prev, status: true }));
     try {
-      // ⚡ REAL CONNECTION CHECK - No hardcoded values!
-      const { firebaseClient } = await import("../config/firebase");
-
-      // Test Firebase connection
-      let firebaseConnected = false;
-      let arduinoConnected = false;
-      let piServerConnected = false;
-
-      try {
-        // Test Firebase by trying to get sensor data
-        const testConnection = await new Promise((resolve) => {
-          const unsubscribe = firebaseClient.getSensorData((data) => {
-            unsubscribe();
-            resolve(data !== null);
-          });
-
-          // Timeout after 5 seconds
-          setTimeout(() => {
-            unsubscribe();
-            resolve(false);
-          }, 5000);
-        });
-
-        firebaseConnected = !!testConnection;
-
-        // Test Arduino connection by sending health check
-        if (firebaseConnected) {
-          const arduinoResponse =
-            await firebaseClient.sendArduinoCommand("S:HEALTH");
-
-          arduinoConnected = !!arduinoResponse;
-          piServerConnected = !!arduinoResponse; // Pi server needed for Arduino communication
-        }
-      } catch (error) {
-        firebaseConnected = false;
-        arduinoConnected = false;
-        piServerConnected = false;
-      }
-
+      // Use Firebase to check system status
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.sendArduinoCommand("S:HEALTH");
+      
       setSystemStatus({
-        arduino_connected: arduinoConnected,
-        firebase_connected: firebaseConnected,
-        camera_active: false, // Camera requires Pi server
-        websocket_enabled: piServerConnected,
-        pi_server_connected: piServerConnected,
+        arduino_connected: success,
+        firebase_connected: true, // Always true in web app
+        camera_active: false, // Would need camera status endpoint
+        websocket_enabled: success,
+        pi_server_connected: success,
       });
     } catch (error) {
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+      console.error("Status check failed:", error);
+      }
       setSystemStatus({
         arduino_connected: false,
-        firebase_connected: false,
+        firebase_connected: true,
         camera_active: false,
         websocket_enabled: false,
         pi_server_connected: false,
       });
     } finally {
-      setLoading((prev) => ({ ...prev, status: false }));
+      setLoading(prev => ({ ...prev, status: false }));
     }
   };
 
@@ -224,8 +200,8 @@ const Settings = () => {
   const startWeightMonitoring = async () => {
     try {
       // Use Firebase to get sensor data
-      const { firebaseClient } = await import("../config/firebase");
-
+      const { firebaseClient } = await import('../config/firebase');
+      
       // Get sensor data from Firebase
       const unsubscribe = firebaseClient.getSensorData((data) => {
         if (data?.sensors?.HX711_FEEDER?.weight) {
@@ -233,16 +209,14 @@ const Settings = () => {
           setIsCalibrated(true);
         }
       });
-
+      
       // ⚡ IMMEDIATE CLEANUP - No setTimeout delays!
       // Cleanup happens when component unmounts or effect re-runs
       return () => unsubscribe();
     } catch (error) {
       // Only log non-connection errors
-      if (
-        error instanceof Error &&
-        !error.message.includes("CONNECTION_FAILED")
-      ) {
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+      console.error("Weight monitoring failed:", error);
       }
     }
   };
@@ -263,20 +237,18 @@ const Settings = () => {
 
   // HX711 Calibration Functions with Firebase
   const startFirebaseCalibration = async () => {
-    setLoading((prev) => ({ ...prev, calibration: true }));
+    setLoading(prev => ({ ...prev, calibration: true }));
     setCalibrationMode("calibrating");
     setCalibrationStep(1);
     setCalibrationMessage("🎯 กำลังเริ่มการปรับเทียบ HX711...");
 
     try {
       const weight = parseFloat(knownWeight);
-
       if (weight <= 0) {
         throw new Error("น้ำหนักต้องมากกว่า 0");
       }
 
       const success = await calibrateWeight(weight);
-
       if (success) {
         setCalibrationMessage("✅ ปรับเทียบสำเร็จ! น้ำหนักจะแม่นยำขึ้น");
         setIsCalibrated(true);
@@ -288,19 +260,18 @@ const Settings = () => {
       setCalibrationMessage(`❌ ปรับเทียบล้มเหลว: ${error}`);
       showMessage("error", "❌ ปรับเทียบล้มเหลว");
     } finally {
-      setLoading((prev) => ({ ...prev, calibration: false }));
+      setLoading(prev => ({ ...prev, calibration: false }));
       setCalibrationMode("idle");
     }
   };
 
   const performFirebaseTare = async () => {
-    setLoading((prev) => ({ ...prev, calibration: true }));
+    setLoading(prev => ({ ...prev, calibration: true }));
     setCalibrationMode("tare");
     setCalibrationMessage("⚖️ กำลัง Tare ตาชั่ง...");
 
     try {
       const success = await tareWeight();
-
       if (success) {
         setCalibrationMessage("✅ Tare สำเร็จ! ตาชั่งถูกรีเซ็ตแล้ว");
         showMessage("success", "⚖️ Tare ตาชั่งสำเร็จ");
@@ -311,7 +282,7 @@ const Settings = () => {
       setCalibrationMessage(`❌ Tare ล้มเหลว: ${error}`);
       showMessage("error", "❌ Tare ล้มเหลว");
     } finally {
-      setLoading((prev) => ({ ...prev, calibration: false }));
+      setLoading(prev => ({ ...prev, calibration: false }));
       setCalibrationMode("idle");
     }
   };
@@ -320,65 +291,63 @@ const Settings = () => {
   const startCalibration = async () => {
     setCalibrationMode("calibrating");
     setCalibrationStep(1);
-    setCalibrationMessage(
-      "📏 กรุณานำวัตถุทุกอย่างออกจากเครื่องชั่ง แล้วกด 'เริ่มปรับเทียร์'",
-    );
+    setCalibrationMessage("📏 กรุณานำวัตถุทุกอย่างออกจากเครื่องชั่ง แล้วกด 'เริ่มปรับเทียร์'");
   };
 
   const performTare = async () => {
-    setLoading((prev) => ({ ...prev, calibration: true }));
+    setLoading(prev => ({ ...prev, calibration: true }));
     try {
       setCalibrationMessage("⏳ กำลังปรับเทียร์เครื่องชั่ง...");
-
+      
       // Use Firebase tare weight
-      const { firebaseClient } = await import("../config/firebase");
+      const { firebaseClient } = await import('../config/firebase');
       const success = await firebaseClient.tareWeight();
-
       if (success) {
         setCalibrationStep(2);
-        setCalibrationMessage(
-          `✅ ปรับเทียร์สำเร็จ! ตอนนี้วางน้ำหนักมาตรฐาน ${knownWeight} กรัม แล้วกด 'ปรับค่า'`,
-        );
+        setCalibrationMessage(`✅ ปรับเทียร์สำเร็จ! ตอนนี้วางน้ำหนักมาตรฐาน ${knownWeight} กรัม แล้วกด 'ปรับค่า'`);
         showMessage("success", "🎯 ปรับเทียร์เครื่องชั่งสำเร็จ");
       } else {
-        throw new Error("Tare failed");
+        throw new Error('Tare failed');
       }
     } catch (error) {
+      // Only log non-connection errors
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+      console.error("Tare failed:", error);
+      }
       setCalibrationMessage("❌ การปรับเทียร์ล้มเหลว กรุณาลองใหม่");
       showMessage("error", "❌ การปรับเทียร์ล้มเหลว");
     } finally {
-      setLoading((prev) => ({ ...prev, calibration: false }));
+      setLoading(prev => ({ ...prev, calibration: false }));
     }
   };
 
   const performCalibration = async () => {
-    setLoading((prev) => ({ ...prev, calibration: true }));
+    setLoading(prev => ({ ...prev, calibration: true }));
     try {
       setCalibrationMessage("⏳ กำลังปรับค่าเครื่องชั่ง...");
-
+      
       const weightInKg = parseFloat(knownWeight) / 1000; // Convert grams to kg
       // Use Firebase calibrate weight
-      const { firebaseClient } = await import("../config/firebase");
+      const { firebaseClient } = await import('../config/firebase');
       const success = await firebaseClient.calibrateWeight(weightInKg);
-
+      
       if (success) {
         setCalibrationStep(3);
         setCalibrationMessage("🎉 ปรับค่าเครื่องชั่งสำเร็จ! ระบบพร้อมใช้งาน");
         setIsCalibrated(true);
         setCalibrationMode("idle");
         showMessage("success", "🎉 ปรับค่าเครื่องชั่งสำเร็จ");
-
+        
         // ⚡ IMMEDIATE RESPONSE - No setTimeout delays!
       } else {
-        throw new Error("Calibration failed");
+        throw new Error('Calibration failed');
       }
     } catch (error) {
-      setCalibrationMessage(
-        "❌ การปรับค่าล้มเหลว กรุณาตรวจสอบน้ำหนักและลองใหม่",
-      );
+      console.error("Calibration failed:", error);
+      setCalibrationMessage("❌ การปรับค่าล้มเหลว กรุณาตรวจสอบน้ำหนักและลองใหม่");
       showMessage("error", "❌ การปรับค่าเครื่องชั่งล้มเหลว");
     } finally {
-      setLoading((prev) => ({ ...prev, calibration: false }));
+      setLoading(prev => ({ ...prev, calibration: false }));
     }
   };
 
@@ -407,21 +376,15 @@ const Settings = () => {
 
   // Save configuration
   const saveConfiguration = async () => {
-    setLoading((prev) => ({ ...prev, config: true }));
+    setLoading(prev => ({ ...prev, config: true }));
     try {
       // Would need save config endpoint
       showMessage("success", "💾 บันทึกการตั้งค่าสำเร็จ");
     } catch (error) {
       showMessage("error", "❌ การบันทึกล้มเหลว");
     } finally {
-      setLoading((prev) => ({ ...prev, config: false }));
+      setLoading(prev => ({ ...prev, config: false }));
     }
-  };
-
-  // Add proper error handling without console statements
-  const handleError = (operation: string, error: any) => {
-    // Log to error reporting service in production
-    // For now, just store in state for user feedback
   };
 
   return (
@@ -439,12 +402,12 @@ const Settings = () => {
           </div>
           <Button
             color="primary"
-            isLoading={loading.config || loading.status}
             startContent={<IoMdRefresh />}
             onPress={() => {
               loadConfiguration();
               loadSystemStatus();
             }}
+            isLoading={loading.config || loading.status}
           >
             รีเฟรช
           </Button>
@@ -452,15 +415,13 @@ const Settings = () => {
 
         {/* Message Display */}
         {message && (
-          <div
-            className={`mt-4 p-3 rounded-lg border ${
-              message.type === "success"
-                ? "bg-green-50 border-green-200 text-green-800"
-                : message.type === "error"
-                  ? "bg-red-50 border-red-200 text-red-800"
-                  : "bg-blue-50 border-blue-200 text-blue-800"
-            }`}
-          >
+          <div className={`mt-4 p-3 rounded-lg border ${
+            message.type === "success" 
+              ? "bg-green-50 border-green-200 text-green-800" 
+              : message.type === "error"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-blue-50 border-blue-200 text-blue-800"
+          }`}>
             {message.text}
           </div>
         )}
@@ -481,9 +442,7 @@ const Settings = () => {
                 {currentWeight.toFixed(3)} kg
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {isCalibrated
-                  ? "✅ เครื่องชั่งพร้อมใช้งาน"
-                  : "⚠️ ต้องปรับค่าเครื่องชั่ง"}
+                {isCalibrated ? "✅ เครื่องชั่งพร้อมใช้งาน" : "⚠️ ต้องปรับค่าเครื่องชั่ง"}
               </div>
             </div>
           </div>
@@ -492,44 +451,41 @@ const Settings = () => {
           {calibrationMode === "idle" ? (
             <div className="space-y-4">
               <div>
-                <label
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  htmlFor="known-weight-input"
-                >
+                <label htmlFor="known-weight-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   น้ำหนักมาตรฐาน (กรัม)
                 </label>
                 <Input
-                  aria-label="น้ำหนักมาตรฐานสำหรับปรับค่าเครื่องชั่ง"
                   id="known-weight-input"
-                  max="5000"
-                  min="100"
                   name="knownWeight"
-                  placeholder="1000"
-                  step="100"
                   type="number"
+                  placeholder="1000"
                   value={knownWeight}
                   onChange={(e) => setKnownWeight(e.target.value)}
+                  min="100"
+                  max="5000"
+                  step="100"
+                  aria-label="น้ำหนักมาตรฐานสำหรับปรับค่าเครื่องชั่ง"
                 />
               </div>
 
               <div className="space-y-3">
                 <div className="flex gap-3">
                   <Button
-                    className="flex-1"
                     color="primary"
-                    isLoading={loading.calibration}
+                    className="flex-1"
                     startContent={<FaWeight />}
                     onPress={startFirebaseCalibration}
+                    isLoading={loading.calibration}
                   >
                     🔥 Firebase Calibrate
                   </Button>
-
+                  
                   <Button
-                    className="flex-1"
                     color="secondary"
-                    isLoading={loading.calibration}
+                    className="flex-1"
                     startContent={<MdScale />}
                     onPress={performFirebaseTare}
+                    isLoading={loading.calibration}
                   >
                     ⚖️ Firebase Tare
                   </Button>
@@ -539,19 +495,19 @@ const Settings = () => {
 
                 <div className="flex gap-3">
                   <Button
-                    className="flex-1"
                     color="default"
+                    className="flex-1"
                     startContent={<FaWeight />}
-                    variant="bordered"
                     onPress={startCalibration}
+                    variant="bordered"
                   >
                     🔌 Local Calibrate
                   </Button>
-
+                  
                   <Button
                     color="warning"
-                    startContent={<IoMdTrash />}
                     variant="bordered"
+                    startContent={<IoMdTrash />}
                     onPress={resetCalibration}
                   >
                     รีเซ็ต
@@ -569,9 +525,7 @@ const Settings = () => {
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
                 <div className="flex items-center text-yellow-700 dark:text-yellow-300 mb-2">
                   <FaClock className="mr-2" />
-                  <span className="font-medium">
-                    ขั้นตอนที่ {calibrationStep}/3
-                  </span>
+                  <span className="font-medium">ขั้นตอนที่ {calibrationStep}/3</span>
                 </div>
                 <p className="text-sm text-yellow-600 dark:text-yellow-400">
                   {calibrationMessage}
@@ -582,23 +536,23 @@ const Settings = () => {
               <div className="flex gap-3">
                 {calibrationStep === 1 && (
                   <Button
-                    className="flex-1"
                     color="success"
-                    isLoading={loading.calibration}
+                    className="flex-1"
                     startContent={<FaArrowDown />}
                     onPress={performTare}
+                    isLoading={loading.calibration}
                   >
                     เริ่มปรับเทียร์ (Tare)
                   </Button>
                 )}
-
+                
                 {calibrationStep === 2 && (
                   <Button
-                    className="flex-1"
                     color="success"
-                    isLoading={loading.calibration}
+                    className="flex-1"
                     startContent={<FaArrowUp />}
                     onPress={performCalibration}
+                    isLoading={loading.calibration}
                   >
                     ปรับค่า ({knownWeight}g)
                   </Button>
@@ -606,9 +560,9 @@ const Settings = () => {
 
                 <Button
                   color="danger"
-                  isDisabled={loading.calibration}
                   variant="bordered"
                   onPress={cancelCalibration}
+                  isDisabled={loading.calibration}
                 >
                   ยกเลิก
                 </Button>
@@ -632,19 +586,12 @@ const Settings = () => {
               "WebSocket Server": systemStatus.websocket_enabled,
               "Pi Server": systemStatus.pi_server_connected,
             }).map(([name, status]) => (
-              <div
-                key={name}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-              >
+              <div key={name} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {name}
                 </span>
-                <div
-                  className={`flex items-center ${status ? "text-green-600" : "text-red-600"}`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full mr-2 ${status ? "bg-green-500" : "bg-red-500"}`}
-                  />
+                <div className={`flex items-center ${status ? "text-green-600" : "text-red-600"}`}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${status ? "bg-green-500" : "bg-red-500"}`} />
                   <span className="text-sm font-medium">
                     {status ? "Connected" : "Disconnected"}
                   </span>
@@ -663,96 +610,65 @@ const Settings = () => {
 
           <div className="space-y-6">
             <div>
-              <label
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                id="sensor-read-interval-label"
-              >
+              <label id="sensor-read-interval-label" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Sensor Read Interval: {config.timing.sensor_read_interval}s
               </label>
               <Slider
-                aria-label={`Sensor read interval: ${config.timing.sensor_read_interval} seconds`}
-                aria-labelledby="sensor-read-interval-label"
-                className="max-w-md"
-                maxValue={10}
-                minValue={1}
                 name="sensorReadInterval"
                 size="sm"
                 step={1}
+                minValue={1}
+                maxValue={10}
                 value={config.timing.sensor_read_interval}
-                onChange={(value) =>
-                  setConfig((prev) => ({
-                    ...prev,
-                    timing: {
-                      ...prev.timing,
-                      sensor_read_interval: Array.isArray(value)
-                        ? value[0]
-                        : value,
-                    },
-                  }))
-                }
+                onChange={(value) => setConfig(prev => ({
+                  ...prev,
+                  timing: { ...prev.timing, sensor_read_interval: Array.isArray(value) ? value[0] : value }
+                }))}
+                className="max-w-md"
+                aria-labelledby="sensor-read-interval-label"
+                aria-label={`Sensor read interval: ${config.timing.sensor_read_interval} seconds`}
               />
             </div>
 
             <div>
-              <label
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                id="firebase-sync-interval-label"
-              >
+              <label id="firebase-sync-interval-label" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Firebase Sync Interval: {config.timing.firebase_sync_interval}s
               </label>
               <Slider
-                aria-label={`Firebase sync interval: ${config.timing.firebase_sync_interval} seconds`}
-                aria-labelledby="firebase-sync-interval-label"
-                className="max-w-md"
-                maxValue={30}
-                minValue={1}
                 name="firebaseSyncInterval"
                 size="sm"
                 step={1}
+                minValue={1}
+                maxValue={30}
                 value={config.timing.firebase_sync_interval}
-                onChange={(value) =>
-                  setConfig((prev) => ({
-                    ...prev,
-                    timing: {
-                      ...prev.timing,
-                      firebase_sync_interval: Array.isArray(value)
-                        ? value[0]
-                        : value,
-                    },
-                  }))
-                }
+                onChange={(value) => setConfig(prev => ({
+                  ...prev,
+                  timing: { ...prev.timing, firebase_sync_interval: Array.isArray(value) ? value[0] : value }
+                }))}
+                className="max-w-md"
+                aria-labelledby="firebase-sync-interval-label"
+                aria-label={`Firebase sync interval: ${config.timing.firebase_sync_interval} seconds`}
               />
             </div>
 
             <div>
-              <label
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                id="websocket-broadcast-interval-label"
-              >
-                WebSocket Broadcast:{" "}
-                {config.timing.websocket_broadcast_interval}s
+              <label id="websocket-broadcast-interval-label" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                WebSocket Broadcast: {config.timing.websocket_broadcast_interval}s
               </label>
               <Slider
-                aria-label={`WebSocket broadcast interval: ${config.timing.websocket_broadcast_interval} seconds`}
-                aria-labelledby="websocket-broadcast-interval-label"
-                className="max-w-md"
-                maxValue={10}
-                minValue={1}
                 name="websocketBroadcastInterval"
                 size="sm"
                 step={1}
+                minValue={1}
+                maxValue={10}
                 value={config.timing.websocket_broadcast_interval}
-                onChange={(value) =>
-                  setConfig((prev) => ({
-                    ...prev,
-                    timing: {
-                      ...prev.timing,
-                      websocket_broadcast_interval: Array.isArray(value)
-                        ? value[0]
-                        : value,
-                    },
-                  }))
-                }
+                onChange={(value) => setConfig(prev => ({
+                  ...prev,
+                  timing: { ...prev.timing, websocket_broadcast_interval: Array.isArray(value) ? value[0] : value }
+                }))}
+                className="max-w-md"
+                aria-labelledby="websocket-broadcast-interval-label"
+                aria-label={`WebSocket broadcast interval: ${config.timing.websocket_broadcast_interval} seconds`}
               />
             </div>
           </div>
@@ -762,19 +678,14 @@ const Settings = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
           <div className="flex items-center text-violet-500 dark:text-violet-400 mb-6">
             <FaTabletAlt className="mr-3 text-xl" />
-            <h2 className="text-xl font-semibold">
-              📱 7-Inch Display Settings
-            </h2>
+            <h2 className="text-xl font-semibold">📱 7-Inch Display Settings</h2>
           </div>
 
           <div className="space-y-6">
             {/* Display Mode Toggle */}
             <div className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-lg border border-violet-200 dark:border-violet-700">
               <div>
-                <label
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  id="display-mode-switch-label"
-                >
+                <label id="display-mode-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   📱 7-Inch Touch Mode
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -782,29 +693,23 @@ const Settings = () => {
                 </p>
               </div>
               <Switch
-                aria-labelledby="display-mode-switch-label"
-                color="secondary"
-                isSelected={config.display.mode === "7inch"}
                 name="displayMode"
+                isSelected={config.display.mode === '7inch'}
                 onValueChange={(checked) =>
-                  setConfig((prev) => ({
+                  setConfig(prev => ({
                     ...prev,
-                    display: {
-                      ...prev.display,
-                      mode: checked ? "7inch" : "desktop",
-                    },
+                    display: { ...prev.display, mode: checked ? '7inch' : 'desktop' }
                   }))
                 }
+                aria-labelledby="display-mode-switch-label"
+                color="secondary"
               />
             </div>
 
             {/* Touch Optimization */}
             <div className="flex items-center justify-between">
               <div>
-                <label
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  id="touch-optimized-switch-label"
-                >
+                <label id="touch-optimized-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   👆 Touch Optimization
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -812,16 +717,16 @@ const Settings = () => {
                 </p>
               </div>
               <Switch
-                aria-labelledby="touch-optimized-switch-label"
-                color="warning"
-                isSelected={config.display.touchOptimized}
                 name="touchOptimized"
+                isSelected={config.display.touchOptimized}
                 onValueChange={(checked) =>
-                  setConfig((prev) => ({
+                  setConfig(prev => ({
                     ...prev,
-                    display: { ...prev.display, touchOptimized: checked },
+                    display: { ...prev.display, touchOptimized: checked }
                   }))
                 }
+                aria-labelledby="touch-optimized-switch-label"
+                color="warning"
               />
             </div>
 
@@ -831,28 +736,18 @@ const Settings = () => {
                 🔤 Font Size
               </label>
               <div className="flex gap-2">
-                {(["small", "normal", "large"] as const).map((size) => (
+                {(['small', 'normal', 'large'] as const).map((size) => (
                   <Button
                     key={size}
-                    color={
-                      config.display.fontSize === size ? "secondary" : "default"
-                    }
                     size="sm"
-                    variant={
-                      config.display.fontSize === size ? "solid" : "bordered"
-                    }
-                    onPress={() =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        display: { ...prev.display, fontSize: size },
-                      }))
-                    }
+                    variant={config.display.fontSize === size ? "solid" : "bordered"}
+                    color={config.display.fontSize === size ? "secondary" : "default"}
+                    onPress={() => setConfig(prev => ({
+                      ...prev,
+                      display: { ...prev.display, fontSize: size }
+                    }))}
                   >
-                    {size === "small"
-                      ? "🔤 เล็ก"
-                      : size === "normal"
-                        ? "🔤 ปกติ"
-                        : "🔤 ใหญ่"}
+                    {size === 'small' ? '🔤 เล็ก' : size === 'normal' ? '🔤 ปกติ' : '🔤 ใหญ่'}
                   </Button>
                 ))}
               </div>
@@ -864,32 +759,18 @@ const Settings = () => {
                 🔘 Button Size
               </label>
               <div className="flex gap-2">
-                {(["small", "normal", "large"] as const).map((size) => (
+                {(['small', 'normal', 'large'] as const).map((size) => (
                   <Button
                     key={size}
-                    color={
-                      config.display.buttonSize === size
-                        ? "secondary"
-                        : "default"
-                    }
-                    size={
-                      size === "small" ? "sm" : size === "normal" ? "md" : "lg"
-                    }
-                    variant={
-                      config.display.buttonSize === size ? "solid" : "bordered"
-                    }
-                    onPress={() =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        display: { ...prev.display, buttonSize: size },
-                      }))
-                    }
+                    size={size === 'small' ? "sm" : size === 'normal' ? "md" : "lg"}
+                    variant={config.display.buttonSize === size ? "solid" : "bordered"}
+                    color={config.display.buttonSize === size ? "secondary" : "default"}
+                    onPress={() => setConfig(prev => ({
+                      ...prev,
+                      display: { ...prev.display, buttonSize: size }
+                    }))}
                   >
-                    {size === "small"
-                      ? "เล็ก"
-                      : size === "normal"
-                        ? "ปกติ"
-                        : "ใหญ่"}
+                    {size === 'small' ? 'เล็ก' : size === 'normal' ? 'ปกติ' : 'ใหญ่'}
                   </Button>
                 ))}
               </div>
@@ -898,10 +779,7 @@ const Settings = () => {
             {/* Advanced Controls */}
             <div className="flex items-center justify-between">
               <div>
-                <label
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  id="advanced-controls-switch-label"
-                >
+                <label id="advanced-controls-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   ⚙️ Advanced Controls
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -909,16 +787,16 @@ const Settings = () => {
                 </p>
               </div>
               <Switch
-                aria-labelledby="advanced-controls-switch-label"
-                color="danger"
-                isSelected={config.display.showAdvancedControls}
                 name="showAdvancedControls"
+                isSelected={config.display.showAdvancedControls}
                 onValueChange={(checked) =>
-                  setConfig((prev) => ({
+                  setConfig(prev => ({
                     ...prev,
-                    display: { ...prev.display, showAdvancedControls: checked },
+                    display: { ...prev.display, showAdvancedControls: checked }
                   }))
                 }
+                aria-labelledby="advanced-controls-switch-label"
+                color="danger"
               />
             </div>
 
@@ -928,40 +806,23 @@ const Settings = () => {
                 🎨 Preview Settings:
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                <div>
-                  📱 Mode:{" "}
-                  {config.display.mode === "7inch"
-                    ? "7-inch Touch Display"
-                    : "Desktop Mode"}
-                </div>
-                <div>
-                  👆 Touch:{" "}
-                  {config.display.touchOptimized ? "Enabled" : "Disabled"}
-                </div>
+                <div>📱 Mode: {config.display.mode === '7inch' ? '7-inch Touch Display' : 'Desktop Mode'}</div>
+                <div>👆 Touch: {config.display.touchOptimized ? 'Enabled' : 'Disabled'}</div>
                 <div>🔤 Font: {config.display.fontSize}</div>
                 <div>🔘 Buttons: {config.display.buttonSize}</div>
-                <div>
-                  ⚙️ Advanced:{" "}
-                  {config.display.showAdvancedControls ? "Shown" : "Hidden"}
-                </div>
+                <div>⚙️ Advanced: {config.display.showAdvancedControls ? 'Shown' : 'Hidden'}</div>
               </div>
             </div>
 
             {/* Apply Button */}
             <Button
-              className="w-full"
               color="secondary"
               variant="solid"
+              className="w-full"
               onPress={() => {
                 // Apply display settings to localStorage or global context
-                localStorage.setItem(
-                  "display_settings",
-                  JSON.stringify(config.display),
-                );
-                showMessage(
-                  "success",
-                  "🎨 Display settings applied! Refresh page to see changes.",
-                );
+                localStorage.setItem('display_settings', JSON.stringify(config.display));
+                showMessage("success", "🎨 Display settings applied! Refresh page to see changes.");
               }}
             >
               🎨 Apply 7-Inch Settings
@@ -981,15 +842,12 @@ const Settings = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <Button
                 color="success"
-                size="sm"
                 variant="flat"
+                size="sm"
                 onPress={() => {
-                  import("../utils/modalSettings").then(({ uiSettings }) => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
                     uiSettings.enableSplash();
-                    showMessage(
-                      "success",
-                      "🎬 Splash screen enabled - refresh to see",
-                    );
+                    showMessage("success", "🎬 Splash screen enabled - refresh to see");
                   });
                 }}
               >
@@ -998,10 +856,10 @@ const Settings = () => {
 
               <Button
                 color="danger"
-                size="sm"
                 variant="flat"
+                size="sm"
                 onPress={() => {
-                  import("../utils/modalSettings").then(({ uiSettings }) => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
                     uiSettings.disableSplash();
                     showMessage("success", "🚫 Splash screen disabled");
                   });
@@ -1009,13 +867,13 @@ const Settings = () => {
               >
                 🚫 Disable Splash
               </Button>
-
+              
               <Button
                 color="warning"
-                size="sm"
                 variant="flat"
+                size="sm"
                 onPress={() => {
-                  import("../utils/modalSettings").then(({ uiSettings }) => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
                     uiSettings.enableMinimalMode();
                     showMessage("success", "🎯 Minimal UI mode enabled");
                   });
@@ -1023,13 +881,13 @@ const Settings = () => {
               >
                 🎯 Minimal Mode
               </Button>
-
+              
               <Button
                 color="secondary"
-                size="sm"
                 variant="flat"
+                size="sm"
                 onPress={() => {
-                  import("../utils/modalSettings").then(({ uiSettings }) => {
+                  import('../utils/modalSettings').then(({ uiSettings }) => {
                     uiSettings.resetSplash();
                     showMessage("success", "🔄 Splash reset - refresh to see");
                   });
@@ -1050,23 +908,15 @@ const Settings = () => {
                   <div>
                     <strong>URL Parameters:</strong>
                     <div className="mt-1 space-y-1">
-                      <div>
-                        • <code>?splash=true</code> - Force show splash
-                      </div>
-                      <div>
-                        • <code>?nosplash=true</code> - Force skip splash
-                      </div>
-                      <div>
-                        • <code>?minimal=true</code> - Minimal UI mode
-                      </div>
+                      <div>• <code>?splash=true</code> - Force show splash</div>
+                      <div>• <code>?nosplash=true</code> - Force skip splash</div>
+                      <div>• <code>?minimal=true</code> - Minimal UI mode</div>
                     </div>
                   </div>
                   <div>
                     <strong>Quick Access:</strong>
                     <div className="mt-1 space-y-1">
-                      <div>
-                        • Visit <code>/splash</code> directly
-                      </div>
+                      <div>• Visit <code>/splash</code> directly</div>
                       <div>• Use buttons above to control</div>
                       <div>• Refresh page after changes</div>
                     </div>
@@ -1078,16 +928,13 @@ const Settings = () => {
             {/* Reset Button */}
             <Button
               color="default"
-              size="sm"
               variant="bordered"
+              size="sm"
               onPress={() => {
-                localStorage.removeItem("splash-disabled");
-                localStorage.removeItem("splash-seen");
-                localStorage.removeItem("ui-settings");
-                showMessage(
-                  "info",
-                  "🔄 UI settings reset - refresh page to apply",
-                );
+                localStorage.removeItem('splash-disabled');
+                localStorage.removeItem('splash-seen');
+                localStorage.removeItem('ui-settings');
+                showMessage("info", "🔄 UI settings reset - refresh page to apply");
               }}
             >
               🔄 Reset UI Settings
@@ -1101,9 +948,6 @@ const Settings = () => {
         {/* Firebase JSON Debug Settings */}
         <JsonDebugSettings />
 
-        {/* Relay Control Panel */}
-        <RelayControlPanel />
-
         {/* Auto Feed Configuration */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">
           <div className="flex items-center text-orange-500 dark:text-orange-400 mb-6">
@@ -1114,10 +958,7 @@ const Settings = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <label
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  id="auto-feed-switch-label"
-                >
+                <label id="auto-feed-switch-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Enable Auto Feed
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -1125,16 +966,16 @@ const Settings = () => {
                 </p>
               </div>
               <Switch
-                aria-label="Enable automatic feeding schedule"
-                aria-labelledby="auto-feed-switch-label"
-                isSelected={config.feeding.auto_feed_enabled}
                 name="autoFeedEnabled"
+                isSelected={config.feeding.auto_feed_enabled}
                 onValueChange={(checked) =>
-                  setConfig((prev) => ({
+                  setConfig(prev => ({
                     ...prev,
-                    feeding: { ...prev.feeding, auto_feed_enabled: checked },
+                    feeding: { ...prev.feeding, auto_feed_enabled: checked }
                   }))
                 }
+                aria-labelledby="auto-feed-switch-label"
+                aria-label="Enable automatic feeding schedule"
               />
             </div>
 
@@ -1144,8 +985,8 @@ const Settings = () => {
                 <span className="font-medium">Schedule Status</span>
               </div>
               <p className="text-sm text-orange-600 dark:text-orange-400">
-                {config.feeding.auto_feed_schedule.length === 0
-                  ? "No feeding schedule configured"
+                {config.feeding.auto_feed_schedule.length === 0 
+                  ? "No feeding schedule configured" 
                   : `${config.feeding.auto_feed_schedule.length} scheduled feeding times`}
               </p>
             </div>
@@ -1158,10 +999,10 @@ const Settings = () => {
         <div className="flex justify-center">
           <Button
             color="success"
-            isLoading={loading.config}
             size="lg"
             startContent={<IoMdSave />}
             onPress={saveConfiguration}
+            isLoading={loading.config}
           >
             💾 Save All Settings
           </Button>

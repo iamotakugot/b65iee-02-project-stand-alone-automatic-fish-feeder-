@@ -1,24 +1,11 @@
 import React, { useState, useEffect } from "react";
-import {
-  FaTemperatureHigh,
-  FaWeight,
-  FaBatteryThreeQuarters,
-  FaWifi,
-  FaExclamationTriangle,
-} from "react-icons/fa";
-import { MdWifiOff } from "react-icons/md";
+import { FaTemperatureHigh, FaWeight, FaBatteryThreeQuarters, FaWifi, FaExclamationTriangle } from "react-icons/fa";
+import { WiHumidity } from "react-icons/wi";
+import { IoWaterOutline } from "react-icons/io5";
 import { BsLightningCharge, BsSun } from "react-icons/bs";
 import { GiWateringCan } from "react-icons/gi";
-import {
-  MdSignalWifiConnectedNoInternet4,
-  MdSignalWifi4Bar,
-} from "react-icons/md";
-
-import {
-  convertFirebaseToSensorValues,
-  formatSensorValue,
-  DashboardSensorValues,
-} from "../utils/firebaseSensorUtils";
+import { MdSignalWifiConnectedNoInternet4, MdSignalWifi4Bar } from "react-icons/md";
+import { convertFirebaseToSensorValues, formatSensorValue, DashboardSensorValues } from "../utils/firebaseSensorUtils";
 import { ArduinoSensorData } from "../config/firebase";
 
 interface DashboardSensorPanelProps {
@@ -36,21 +23,20 @@ interface SensorCardProps {
   lastUpdate?: string;
 }
 
-const SensorCard: React.FC<SensorCardProps> = ({
-  icon,
-  label,
-  value,
-  unit,
-  bgColor,
+const SensorCard: React.FC<SensorCardProps> = ({ 
+  icon, 
+  label, 
+  value, 
+  unit, 
+  bgColor, 
   iconColor,
-  lastUpdate,
+  lastUpdate 
 }) => {
-  const displayValue =
-    value !== null && value !== undefined
-      ? typeof value === "number"
-        ? value.toFixed(1)
-        : value.toString()
-      : "--";
+  const displayValue = value !== null && value !== undefined 
+    ? typeof value === 'number' 
+      ? value.toFixed(1) 
+      : value.toString()
+    : "--";
 
   return (
     <div className={`${bgColor} rounded-lg p-4 border shadow-sm`}>
@@ -58,11 +44,12 @@ const SensorCard: React.FC<SensorCardProps> = ({
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {label}
         </span>
-        <div className={iconColor}>{icon}</div>
+        <div className={iconColor}>
+          {icon}
+        </div>
       </div>
       <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-        {displayValue}
-        {displayValue !== "--" ? unit : ""}
+        {displayValue}{displayValue !== "--" ? unit : ""}
       </div>
       {lastUpdate && (
         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -73,30 +60,28 @@ const SensorCard: React.FC<SensorCardProps> = ({
   );
 };
 
-// 🔥 NO MOCK DATA GENERATOR - All data must come from Firebase
-function getEmptyData(): DashboardSensorValues {
-  return {
-    feederTemp: 0,
-    feederHumidity: 0,
-    systemTemp: 0,
-    systemHumidity: 0,
-    feederWeight: 0,
-    weight: 0,
-    batteryVoltage: 0,
-    batteryPercentage: 0,
-    loadVoltage: 0,
-    loadCurrent: 0,
-    solarVoltage: 0,
-    solarCurrent: 0,
-    soilMoisture: 0,
-  };
-}
+  // 🔥 NO MOCK DATA GENERATOR - All data must come from Firebase
+  function getEmptyData(): DashboardSensorValues {
+    return {
+      feederTemp: 0,
+      feederHumidity: 0,
+      systemTemp: 0,
+      systemHumidity: 0,
+      feederWeight: 0,
+      weight: 0,
+      batteryVoltage: 0,
+      batteryPercentage: 0,
+      loadVoltage: 0,
+      loadCurrent: 0,
+      solarVoltage: 0,
+      solarCurrent: 0,
+      soilMoisture: 0,
+    };
+  }
 
 // Connection Status Component
 const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
-  const [connectionStatus, setConnectionStatus] = useState<
-    "connected" | "disconnected" | "warning"
-  >("connected");
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'warning'>('connected');
   const [autoUpdateCounter, setAutoUpdateCounter] = useState(5);
 
   useEffect(() => {
@@ -105,15 +90,13 @@ const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
       const lastUpdateTime = new Date(lastUpdate).getTime();
       const now = Date.now();
       const timeDiff = now - lastUpdateTime;
-
-      if (timeDiff < 30000) {
-        // less than 30 seconds
-        setConnectionStatus("connected");
-      } else if (timeDiff < 60000) {
-        // less than 1 minute
-        setConnectionStatus("warning");
+      
+      if (timeDiff < 30000) { // less than 30 seconds
+        setConnectionStatus('connected');
+      } else if (timeDiff < 60000) { // less than 1 minute
+        setConnectionStatus('warning');
       } else {
-        setConnectionStatus("disconnected");
+        setConnectionStatus('disconnected');
       }
     };
 
@@ -128,32 +111,29 @@ const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
 
   const getStatusConfig = () => {
     switch (connectionStatus) {
-      case "connected":
+      case 'connected':
         return {
           icon: <MdSignalWifi4Bar className="text-green-500" />,
-          text: "เชื่อมต่อแล้ว",
-          bgColor:
-            "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700",
-          textColor: "text-green-700 dark:text-green-300",
-          dotColor: "bg-green-500",
+          text: 'เชื่อมต่อแล้ว',
+          bgColor: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700',
+          textColor: 'text-green-700 dark:text-green-300',
+          dotColor: 'bg-green-500'
         };
-      case "warning":
+      case 'warning':
         return {
           icon: <FaExclamationTriangle className="text-yellow-500" />,
-          text: "การเชื่อมต่อช้า",
-          bgColor:
-            "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700",
-          textColor: "text-yellow-700 dark:text-yellow-300",
-          dotColor: "bg-yellow-500",
+          text: 'การเชื่อมต่อช้า',
+          bgColor: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700',
+          textColor: 'text-yellow-700 dark:text-yellow-300',
+          dotColor: 'bg-yellow-500'
         };
-      case "disconnected":
+      case 'disconnected':
         return {
           icon: <MdSignalWifiConnectedNoInternet4 className="text-red-500" />,
-          text: "การเชื่อมต่อขาด",
-          bgColor:
-            "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700",
-          textColor: "text-red-700 dark:text-red-300",
-          dotColor: "bg-red-500",
+          text: 'การเชื่อมต่อขาด',
+          bgColor: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700',
+          textColor: 'text-red-700 dark:text-red-300',
+          dotColor: 'bg-red-500'
         };
     }
   };
@@ -166,9 +146,7 @@ const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
         <div className="flex items-center gap-3">
           <div className="relative">
             {config.icon}
-            <div
-              className={`absolute -top-1 -right-1 w-3 h-3 ${config.dotColor} rounded-full animate-pulse`}
-            />
+            <div className={`absolute -top-1 -right-1 w-3 h-3 ${config.dotColor} rounded-full animate-pulse`}></div>
           </div>
           <div>
             <div className={`font-semibold ${config.textColor}`}>
@@ -192,15 +170,19 @@ const ConnectionStatus: React.FC<{ lastUpdate: string }> = ({ lastUpdate }) => {
   );
 };
 
-const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
-  sensorData,
-  lastUpdate,
+const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({ 
+  sensorData, 
+  lastUpdate 
 }) => {
   const values = convertFirebaseToSensorValues(sensorData);
+  
+  // Use example data if no real data available (for development)
+  // 🔥 NO MOCK DATA - Only use real Firebase data or show zeros
+  const displayValues = Object.values(values).some(v => v !== null) 
+    ? values 
+    : getEmptyData();
 
-  // 🔥 PRODUCTION READY - Only show real Firebase data or zeros
-  const displayValues = values;
-  const hasRealData = Object.values(values).some((v) => v !== null);
+  const hasRealData = Object.values(values).some(v => v !== null);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6">
@@ -226,8 +208,8 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
             ข้อมูลแบบ Real-time
           </strong>
           {!hasRealData && (
-            <span className="ml-2 text-red-600 dark:text-red-400">
-              ⚠️ No sensor data available - Check Pi Server connection
+            <span className="ml-2 text-orange-600 dark:text-orange-400">
+              (ใช้ข้อมูลจำลองสำหรับทดสอบ)
             </span>
           )}
         </div>
@@ -237,29 +219,16 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
       </div>
 
       {/* Real-time Data Notice */}
-      <div
-        className={`${hasRealData ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700" : "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700"} rounded-lg p-4 mb-6`}
-      >
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
         <div className="flex items-center gap-3">
-          {hasRealData ? (
-            <FaWifi className="text-blue-500 text-xl" />
-          ) : (
-            <MdWifiOff className="text-orange-500 text-xl" />
-          )}
+          <FaWifi className="text-blue-500 text-xl" />
           <div>
-            <h3
-              className={`font-semibold ${hasRealData ? "text-blue-700 dark:text-blue-300" : "text-orange-700 dark:text-orange-300"}`}
-            >
-              {hasRealData
-                ? "การอัพเดทข้อมูลอัตโนมัติ"
-                : "รอการเชื่อมต่อ Pi Server"}
+            <h3 className="font-semibold text-blue-700 dark:text-blue-300">
+              การอัพเดทข้อมูลอัตโนมัติ
             </h3>
-            <p
-              className={`text-sm ${hasRealData ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"}`}
-            >
-              {hasRealData
-                ? "ระบบจะรับข้อมูลจาก Firebase อัตโนมัติทุก 5 วินาที โดยไม่ต้องรีเฟรชหน้า"
-                : "กรุณาตรวจสอบการเชื่อมต่อ Raspberry Pi Server และ Arduino"}
+            <p className="text-sm text-blue-600 dark:text-blue-400">
+              ระบบจะรับข้อมูลจาก Firebase อัตโนมัติทุก 5 วินาที โดยไม่ต้องรีเฟรชหน้า
+              {!hasRealData && " - ปัจจุบันแสดงข้อมูลจำลองเนื่องจากยังไม่ได้เชื่อมต่อกับ Pi Server"}
             </p>
           </div>
         </div>
@@ -311,62 +280,62 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
 
         {/* Solar Voltage */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700"
           icon={<BsSun className="text-xl" />}
-          iconColor="text-yellow-500 dark:text-yellow-400"
           label="Solar Panel Voltage"
-          unit="V"
           value={displayValues.solarVoltage}
+          unit="V"
+          bgColor="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700"
+          iconColor="text-yellow-500 dark:text-yellow-400"
         />
 
         {/* Feed Weight (HX711_FEEDER) */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700"
           icon={<FaWeight className="text-xl" />}
-          iconColor="text-purple-500 dark:text-purple-400"
           label="Feed Weight (HX711)"
-          unit="g"
           value={displayValues.feederWeight}
+          unit="g"
+          bgColor="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700"
+          iconColor="text-purple-500 dark:text-purple-400"
         />
 
         {/* Pellet Humidity (Soil Moisture) */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-700"
           icon={<GiWateringCan className="text-xl" />}
-          iconColor="text-green-500 dark:text-green-400"
           label="Pellet Humidity"
-          unit="%"
           value={displayValues.soilMoisture}
+          unit="%"
+          bgColor="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-700"
+          iconColor="text-green-500 dark:text-green-400"
         />
 
         {/* Load Voltage */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-700"
           icon={<BsSun className="text-xl" />}
-          iconColor="text-yellow-500 dark:text-yellow-400"
           label="Load Voltage"
-          unit="V"
           value={displayValues.loadVoltage}
+          unit="V"
+          bgColor="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-700"
+          iconColor="text-yellow-500 dark:text-yellow-400"
         />
 
         {/* Load Current */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-700"
           icon={<BsLightningCharge className="text-xl" />}
-          iconColor="text-orange-500 dark:text-orange-400"
           label="Load Current"
-          unit="A"
           value={displayValues.loadCurrent}
+          unit="A"
+          bgColor="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border-orange-200 dark:border-orange-700"
+          iconColor="text-orange-500 dark:text-orange-400"
         />
 
         {/* Battery Voltage */}
         <SensorCard
-          bgColor="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-700"
           icon={<FaBatteryThreeQuarters className="text-xl" />}
-          iconColor="text-indigo-500 dark:text-indigo-400"
           label="Battery Voltage"
-          unit="V"
           value={displayValues.batteryVoltage}
+          unit="V"
+          bgColor="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-700"
+          iconColor="text-indigo-500 dark:text-indigo-400"
         />
 
         {/* Battery Percentage */}
@@ -381,11 +350,9 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
             {formatSensorValue(displayValues.batteryPercentage, "%")}
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
+            <div 
               className="bg-gradient-to-r from-emerald-500 to-green-500 h-2 rounded-full transition-all duration-300"
-              style={{
-                width: `${Math.min(100, Math.max(0, displayValues.batteryPercentage || 0))}%`,
-              }}
+              style={{ width: `${Math.min(100, Math.max(0, displayValues.batteryPercentage || 0))}%` }}
             />
           </div>
         </div>
@@ -396,7 +363,7 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-gray-600 dark:text-gray-300">
                 Real-time monitoring active
               </span>
@@ -414,4 +381,4 @@ const DashboardSensorPanel: React.FC<DashboardSensorPanelProps> = ({
   );
 };
 
-export default DashboardSensorPanel;
+export default DashboardSensorPanel; 

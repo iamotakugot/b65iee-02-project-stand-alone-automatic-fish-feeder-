@@ -14,9 +14,9 @@ const AppRouter = ({ children }: AppRouterProps) => {
     const splashDisabled = localStorage.getItem("splash-disabled") === "true";
     const splashSeen = localStorage.getItem("splash-seen") === "true";
     const urlParams = new URLSearchParams(window.location.search);
-    const showSplash = urlParams.get("splash") === "true";
-    const noSplash = urlParams.get("nosplash") === "true";
-
+    const showSplash = urlParams.get('splash') === 'true';
+    const noSplash = urlParams.get('nosplash') === 'true';
+    
     if (noSplash) {
       // Force skip splash via URL
       setHasSeenSplash(true);
@@ -49,10 +49,10 @@ const AppRouter = ({ children }: AppRouterProps) => {
 
   // หากยังไม่เคยดู splash และไม่ได้อยู่ในหน้า splash
   if (!hasSeenSplash && location.pathname !== "/splash") {
-    return <Navigate replace to="/splash" />;
+    return <Navigate to="/splash" replace />;
   }
 
   return <>{children}</>;
 };
 
-export default AppRouter;
+export default AppRouter; 

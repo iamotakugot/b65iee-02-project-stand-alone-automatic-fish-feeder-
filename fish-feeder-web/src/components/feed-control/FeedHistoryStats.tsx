@@ -1,17 +1,13 @@
 interface FeedHistoryStatsProps {
   feedHistory: any[];
   feedStatistics: any;
-  formatWeightDisplay: (
-    grams: string | number,
-    showName?: boolean,
-    name?: string,
-  ) => string;
+  formatWeightDisplay: (grams: string | number, showName?: boolean, name?: string) => string;
 }
 
 export const FeedHistoryStats = ({
   feedHistory,
   feedStatistics,
-  formatWeightDisplay,
+  formatWeightDisplay
 }: FeedHistoryStatsProps) => {
   return (
     <div className="space-y-4">
@@ -30,7 +26,7 @@ export const FeedHistoryStats = ({
               {formatWeightDisplay(feedStatistics.today_total || 0)}
             </div>
           </div>
-
+          
           <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
             <div className="text-sm font-medium text-indigo-800 dark:text-indigo-300 mb-1">
               Weekly Average
@@ -47,7 +43,7 @@ export const FeedHistoryStats = ({
         <h4 className="text-md font-medium text-gray-700 dark:text-gray-300">
           Recent Feeds
         </h4>
-
+        
         {feedHistory.length > 0 ? (
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {feedHistory.slice(0, 10).map((feed, index) => (
@@ -79,4 +75,4 @@ export const FeedHistoryStats = ({
       </div>
     </div>
   );
-};
+}; 

@@ -5,11 +5,7 @@ interface FeedStatusDisplayProps {
   currentWeight: number;
   weightBeforeFeed: number;
   lastFeedTime: string | null;
-  formatWeightDisplay: (
-    grams: string | number,
-    showName?: boolean,
-    name?: string,
-  ) => string;
+  formatWeightDisplay: (grams: string | number, showName?: boolean, name?: string) => string;
 }
 
 export const FeedStatusDisplay = ({
@@ -17,7 +13,7 @@ export const FeedStatusDisplay = ({
   currentWeight,
   weightBeforeFeed,
   lastFeedTime,
-  formatWeightDisplay,
+  formatWeightDisplay
 }: FeedStatusDisplayProps) => {
   return (
     <div className="space-y-4">
@@ -28,13 +24,9 @@ export const FeedStatusDisplay = ({
       {/* Connection Status */}
       <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
         <div className="flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              connectionStatus.includes("Connected")
-                ? "bg-green-500"
-                : "bg-red-500"
-            }`}
-          />
+          <div className={`w-3 h-3 rounded-full ${
+            connectionStatus.includes("Connected") ? "bg-green-500" : "bg-red-500"
+          }`} />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {connectionStatus}
           </span>
@@ -67,8 +59,7 @@ export const FeedStatusDisplay = ({
               {formatWeightDisplay(weightBeforeFeed)}
             </div>
             <div className="text-sm text-green-700 dark:text-green-400 mt-1">
-              Difference:{" "}
-              {formatWeightDisplay(Math.abs(currentWeight - weightBeforeFeed))}
+              Difference: {formatWeightDisplay(Math.abs(currentWeight - weightBeforeFeed))}
               {currentWeight > weightBeforeFeed ? " (gained)" : " (lost)"}
             </div>
           </div>
@@ -87,4 +78,4 @@ export const FeedStatusDisplay = ({
       </div>
     </div>
   );
-};
+}; 

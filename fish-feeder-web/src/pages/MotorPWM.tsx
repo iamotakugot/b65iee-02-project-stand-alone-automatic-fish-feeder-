@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Slider } from "@heroui/slider";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-import { FaArrowUp, FaArrowDown, FaPlay, FaStop } from "react-icons/fa";
+import { FaSlidersH, FaArrowUp, FaArrowDown, FaPlay, FaStop } from "react-icons/fa";
 import { HiCog } from "react-icons/hi";
 import { RiBlazeFill } from "react-icons/ri";
 import { MdRotateRight, MdRotateLeft } from "react-icons/md";
@@ -33,12 +33,12 @@ interface MotorControlRequest {
 
 const MotorPWM = () => {
   // Use Firebase API Context
-  const {
-    controlAuger,
-    controlBlower,
-    controlActuator,
+  const { 
+    controlAuger, 
+    controlBlower, 
+    controlActuator, 
     setMotorPWM,
-    isConnected,
+    isConnected 
   } = useApi();
 
   // PWM control states
@@ -70,7 +70,7 @@ const MotorPWM = () => {
   // Loading states
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(
-    isConnected ? "🔌 Connected to Firebase" : "❌ Disconnected",
+    isConnected ? "🔌 Connected to Firebase" : "❌ Disconnected"
   );
 
   // Direct command states
@@ -95,17 +95,15 @@ const MotorPWM = () => {
     setLoading(true);
     try {
       // Use direct command instead of sendCommand
-      const { firebaseClient } = await import("../config/firebase");
-      const success = await firebaseClient.sendArduinoCommand("S:HEALTH");
-
+      const { firebaseClient } = await import('../config/firebase');
+      const success = await firebaseClient.sendArduinoCommand('S:HEALTH');
+      
       if (success) {
         setConnectionStatus("✅ System Health: All OK");
         setLastResponseTime(new Date().toLocaleTimeString());
-        setCommandResponse(
-          `{"status": "success", "command": "S:HEALTH", "method": "firebase"}`,
-        );
+        setCommandResponse(`{"status": "success", "command": "S:HEALTH", "method": "firebase"}`);
       } else {
-        throw new Error("Health check failed");
+        throw new Error('Health check failed');
       }
     } catch (error: any) {
       setConnectionStatus("❌ System Health Check Failed");
@@ -142,9 +140,9 @@ const MotorPWM = () => {
     }
 
     if (motorType === "auger") {
-      setAugerState((prev) => ({ ...prev, ...newState }));
+      setAugerState(prev => ({ ...prev, ...newState }));
     } else {
-      setBlowerState((prev) => ({ ...prev, ...newState }));
+      setBlowerState(prev => ({ ...prev, ...newState }));
     }
   };
 
@@ -157,32 +155,30 @@ const MotorPWM = () => {
       switch (action.action) {
         case "speed":
           const speed = action.speed || Math.round(augerPWM * 2.55);
-
-          await setMotorPWM("auger", speed);
+          await setMotorPWM('auger', speed);
           updateMotorState("auger", `SPD:${speed}`, speed);
           setConnectionStatus(`✅ Auger speed: ${speed} via Firebase`);
           break;
         case "forward":
-          await controlAuger("forward");
+          await controlAuger('forward');
           updateMotorState("auger", "G:1");
           setConnectionStatus(`✅ Auger forward via Firebase`);
           break;
         case "reverse":
-          await controlAuger("reverse");
+          await controlAuger('reverse');
           updateMotorState("auger", "G:2");
           setConnectionStatus(`✅ Auger reverse via Firebase`);
           break;
         case "stop":
-          await controlAuger("stop");
+          await controlAuger('stop');
           updateMotorState("auger", "G:0");
           setConnectionStatus(`✅ Auger stop via Firebase`);
           break;
       }
 
       setLastResponseTime(new Date().toLocaleTimeString());
-      setCommandResponse(
-        `{"status": "success", "action": "${action.action}", "method": "firebase"}`,
-      );
+      setCommandResponse(`{"status": "success", "action": "${action.action}", "method": "firebase"}`);
+
     } catch (error) {
       console.error("Failed to control auger:", error);
       setConnectionStatus(`❌ Error: ${error}`);
@@ -202,9 +198,8 @@ const MotorPWM = () => {
       setConnectionStatus(`✅ Actuator ${action} via Firebase`);
       setActuatorMoving(action === "stop" ? null : action);
       setLastResponseTime(new Date().toLocaleTimeString());
-      setCommandResponse(
-        `{"status": "success", "action": "${action}", "method": "firebase"}`,
-      );
+      setCommandResponse(`{"status": "success", "action": "${action}", "method": "firebase"}`);
+
     } catch (error) {
       console.error(`Failed to control actuator:`, error);
       setConnectionStatus(`❌ Error: ${error}`);
@@ -221,41 +216,33 @@ const MotorPWM = () => {
       setConnectionStatus("📡 Sending direct command...");
 
       // Use Firebase direct command
-      const { firebaseClient } = await import("../config/firebase");
+      const { firebaseClient } = await import('../config/firebase');
       const success = await firebaseClient.sendArduinoCommand(command);
 
       console.log(`Direct command response:`, success);
 
       if (success) {
         setConnectionStatus(`✅ Command sent: ${command} via Firebase`);
-        setCommandResponse(
-          `{"status": "success", "command": "${command}", "method": "firebase"}`,
-        );
+        setCommandResponse(`{"status": "success", "command": "${command}", "method": "firebase"}`);
         setLastResponseTime(new Date().toLocaleTimeString());
 
         // Update motor states based on command
         if (command.startsWith("G:") || command.startsWith("SPD:")) {
-          const speed = command.startsWith("SPD:")
-            ? parseInt(command.split(":")[1])
+          const speed = command.startsWith("SPD:") 
+            ? parseInt(command.split(":")[1]) 
             : undefined;
-
           updateMotorState("auger", command, speed);
         } else if (command.startsWith("B:")) {
           updateMotorState("blower", command);
         }
       } else {
         setConnectionStatus(`❌ Command failed: ${command}`);
-        setCommandResponse(
-          `{"status": "failed", "command": "${command}", "method": "firebase"}`,
-        );
+        setCommandResponse(`{"status": "failed", "command": "${command}", "method": "firebase"}`);
       }
     } catch (error) {
       // Only log non-connection errors
-      if (
-        error instanceof Error &&
-        !error.message.includes("CONNECTION_FAILED")
-      ) {
-        console.error(`Failed to send direct command:`, error);
+      if (error instanceof Error && !error.message.includes('CONNECTION_FAILED')) {
+      console.error(`Failed to send direct command:`, error);
       }
       setConnectionStatus(`❌ Connection error: ${error}`);
       setCommandResponse(`{"status": "error", "message": "${error}"}`);
@@ -264,27 +251,23 @@ const MotorPWM = () => {
     }
   };
 
-  // Handle blower control via Firebase
+          // Handle blower control via Firebase
   const handleBlowerPWM = async (speed: number) => {
     try {
       setLoading(true);
       setConnectionStatus("🌪️ Setting blower speed...");
-
+      
       // Use Firebase direct command
-      const { firebaseClient } = await import("../config/firebase");
+      const { firebaseClient } = await import('../config/firebase');
       const success = await firebaseClient.sendBlowerCommand(`B:SPD:${speed}`);
 
       if (success) {
         setConnectionStatus(`✅ Blower speed set to ${speed} via Firebase`);
         updateMotorState("blower", `B:SPD:${speed}`, speed);
-        setCommandResponse(
-          `{"status": "success", "command": "B:SPD:${speed}", "method": "firebase"}`,
-        );
+        setCommandResponse(`{"status": "success", "command": "B:SPD:${speed}", "method": "firebase"}`);
       } else {
         setConnectionStatus(`❌ Blower control error`);
-        setCommandResponse(
-          `{"status": "failed", "command": "B:SPD:${speed}", "method": "firebase"}`,
-        );
+        setCommandResponse(`{"status": "failed", "command": "B:SPD:${speed}", "method": "firebase"}`);
       }
     } catch (error) {
       console.error(`Failed to set blower speed:`, error);
@@ -294,6 +277,8 @@ const MotorPWM = () => {
       setLoading(false);
     }
   };
+
+
 
   // ⚡ PRODUCTION COMMANDS - No test commands!
   const quickCommands = [
@@ -305,7 +290,7 @@ const MotorPWM = () => {
     { label: "🌪️ Blower On", command: "B:1", color: "primary" },
     { label: "⏹️ Blower Off", command: "B:0", color: "default" },
     { label: "💡 Relay 1 On", command: "R:1", color: "secondary" },
-    { label: "💡 Relay 1 Off", command: "R:4", color: "default" },
+            { label: "💡 Relay 1 Off", command: "R:4", color: "default" },
     { label: "💡 Relay 2 On", command: "R:2", color: "secondary" },
   ];
 
@@ -320,17 +305,17 @@ const MotorPWM = () => {
           </h1>
           <div className="flex items-center gap-3">
             <Button
-              color="primary"
-              isLoading={loading}
               size="sm"
+              color="primary"
               variant="bordered"
+              isLoading={loading}
               onPress={checkSystemHealth}
             >
               🔍 System Health
             </Button>
             <Button
-              color={autoRefresh ? "success" : "default"}
               size="sm"
+              color={autoRefresh ? "success" : "default"}
               variant={autoRefresh ? "solid" : "bordered"}
               onPress={() => setAutoRefresh(!autoRefresh)}
             >
@@ -339,9 +324,8 @@ const MotorPWM = () => {
           </div>
         </div>
         <div className="text-sm text-gray-600 dark:text-gray-300">
-          Control motors via{" "}
-          <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | Status:{" "}
-          <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
+          Control motors via <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | 
+          Status: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
             {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
           </code>
         </div>
@@ -392,62 +376,35 @@ const MotorPWM = () => {
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 mb-6 border border-blue-200 dark:border-blue-700">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Speed (PWM)
-              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Speed (PWM)</div>
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {augerState.speed}/255
-                <span className="text-sm ml-2">
-                  ({Math.round((augerState.speed / 255) * 100)}%)
-                </span>
+                {augerState.speed}/255 
+                <span className="text-sm ml-2">({Math.round((augerState.speed / 255) * 100)}%)</span>
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Direction
-              </div>
-              <div
-                className={`text-lg font-semibold flex items-center ${
-                  augerState.direction === "forward"
-                    ? "text-green-600"
-                    : augerState.direction === "reverse"
-                      ? "text-orange-600"
-                      : "text-gray-600"
-                }`}
-              >
-                {augerState.direction === "forward" && (
-                  <MdRotateRight className="mr-1" />
-                )}
-                {augerState.direction === "reverse" && (
-                  <MdRotateLeft className="mr-1" />
-                )}
-                {augerState.direction === "stopped" && (
-                  <FaStop className="mr-1" />
-                )}
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Direction</div>
+              <div className={`text-lg font-semibold flex items-center ${
+                augerState.direction === "forward" ? "text-green-600" :
+                augerState.direction === "reverse" ? "text-orange-600" : "text-gray-600"
+              }`}>
+                {augerState.direction === "forward" && <MdRotateRight className="mr-1" />}
+                {augerState.direction === "reverse" && <MdRotateLeft className="mr-1" />}
+                {augerState.direction === "stopped" && <FaStop className="mr-1" />}
                 {augerState.direction.toUpperCase()}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Status
-              </div>
-              <div
-                className={`text-lg font-semibold flex items-center ${
-                  augerState.isRunning ? "text-green-600" : "text-gray-600"
-                }`}
-              >
-                {augerState.isRunning ? (
-                  <FaPlay className="mr-1" />
-                ) : (
-                  <FaStop className="mr-1" />
-                )}
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
+              <div className={`text-lg font-semibold flex items-center ${
+                augerState.isRunning ? "text-green-600" : "text-gray-600"
+              }`}>
+                {augerState.isRunning ? <FaPlay className="mr-1" /> : <FaStop className="mr-1" />}
                 {augerState.isRunning ? "RUNNING" : "STOPPED"}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Last Command
-              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Command</div>
               <div className="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                 {augerState.lastCommand}
               </div>
@@ -487,17 +444,13 @@ const MotorPWM = () => {
               isLoading={loading}
               size="lg"
               startContent={<IoSpeedometer />}
-              onPress={() =>
-                handleAugerControl({
-                  action: "speed",
-                  speed: Math.round(augerPWM * 2.55),
-                })
-              }
+              onPress={() => handleAugerControl({ 
+                action: "speed", 
+                speed: Math.round(augerPWM * 2.55) 
+              })}
             >
               Set Speed
-              <div className="text-xs opacity-75">
-                SPD:{Math.round(augerPWM * 2.55)}
-              </div>
+              <div className="text-xs opacity-75">SPD:{Math.round(augerPWM * 2.55)}</div>
             </Button>
             <Button
               className="h-14"
@@ -549,37 +502,23 @@ const MotorPWM = () => {
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 mb-6 border border-purple-200 dark:border-purple-700">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Speed (PWM)
-              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Speed (PWM)</div>
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                {blowerState.speed}/255
-                <span className="text-sm ml-2">
-                  ({Math.round((blowerState.speed / 255) * 100)}%)
-                </span>
+                {blowerState.speed}/255 
+                <span className="text-sm ml-2">({Math.round((blowerState.speed / 255) * 100)}%)</span>
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Status
-              </div>
-              <div
-                className={`text-lg font-semibold flex items-center ${
-                  blowerState.isRunning ? "text-green-600" : "text-gray-600"
-                }`}
-              >
-                {blowerState.isRunning ? (
-                  <FaPlay className="mr-1" />
-                ) : (
-                  <FaStop className="mr-1" />
-                )}
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
+              <div className={`text-lg font-semibold flex items-center ${
+                blowerState.isRunning ? "text-green-600" : "text-gray-600"
+              }`}>
+                {blowerState.isRunning ? <FaPlay className="mr-1" /> : <FaStop className="mr-1" />}
                 {blowerState.isRunning ? "RUNNING" : "STOPPED"}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Last Command
-              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Command</div>
               <div className="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                 {blowerState.lastCommand}
               </div>
@@ -591,8 +530,7 @@ const MotorPWM = () => {
           <div className="px-2 mb-6">
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Set Blower Speed: {blowerPWM}% ({Math.round(blowerPWM * 2.55)}
-                /255)
+                Set Blower Speed: {blowerPWM}% ({Math.round(blowerPWM * 2.55)}/255)
               </label>
               <Slider
                 showTooltip
@@ -621,13 +559,12 @@ const MotorPWM = () => {
                 try {
                   setLoading(true);
                   const speed = Math.round(blowerPWM * 2.55);
-
-                  await setMotorPWM("blower", speed);
+                  await setMotorPWM('blower', speed);
                   setConnectionStatus(`✅ Blower speed ${speed} via Firebase`);
                   updateMotorState("blower", `B:SPD:${speed}`, speed);
                   setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
-                  console.error("Blower Speed failed:", error);
+                  console.error('Blower Speed failed:', error);
                   setConnectionStatus(`❌ Blower speed failed: ${error}`);
                 } finally {
                   setLoading(false);
@@ -644,12 +581,12 @@ const MotorPWM = () => {
               onPress={async () => {
                 try {
                   setLoading(true);
-                  await controlBlower("on");
+                  await controlBlower('on');
                   setConnectionStatus(`✅ Blower ON via Firebase`);
                   updateMotorState("blower", "B:1", 255);
                   setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
-                  console.error("Blower ON failed:", error);
+                  console.error('Blower ON failed:', error);
                   setConnectionStatus(`❌ Blower ON failed: ${error}`);
                 } finally {
                   setLoading(false);
@@ -667,12 +604,12 @@ const MotorPWM = () => {
               onPress={async () => {
                 try {
                   setLoading(true);
-                  await controlBlower("off");
+                  await controlBlower('off');
                   setConnectionStatus(`✅ Blower OFF via Firebase`);
                   updateMotorState("blower", "B:0", 0);
                   setLastResponseTime(new Date().toLocaleTimeString());
                 } catch (error) {
-                  console.error("Blower OFF failed:", error);
+                  console.error('Blower OFF failed:', error);
                   setConnectionStatus(`❌ Blower OFF failed: ${error}`);
                 } finally {
                   setLoading(false);
@@ -695,8 +632,7 @@ const MotorPWM = () => {
         </div>
 
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          Control the linear actuator using Firebase commands. Commands sent
-          via:
+          Control the linear actuator using Firebase commands. Commands sent via: 
           <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded ml-1">
             Firebase → Pi Server → Arduino Serial
           </code>
@@ -856,68 +792,18 @@ const MotorPWM = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-blue-700 dark:text-blue-300">
               <div className="space-y-1">
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    S:ALL
-                  </code>{" "}
-                  - Get all sensor readings
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    G:1
-                  </code>{" "}
-                  - Auger motor forward
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    G:2
-                  </code>{" "}
-                  - Auger motor reverse
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    G:0
-                  </code>{" "}
-                  - Auger motor stop
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    SPD:&lt;0-255&gt;
-                  </code>{" "}
-                  - Set motor PWM speed
-                </div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">S:ALL</code> - Get all sensor readings</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">G:1</code> - Auger motor forward</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">G:2</code> - Auger motor reverse</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">G:0</code> - Auger motor stop</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">SPD:&lt;0-255&gt;</code> - Set motor PWM speed</div>
               </div>
               <div className="space-y-1">
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    B:1
-                  </code>{" "}
-                  - Blower fan on
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    B:0
-                  </code>{" "}
-                  - Blower fan off
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    R:1
-                  </code>{" "}
-                  - Relay 1 on
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    R:4
-                  </code>{" "}
-                  - Relay 1 off
-                </div>
-                <div>
-                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                    S:HEALTH
-                  </code>{" "}
-                  - System health check
-                </div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">B:1</code> - Blower fan on</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">B:0</code> - Blower fan off</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:1</code> - Relay 1 on</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">R:4</code> - Relay 1 off</div>
+                <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">S:HEALTH</code> - System health check</div>
               </div>
             </div>
           </div>
@@ -928,22 +814,17 @@ const MotorPWM = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-100 dark:border-gray-700">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-4">
-            <div
-              className={`flex items-center ${
-                connectionStatus.includes("✅")
-                  ? "text-green-600"
-                  : connectionStatus.includes("❌")
-                    ? "text-red-600"
-                    : "text-yellow-600"
-              }`}
-            >
+            <div className={`flex items-center ${
+              connectionStatus.includes("✅") ? "text-green-600" : 
+              connectionStatus.includes("❌") ? "text-red-600" : "text-yellow-600"
+            }`}>
               <div className="w-3 h-3 rounded-full bg-current mr-2 animate-pulse" />
               System Status: {connectionStatus}
             </div>
           </div>
           <div className="text-gray-500 dark:text-gray-400">
-            🔄 Auto-refresh: {autoRefresh ? "ON" : "OFF"} | Last update:{" "}
-            {lastResponseTime || "Never"}
+            🔄 Auto-refresh: {autoRefresh ? "ON" : "OFF"} | 
+            Last update: {lastResponseTime || "Never"}
           </div>
         </div>
       </div>
