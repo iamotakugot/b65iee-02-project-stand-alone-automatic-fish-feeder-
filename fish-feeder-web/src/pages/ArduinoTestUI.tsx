@@ -440,9 +440,9 @@ const ArduinoTestUI = () => {
               🚀 Max (255)
             </button>
           </div>
-          <div className="text-xs text-gray-500">
-            ⚠️ PWM >= 230 required for motor operation
-          </div>
+                      <div className="text-xs text-gray-500">
+              ⚠️ PWM &gt;= 230 required for motor operation
+            </div>
         </div>
       </div>
     </div>
