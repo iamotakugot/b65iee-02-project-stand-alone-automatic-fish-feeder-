@@ -359,22 +359,51 @@ def main_data_loop():
     
     while state.running:
         try:
-            # Read Arduino data
+            sensor_data = None
+            
+            # Read Arduino data if connected
             if state.arduino_connected:
                 sensor_data = read_arduino_data()
                 
                 if sensor_data:
-                    logger.info(f"Sensor data: {json.dumps(sensor_data, indent=2)}")
-                    
-                    # Update Firebase
-                    update_firebase_sensors(sensor_data)
-                    
-                    # Backup data
-                    backup_sensor_data(sensor_data)
-                    
-                    # Broadcast via WebSocket
-                    if config.WEBSOCKET_ENABLED:
-                        sio.emit('sensor_data', sensor_data)
+                    logger.info(f"Arduino sensor data received")
+            
+            # Generate mock data if Arduino not connected (for testing)
+            if not sensor_data and not state.arduino_connected:
+                sensor_data = {
+                    "timestamp": int(time.time()),
+                    "status": "mock_data_no_arduino",
+                    "sensors": {
+                        "feed_tank": {"temperature": 25.5, "humidity": 60.0},
+                        "control_box": {"temperature": 28.0, "humidity": 55.0},
+                        "weight_kg": 2.3,
+                        "soil_moisture_percent": 45,
+                        "power": {
+                            "solar_voltage": 12.8,
+                            "solar_current": 1.2,
+                            "load_voltage": 12.4,
+                            "load_current": 0.8,
+                            "battery_status": "75"
+                        }
+                    },
+                    "controls": {
+                        "relays": {"led_pond_light": False, "control_box_fan": False},
+                        "motors": {"blower_ventilation": 0, "auger_food_dispenser": 0, "actuator_feeder": 0}
+                    },
+                    "free_memory_bytes": 15360
+                }
+                logger.info("Generated mock sensor data (Arduino not connected)")
+            
+            if sensor_data:
+                # Update Firebase
+                update_firebase_sensors(sensor_data)
+                
+                # Backup data
+                backup_sensor_data(sensor_data)
+                
+                # Broadcast via WebSocket
+                if config.WEBSOCKET_ENABLED:
+                    sio.emit('sensor_data', sensor_data)
             
             time.sleep(config.SENSOR_UPDATE_INTERVAL)
             
