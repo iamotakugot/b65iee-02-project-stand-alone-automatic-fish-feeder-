@@ -55,7 +55,17 @@ interface ControlCommand {
 const ArduinoTestUI = () => {
   // 🔥 Firebase URL ที่ถูกต้อง
   const FIREBASE_URL = 'https://b65iee-02-fishfeederstandalone-default-rtdb.asia-southeast1.firebasedatabase.app';
-  const PI_SERVER_URL = 'http://localhost:5000';
+  
+  // 🌐 Auto-detect environment (Firebase hosting vs localhost)
+  const isFirebaseHosting = () => {
+    if (typeof window === 'undefined') return false;
+    return window.location.hostname.includes('.web.app') || 
+           window.location.hostname.includes('firebase') ||
+           window.location.hostname.includes('firebaseapp.com');
+  };
+  
+  const PI_SERVER_URL = isFirebaseHosting() ? null : 'http://localhost:5000';
+  const FIREBASE_ONLY_MODE = isFirebaseHosting();
 
   // State management
   const [sensorData, setSensorData] = useState<SensorData>({});
@@ -67,8 +77,14 @@ const ArduinoTestUI = () => {
 
   // 🚀 WebSocket connection for real-time data
   useEffect(() => {
+    // Skip WebSocket in Firebase hosting mode
+    if (FIREBASE_ONLY_MODE) {
+      addToLog('🔥 Running in Firebase-only mode - skipping WebSocket');
+      return;
+    }
+    
     // Connect to Pi Server WebSocket
-    socketRef.current = io(PI_SERVER_URL);
+    socketRef.current = io(PI_SERVER_URL!);
 
     socketRef.current.on('connect', () => {
       setIsConnected(true);
@@ -132,7 +148,22 @@ const ArduinoTestUI = () => {
   // 📤 Send command functions
   const sendCommand = async (command: any) => {
     try {
-      // Send via WebSocket first
+      // Firebase-only mode: Send directly to Firebase
+      if (FIREBASE_ONLY_MODE) {
+        const response = await fetch(`${FIREBASE_URL}/controls.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(command)
+        });
+
+        if (response.ok) {
+          addToLog(`📤 Sent via Firebase: ${JSON.stringify(command)}`);
+          return true;
+        }
+        throw new Error('Firebase command failed');
+      }
+
+      // Development mode: Send via WebSocket first
       if (socketRef.current?.connected) {
         socketRef.current.emit('send_command', command);
         addToLog(`📤 Sent via WebSocket: ${JSON.stringify(command)}`);

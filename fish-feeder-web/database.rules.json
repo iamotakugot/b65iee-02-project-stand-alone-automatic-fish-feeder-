@@ -16,6 +16,10 @@
       ".read": true,
       ".write": true
     },
+    "controls": {
+      ".read": true,
+      ".write": true
+    },
     "commands": {
       ".read": true,
       ".write": true
