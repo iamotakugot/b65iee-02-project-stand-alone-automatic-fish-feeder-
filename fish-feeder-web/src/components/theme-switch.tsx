@@ -2,7 +2,7 @@ import { FC, useState, useEffect } from "react";
 import { Switch } from "@heroui/switch";
 import { useTheme } from "@heroui/use-theme";
 
-import { SunFilledIcon, MoonFilledIcon } from "@/components/icons";
+import { SunFilledIcon, MoonFilledIcon } from "./ui/icons";
 
 export interface ThemeSwitchProps {
   className?: string;

@@ -213,9 +213,6 @@ export const useOptimizedFirebase = () => {
         SOLAR_VOLTAGE: {
           voltage: api.sensorData.solar_voltage,
           current: api.sensorData.solar_current
-        },
-        SOIL_MOISTURE: {
-          moisture: api.sensorData.soil_moisture
         }
       },
       status: {

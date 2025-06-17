@@ -168,7 +168,7 @@ export const getCurrentSensorValues = (
       getSensorValue(sensors, API_CONFIG.SENSOR_NAMES.BATTERY_STATUS, "charging"),
 
     // Additional sensors
-    soilMoisture: getSensorValue(sensors, "SOIL_MOISTURE", "moisture"),
+
     
     // System health
     systemOk: getSensorValue(sensors, "SYSTEM_HEALTH", "system_ok", 1),

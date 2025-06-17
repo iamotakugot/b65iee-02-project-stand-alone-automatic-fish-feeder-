@@ -62,7 +62,7 @@ const SystemStatusBanner: React.FC<SystemStatusBannerProps> = ({
                   {isFullyOffline ? (
                     <p>Both Firebase and Pi server are offline. Please check your internet connection.</p>
                   ) : (
-                    <p>Pi server is offline. Web interface is active via Firebase, but hardware control commands will be queued.</p>
+                    <p>Pi server is offline. Web interface is active via Firebase, but hardware control commands will be queued until Pi reconnects. ✅ Protocol: Unified JSON format ready.</p>
                   )}
                 </div>
                 

@@ -99,12 +99,7 @@ const Sensors: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-yellow-50 p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-yellow-800 mb-3">🌱 Soil Moisture</h3>
-            <div className="text-2xl font-bold text-center">
-              {sensors.soil}%
-            </div>
-          </div>
+
 
           {/* Power System */}
           <div className="bg-orange-50 p-6 rounded-lg shadow">

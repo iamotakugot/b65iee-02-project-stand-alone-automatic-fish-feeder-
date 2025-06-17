@@ -21,12 +21,13 @@ const app = initializeApp(firebaseConfig);
 export const database = getDatabase(app);
 export const auth = null; // For future use
 
-// Firebase paths
+// Firebase paths - UNIFIED with Pi Server
 export const FIREBASE_PATHS = {
-  controls: 'fish-feeder-system/controls',
-  status: 'fish-feeder-system/status',
-  logs: 'fish-feeder-system/logs', 
-  config: 'fish-feeder-system/config'
+  controls: '/controls',
+  sensors: '/sensors', 
+  status: '/status',
+  logs: '/logs', 
+  config: '/config'
 };
 
 export default app; 

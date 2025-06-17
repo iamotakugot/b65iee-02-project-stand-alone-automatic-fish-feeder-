@@ -1,67 +1,50 @@
 # Fish Feeder Pi Server Requirements
-# Core dependencies
+
+# ===== CORE DEPENDENCIES =====
 flask==2.3.3
 flask-cors==4.0.0
 pyserial==3.5
 requests==2.31.0
 
-# Firebase dependencies
-firebase-admin==6.2.0
+# ===== HIGH-PERFORMANCE JSON =====
+orjson==3.9.10
 
-# Google Drive API dependencies
+# ===== FIREBASE & GOOGLE CLOUD =====
+firebase-admin==6.2.0
 google-api-python-client==2.108.0
 google-auth==2.23.4
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
+google-cloud-firestore==2.11.1
 
-# WebSocket for real-time communication
+# ===== COMPUTER VISION =====
+opencv-python==4.8.1.78
+
+# ===== WEBSOCKET & REAL-TIME =====
 python-socketio==5.10.0
 eventlet==0.33.3
 
-# Optional dependencies for enhanced functionality
-python-dotenv==1.0.0
-schedule==1.2.0
+# ===== SYSTEM MONITORING =====
+psutil==5.9.5
 
-# Development dependencies (optional)
-pytest==7.4.2
-pytest-cov==4.1.0
-
-# Firebase and Google Cloud dependencies
-google-cloud-firestore==2.11.1
-
-# Data processing
+# ===== DATA PROCESSING =====
 pandas==2.0.3
 numpy==1.24.3
 
-# System monitoring
-psutil==5.9.5
-
-# Protobuf for high-performance communication
+# ===== UTILITIES =====
+python-dotenv==1.0.0
+schedule==1.2.0
 protobuf==4.25.1
-
-# Optional: MessagePack as alternative
-msgpack==1.0.7
-
-# Advanced scheduling and task management
-apscheduler==3.10.4
-
-# File system monitoring
 watchdog==3.0.0
-
-# Beautiful console output and progress bars
 rich==13.7.0
 
-# Data validation and type checking
-pydantic==2.5.0
-
-# CBOR binary format support
-cbor2==5.4.6
-
-# Development tools
+# ===== DEVELOPMENT TOOLS (Optional) =====
+pytest==7.4.2
+pytest-cov==4.1.0
 black==23.12.1
 isort==5.13.2
 mypy==1.8.0
 
-# Performance monitoring
+# ===== PERFORMANCE MONITORING (Optional) =====
 memory-profiler==0.61.0
 line-profiler==4.1.1 

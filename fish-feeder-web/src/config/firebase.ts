@@ -30,7 +30,38 @@ export interface SensorValue {
 }
 
 export interface ArduinoSensorData {
-  // Temperature & Humidity sensors (updated Arduino format)
+  // 🔥 UNIFIED NAMING CONVENTION - ตรงกับเอกสาร COMPLETE_SYSTEM_REFERENCE.md
+  
+  // Temperature & Humidity (unified naming)
+  temp_feed_tank?: number;        // อุณหภูมิถังอาหาร (°C)
+  temp_control_box?: number;      // อุณหภูมิกล่องควบคุม (°C) 
+  humidity_feed_tank?: number;    // ความชื้นถังอาหาร (%)
+  humidity_control_box?: number;  // ความชื้นกล่องควบคุม (%)
+  
+  // Weight System (unified naming)
+  weight_kg?: number;             // น้ำหนักอาหาร (kg)
+  weight_raw?: number;            // ค่า raw จาก HX711
+  weight_calibrated?: boolean;    // สถานะ calibration
+  
+  // Environment (unified naming)
+
+  
+  // Power System (unified naming)
+  solar_voltage?: number;         // แรงดันโซลาร์ (V)
+  solar_current?: number;         // กระแสโซลาร์ (A)
+  load_voltage?: number;          // แรงดันโหลด (V)
+  load_current?: number;          // กระแสโหลด (A)
+  battery_percent?: number;       // เปอร์เซ็นต์แบต (%)
+  battery_status?: string;        // สถานะแบต
+  
+  // Control States (unified naming)
+  relay_led_pond?: boolean;       // LED บ่อปลา
+  relay_fan_box?: boolean;        // พัดลมกล่องควบคุม
+  motor_auger_pwm?: number;       // Auger ส่งอาหาร (0-255)
+  motor_actuator_pwm?: number;    // Actuator เปิด/ปิด (0-255)
+  motor_blower_pwm?: number;      // Blower เป่าอาหาร (0-255)
+  
+  // Legacy support (for backward compatibility)
   DHT22_SYSTEM?: {
     temperature?: SensorValue;
     humidity?: SensorValue;
@@ -39,29 +70,22 @@ export interface ArduinoSensorData {
     temperature?: SensorValue;
     humidity?: SensorValue;
   };
-  // Weight sensors (new Arduino format)
   HX711_FEEDER?: {
     weight: SensorValue;
   };
-  // Legacy weight sensor name (for backward compatibility)
   WEIGHT?: {
     weight: SensorValue;
   };
-  // Power system sensors (updated Arduino format)
   BATTERY_STATUS?: {
     voltage: SensorValue;
     current: SensorValue;
-    percentage?: SensorValue; // Calculated field
+    percentage?: SensorValue;
   };
   SOLAR_VOLTAGE?: {
     voltage: SensorValue;
   };
   SOLAR_CURRENT?: {
     current: SensorValue;
-  };
-  // Environment sensors (updated Arduino format)
-  SOIL_MOISTURE?: {
-    moisture: SensorValue;
   };
   // 🏠 ROOM SENSORS - ใส่ห้องครบ
   ROOM_TEMPERATURE?: {
@@ -182,32 +206,106 @@ class GlobalFirebaseListenerManager {
 
   private createListener(): void {
     console.log("🔥 Creating global Firebase listener");
-    const fishFeederRef = ref(this.database, "fish_feeder");
+    const rootRef = ref(this.database, "/"); // ROOT LEVEL - matches Pi Server
     let isActive = true;
 
     const unsubscribe = onValue(
-      fishFeederRef,
+      rootRef,
       (snapshot) => {
         if (!isActive) return;
         
         try {
           const rawData = snapshot.val();
-          console.log("🔥 Global Firebase raw data received:", rawData);
+          console.log("🔥 Firebase raw data received:", rawData);
 
-          // ⚡ SIMPLE DATA PROCESSING - No complex variable declarations
           let processedData: FirebaseData;
 
           if (rawData) {
+            // ✅ UNIFIED MAPPING - Pi Server ส่งมาในรูปแบบ root level แล้ว
             processedData = {
               timestamp: rawData.timestamp || new Date().toISOString(),
-              sensors: rawData.sensors || {},
-              status: {
-                online: rawData.status?.online ?? true,
-                last_updated: rawData.timestamp || new Date().toISOString(),
-                arduino_connected: rawData.status?.arduino_connected ?? false
+              sensors: {
+                // 🔥 DIRECT MAPPING จาก Pi Server unified structure
+                temp_feed_tank: rawData.sensors?.temp_feed_tank,
+                temp_control_box: rawData.sensors?.temp_control_box,
+                humidity_feed_tank: rawData.sensors?.humidity_feed_tank,
+                humidity_control_box: rawData.sensors?.humidity_control_box,
+                weight_kg: rawData.sensors?.weight_kg,
+            
+                solar_voltage: rawData.sensors?.solar_voltage,
+                solar_current: rawData.sensors?.solar_current,
+                load_voltage: rawData.sensors?.load_voltage,
+                load_current: rawData.sensors?.load_current,
+                battery_percent: rawData.sensors?.battery_percent,
+                battery_status: rawData.sensors?.battery_status,
+                relay_led_pond: rawData.sensors?.relay_led_pond,
+                relay_fan_box: rawData.sensors?.relay_fan_box,
+                motor_auger_pwm: rawData.sensors?.motor_auger_pwm,
+                motor_actuator_pwm: rawData.sensors?.motor_actuator_pwm,
+                motor_blower_pwm: rawData.sensors?.motor_blower_pwm,
+                
+                // 📊 Legacy compatibility mapping for old components
+                DHT22_SYSTEM: rawData.sensors?.temp_control_box ? {
+                  temperature: {
+                    value: rawData.sensors.temp_control_box,
+                    unit: "°C",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  },
+                  humidity: {
+                    value: rawData.sensors.humidity_control_box || 0,
+                    unit: "%",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  }
+                } : undefined,
+                
+                DHT22_FEEDER: rawData.sensors?.temp_feed_tank ? {
+                  temperature: {
+                    value: rawData.sensors.temp_feed_tank,
+                    unit: "°C", 
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  },
+                  humidity: {
+                    value: rawData.sensors.humidity_feed_tank || 0,
+                    unit: "%",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  }
+                } : undefined,
+                
+                HX711_FEEDER: rawData.sensors?.weight_kg ? {
+                  weight: {
+                    value: rawData.sensors.weight_kg,
+                    unit: "kg",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  }
+                } : undefined,
+                
+                BATTERY_STATUS: rawData.sensors?.battery_percent ? {
+                  voltage: {
+                    value: rawData.sensors.load_voltage || 0,
+                    unit: "V",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  },
+                  current: {
+                    value: rawData.sensors.load_current || 0,
+                    unit: "A",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  },
+                  percentage: {
+                    value: rawData.sensors.battery_percent,
+                    unit: "%",
+                    timestamp: rawData.timestamp || new Date().toISOString()
+                  }
+                } : undefined
               },
-              control: rawData.control || rawData.controls
+              status: {
+                online: rawData.status?.pi_server_running || rawData.status?.online || false,
+                last_updated: rawData.status?.last_update || rawData.timestamp || new Date().toISOString(),
+                arduino_connected: rawData.status?.arduino_connected || false
+              },
+              control: rawData.controls || {}
             };
+            
+            console.log("[WEB] Processed Firebase data:", processedData);
           } else {
             processedData = {
               timestamp: new Date().toISOString(),
@@ -272,7 +370,7 @@ class GlobalFirebaseListenerManager {
 
     this.activeListener = () => {
       isActive = false;
-      off(fishFeederRef, "value", unsubscribe);
+      off(rootRef, "value", unsubscribe);
       console.log("🔥 Global Firebase listener unsubscribed");
     };
   }
@@ -323,55 +421,82 @@ class FirebaseClient {
     return () => off(statusRef, "value", unsubscribe);
   }
 
-  // Control LED - ✅ แก้ไขให้ส่งข้อมูลที่ Pi แปลงเป็น Arduino Protocol ได้
+  // Control LED - UNIFIED PROTOCOL
   async controlLED(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
-      console.log(`🔵 Sending LED command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/led");
+      console.log(`💡 [WEB] Sending LED command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:3 (ON) หรือ R:4 (OFF)
-      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus());
-      await set(controlRef, value);
-
-      console.log(`✅ LED command sent successfully: ${action} (${value})`);
+      // Send unified JSON format matching Pi Server protocol
+      const command = {
+        controls: {
+          relays: {
+            led_pond_light: action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus())
+          }
+        },
+        timestamp: Date.now()
+      };
+      
+      await set(controlRef, command);
+      console.log(`✅ [WEB] LED unified command sent:`, command);
       return true;
     } catch (error) {
-      console.error("❌ LED control error:", error);
+      console.error("❌ [WEB] LED control error:", error);
       return false;
     }
   }
 
-  // Control Fan - ✅ แก้ไขให้ส่งข้อมูลที่ Pi แปลงเป็น Arduino Protocol ได้
+  // Control Fan - UNIFIED PROTOCOL
   async controlFan(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
-      console.log(`🌀 Sending Fan command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/fan");
+      console.log(`🌀 [WEB] Sending Fan command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น R:1 (ON) หรือ R:2 (OFF)
-      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus());
-      await set(controlRef, value);
+      // Send unified JSON format matching Pi Server protocol
+      const command = {
+        controls: {
+          relays: {
+            control_box_fan: action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus())
+          }
+        },
+        timestamp: Date.now()
+      };
 
-      console.log(`✅ Fan command sent successfully: ${action} (${value})`);
+      await set(controlRef, command);
+      console.log(`✅ [WEB] Fan unified command sent:`, command);
       return true;
     } catch (error) {
-      console.error("❌ Fan control error:", error);
+      console.error("❌ [WEB] Fan control error:", error);
       return false;
     }
   }
 
-  // Control Feeder - ✅ ส่งข้อมูลที่ Pi แปลงเป็น FEED:small/medium/large ได้
+  // Control Feeder - UNIFIED PROTOCOL
   async controlFeeder(action: "on" | "off" | "small" | "medium" | "large" | "auto" | "stop"): Promise<boolean> {
     try {
-      console.log(`🍚 Sending Feeder command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/feeder");
+      console.log(`🐟 [WEB] Sending Feeder command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ ส่งคำสั่งที่ Pi จะแปลงเป็น FEED:small/medium/large หรือ R:0
-      let value = action;
-      if (action === "on") value = "medium";  // Default to medium
-      if (action === "off") value = "stop";
+      // Convert action to PWM value for auger motor
+      let pwmValue = 0;
+      if (action === "small") pwmValue = 100;
+      else if (action === "medium" || action === "on") pwmValue = 150;
+      else if (action === "large") pwmValue = 200;
+      else if (action === "auto") pwmValue = 150;
+      else pwmValue = 0; // stop/off
+
+      // Send unified JSON format matching Pi Server protocol
+      const command = {
+        controls: {
+          motors: {
+            auger_food_dispenser: pwmValue
+          }
+        },
+        timestamp: Date.now()
+      };
       
-      await set(controlRef, value);
-      console.log(`✅ Feeder command sent successfully: ${value}`);
+      await set(controlRef, command);
+      console.log(`✅ [WEB] Feeder unified command sent:`, command);
       return true;
     } catch (error) {
       console.error("❌ Feeder control error:", error);
@@ -379,56 +504,94 @@ class FirebaseClient {
     }
   }
 
-  // Control Blower - ✅ ส่งข้อมูลที่ Pi แปลงเป็น B:1/B:0 ได้
+  // Control Blower - UNIFIED PROTOCOL
   async controlBlower(action: "on" | "off" | "toggle"): Promise<boolean> {
     try {
-      console.log(`💨 Sending Blower command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/blower");
+      console.log(`💨 [WEB] Sending Blower command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ ส่ง boolean ที่ Pi จะแปลงเป็น B:1 (ON) หรือ B:0 (OFF)
-      const value = action === "on" ? true : (action === "off" ? false : !await this.getCurrentBlowerStatus());
-      await set(controlRef, value);
+      // Convert action to PWM value
+      let pwmValue = 0;
+      if (action === "on") pwmValue = 200;
+      else if (action === "toggle") pwmValue = await this.getCurrentBlowerStatus() ? 0 : 200;
+      else pwmValue = 0; // off
 
-      console.log(`✅ Blower command sent successfully: ${action} (${value})`);
+      // Send unified JSON format matching Pi Server protocol
+      const command = {
+        controls: {
+          motors: {
+            blower_ventilation: pwmValue
+          }
+        },
+        timestamp: Date.now()
+      };
+      
+      await set(controlRef, command);
+      console.log(`✅ [WEB] Blower unified command sent:`, command);
       return true;
     } catch (error) {
-      console.error("❌ Blower control error:", error);
+      console.error("❌ [WEB] Blower control error:", error);
       return false;
     }
   }
 
-  // Control Actuator - ✅ ส่งข้อมูลที่ Pi แปลงเป็น A:1/A:2/A:0 ได้
+  // Control Actuator - UNIFIED PROTOCOL
   async controlActuator(action: "up" | "down" | "stop"): Promise<boolean> {
     try {
-      console.log(`🔧 Sending Actuator command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/actuator");
+      console.log(`📏 [WEB] Sending Actuator command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ ส่งคำสั่งที่ Pi จะแปลงเป็น A:1 (UP), A:2 (DOWN), A:0 (STOP)
-      await set(controlRef, action);
-      console.log(`✅ Actuator command sent successfully: ${action}`);
+      // Convert action to PWM value
+      let pwmValue = 0;
+      if (action === "up") pwmValue = 200;
+      else if (action === "down") pwmValue = 200; // Same speed, direction handled by Pi
+      else pwmValue = 0; // stop
+
+      // Send unified JSON format matching Pi Server protocol
+      const command = {
+        controls: {
+          motors: {
+            actuator_feeder: pwmValue
+          }
+        },
+        timestamp: Date.now()
+      };
+      
+      await set(controlRef, command);
+      console.log(`✅ [WEB] Actuator unified command sent:`, command);
       return true;
     } catch (error) {
-      console.error("❌ Actuator control error:", error);
+      console.error("❌ [WEB] Actuator control error:", error);
       return false;
     }
   }
 
-  // Control Auger - ✅ ส่งข้อมูลที่ Pi แปลงเป็น G:1/G:2/G:0 ได้
+  // Control Auger - UNIFIED PROTOCOL
   async controlAuger(action: "on" | "off" | "forward" | "reverse" | "stop"): Promise<boolean> {
     try {
-      console.log(`🌀 Sending Auger command: ${action}`);
-      const controlRef = ref(this.database, "fish_feeder/control/auger");
+      console.log(`🌀 [WEB] Sending Auger command: ${action}`);
+      const controlRef = ref(this.database, "/controls");
 
-      // ✅ แปลง action เป็นคำสั่งที่ Pi เข้าใจ
-      let augerAction = action;
-      if (action === "on") augerAction = "forward";
-      if (action === "off") augerAction = "stop";
+      // Send unified JSON format
+      let augerValue = 0;
+      if (action === "on" || action === "forward") augerValue = 200;
+      if (action === "reverse") augerValue = -200;
+      if (action === "stop" || action === "off") augerValue = 0;
 
-      await set(controlRef, augerAction);
-      console.log(`✅ Auger command sent successfully: ${augerAction}`);
+      const command = {
+        controls: {
+          motors: {
+            auger_food_dispenser: Math.abs(augerValue) // Pi Server handles direction separately
+          }
+        },
+        timestamp: Date.now()
+      };
+      
+      await set(controlRef, command);
+      console.log(`✅ [WEB] Auger unified command sent:`, command);
       return true;
     } catch (error) {
-      console.error("❌ Auger control error:", error);
+      console.error("❌ [WEB] Auger control error:", error);
       return false;
     }
   }
@@ -436,8 +599,9 @@ class FirebaseClient {
   // Helper methods to get current status for toggle
   private async getCurrentLEDStatus(): Promise<boolean> {
     try {
-      const snapshot = await get(ref(this.database, "fish_feeder/control/led"));
-      return snapshot.val() || false;
+      const snapshot = await get(ref(this.database, "/sensors"));
+      const data = snapshot.val();
+      return data?.relay_led_pond || false;
     } catch {
       return false;
     }
@@ -445,8 +609,9 @@ class FirebaseClient {
 
   private async getCurrentFanStatus(): Promise<boolean> {
     try {
-      const snapshot = await get(ref(this.database, "fish_feeder/control/fan"));
-      return snapshot.val() || false;
+      const snapshot = await get(ref(this.database, "/sensors"));
+      const data = snapshot.val();
+      return data?.relay_fan_box || false;
     } catch {
       return false;
     }
@@ -454,8 +619,9 @@ class FirebaseClient {
 
   private async getCurrentBlowerStatus(): Promise<boolean> {
     try {
-      const snapshot = await get(ref(this.database, "fish_feeder/control/blower"));
-      return snapshot.val() || false;
+      const snapshot = await get(ref(this.database, "/sensors"));
+      const data = snapshot.val();
+      return (data?.motor_blower_pwm || 0) > 0;
     } catch {
       return false;
     }
@@ -465,13 +631,15 @@ class FirebaseClient {
   async setMotorPWM(motorId: string, speed: number): Promise<boolean> {
     try {
       console.log(`⚙️ Setting Motor ${motorId} PWM: ${speed}`);
-      const controlRef = ref(this.database, `fish_feeder/control/motors/${motorId}`);
+      const controlRef = ref(this.database, "fish_feeder/control");
 
-      await set(controlRef, {
-        speed: speed,
-        enabled: speed > 0,
+      const command = {
+        [`motor_${motorId}_pwm`]: speed,
+        [`motor_${motorId}_enabled`]: speed > 0,
         timestamp: new Date().toISOString()
-      });
+      };
+      
+      await set(controlRef, command);
       console.log(`✅ Motor PWM set successfully: ${motorId} = ${speed}`);
 
       return true;
@@ -551,121 +719,30 @@ class FirebaseClient {
   // Turn off all devices
   async turnOffAll(): Promise<boolean> {
     try {
-      const controlRef = ref(this.database, "fish_feeder/control");
+      console.log("🚨 [WEB] Emergency shutdown - turning off all devices");
+      const controlRef = ref(this.database, "/controls");
 
-      await set(controlRef, {
-        led: "off",
-        fan: "off",
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Turn off all error:", error);
-
-      return false;
-    }
-  }
-
-  // Send command to Arduino
-  async sendArduinoCommand(command: string): Promise<boolean> {
-    try {
-      const commandRef = ref(this.database, "fish_feeder/commands");
-
-      await set(commandRef, {
-        command: command,
-        timestamp: new Date().toISOString(),
-        status: "pending"
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Arduino command error:", error);
-
-      return false;
-    }
-  }
-
-  // Send Ultra Fast Relay Command
-  async sendRelayCommand(command: string): Promise<boolean> {
-    try {
-      console.log(`⚡ Sending Relay command: ${command}`);
-      const controlRef = ref(this.database, "fish_feeder/commands/relay");
+      // Send unified shutdown command
+      const command = {
+        controls: {
+          relays: {
+            led_pond_light: false,
+            control_box_fan: false
+          },
+          motors: {
+            auger_food_dispenser: 0,
+            actuator_feeder: 0,
+            blower_ventilation: 0
+          }
+        },
+        timestamp: Date.now()
+      };
 
       await set(controlRef, command);
-      console.log(`✅ Relay command sent successfully: ${command}`);
-
+      console.log("✅ [WEB] Emergency shutdown command sent");
       return true;
     } catch (error) {
-      console.error("❌ Relay command error:", error);
-
-      return false;
-    }
-  }
-
-  // Send Motor Command
-  async sendMotorCommand(command: string): Promise<boolean> {
-    try {
-      console.log(`🌀 Sending Motor command: ${command}`);
-      const controlRef = ref(this.database, "fish_feeder/commands/motor");
-
-      await set(controlRef, command);
-      console.log(`✅ Motor command sent successfully: ${command}`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Motor command error:", error);
-
-      return false;
-    }
-  }
-
-  // Send Blower PWM Command
-  async sendBlowerCommand(command: string): Promise<boolean> {
-    try {
-      console.log(`💨 Sending Blower command: ${command}`);
-      const controlRef = ref(this.database, "fish_feeder/commands/blower");
-
-      await set(controlRef, command);
-      console.log(`✅ Blower command sent successfully: ${command}`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Blower command error:", error);
-
-      return false;
-    }
-  }
-
-  // Send Actuator Direct Command
-  async sendActuatorCommand(command: string): Promise<boolean> {
-    try {
-      console.log(`🔧 Sending Actuator command: ${command}`);
-      const controlRef = ref(this.database, "fish_feeder/commands/actuator");
-
-      await set(controlRef, command);
-      console.log(`✅ Actuator command sent successfully: ${command}`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Actuator command error:", error);
-
-      return false;
-    }
-  }
-
-  // Send Feed Command
-  async sendFeedCommand(command: string): Promise<boolean> {
-    try {
-      console.log(`🐟 Sending Feed command: ${command}`);
-      const controlRef = ref(this.database, "fish_feeder/commands/feed");
-
-      await set(controlRef, command);
-      console.log(`✅ Feed command sent successfully: ${command}`);
-
-      return true;
-    } catch (error) {
-      console.error("❌ Feed command error:", error);
-
+      console.error("❌ [WEB] Emergency shutdown error:", error);
       return false;
     }
   }

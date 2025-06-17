@@ -145,12 +145,16 @@ const FeedControlModular = () => {
     setWeightBeforeFeed(currentWeight);
 
     try {
-      await controlActuator("up");
-      await controlAuger("on");
-      await controlBlower("on");
-      await controlActuator("down");
+      console.log("🐟 Starting feed sequence with unified protocol...");
+      
+      // ✅ UNIFIED PROTOCOL SEQUENCE
+      await controlActuator("up");     // Opens feeder using /controls/motors/actuator_feeder
+      await controlAuger("forward");   // Dispenses food using /controls/motors/auger_food_dispenser  
+      await controlBlower("on");       // Blows food using /controls/motors/blower_ventilation
+      await controlActuator("down");   // Closes feeder
       
       setLastFeedTime(new Date().toLocaleString());
+      console.log("✅ Feed sequence completed successfully");
       
       // ✅ IMMEDIATE DATA REFRESH - No setTimeout delays!
       fetchCurrentWeight();

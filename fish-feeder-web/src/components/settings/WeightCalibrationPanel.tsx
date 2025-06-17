@@ -125,7 +125,7 @@ export const WeightCalibrationPanel: React.FC<WeightCalibrationProps> = ({ class
           HX711 Weight Sensor Calibration
         </h2>
         <span className="text-sm text-gray-500">
-          EEPROM Auto-Save
+          ✅ Unified Protocol | EEPROM Auto-Save
         </span>
       </div>
 

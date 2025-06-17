@@ -1,232 +1,492 @@
-# Fish Feeder Pi Server
+# 🐧 Raspberry Pi Server - Fish Feeder IoT Bridge
 
-Python server application for the Fish Feeder IoT system running on Raspberry Pi 4.
+**Pi Server เป็นสะพานเชื่อมต่อระหว่าง Arduino ↔ Firebase ↔ Camera**
 
-## Overview
+## 📋 Overview
 
-This server acts as the central communication hub between the Arduino hardware and Firebase, providing real-time data processing, command routing, and system monitoring.
+Raspberry Pi 4 ทำหน้าที่เป็น **Central Hub** ของระบบ Fish Feeder โดย:
+- รับข้อมูลจาก Arduino ผ่าน Serial USB
+- ส่งข้อมูลไป Firebase Realtime Database
+- ประมวลผลกล้องและ AI
+- เก็บข้อมูลใน Local JSON Database
 
-## Architecture Role
+## 🏗️ Architecture
 
 ```
-Web App → Firebase → [PI SERVER] → Arduino (Serial)
+Arduino USB ↔ Pi Server ↔ Firebase ↔ Web Interface
+    ↓           ↓              ↓
+  Sensors   Camera/AI    Local Database
 ```
 
-The Pi Server:
-- Listens to Firebase for control commands
-- Sends commands to Arduino via Serial
-- Receives sensor data from Arduino
-- Updates Firebase with sensor data
-- Handles camera streaming (PageKite)
+## 📁 Project Structure
 
-## Features
+```
+rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite/
+├── main.py                 # Main server application
+├── main_new.py             # New version (if exists)
+├── requirements.txt        # Python dependencies
+├── config.env             # Environment configuration
+├── deploy.sh              # Deployment script
+├── README.md              # This documentation
+├── 📁 communication/       # Arduino ↔ Firebase communication
+│   ├── arduino_comm.py    # Arduino serial communication
+│   └── firebase_comm.py   # Firebase database operations
+├── 📁 camera/             # Camera and AI processing
+│   ├── streaming.py       # Video streaming
+│   ├── ai_processor.py    # AI/ML processing
+│   ├── photos/           # Photo storage
+│   ├── videos/           # Video storage
+│   └── thumbnails/       # Thumbnail storage
+├── 📁 database/           # Local JSON database
+│   └── local_json_db.py  # JSON database operations
+├── 📁 config/             # Configuration files
+│   ├── settings.py       # System settings
+│   └── constants.py      # System constants
+├── 📁 system/             # System management
+│   └── state_manager.py  # System state management
+├── 📁 web/                # Web interface backend
+│   └── websocket_events.py # WebSocket events
+└── 📁 fish_feeder_data/   # Local data storage
+    ├── sensors/          # Daily sensor data
+    ├── controls/         # Control commands history
+    ├── logs/            # System logs
+    ├── settings/        # Settings backup
+    └── backups/         # Data backups
+```
 
-- Firebase Realtime Database integration
-- Serial communication with Arduino
-- Command processing and routing
-- Sensor data collection and validation
-- Camera streaming support
-- System health monitoring
-- Error handling and logging
+## 🚀 Quick Start
 
-## Requirements
-
-- Python 3.11+
-- Raspberry Pi 4 (2GB+ RAM recommended)
-- Arduino connected via USB/Serial
-- Firebase service account
-- Internet connection
-
-## Installation
-
-### 1. System Dependencies
+### 1. System Requirements
 ```bash
-sudo apt update
-sudo apt install python3-pip python3-venv
+# Raspberry Pi OS (Debian 11+ recommended)
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3 python3-pip git
 ```
 
-### 2. Python Environment
+### 2. Installation
 ```bash
 cd rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### 3. Configuration
-Create `config.env` file:
-```env
-FIREBASE_SERVICE_ACCOUNT_PATH=firebase-service-account.json
-ARDUINO_PORT=/dev/ttyUSB0
-ARDUINO_BAUD_RATE=115200
-LOG_LEVEL=INFO
+```bash
+# Copy and edit environment file
+cp config.env.example config.env
+nano config.env
 ```
 
 ### 4. Firebase Setup
-Place your Firebase service account JSON file in the directory and update the path in `config.env`.
-
-## Usage
-
-### Start Server
 ```bash
-python main.py
+# Place your Firebase service account key
+cp firebase-service-account.json ./
 ```
 
-### Development Mode
+### 5. Run Server
 ```bash
-python main_100_percent_qa.py
+python3 main.py
 ```
 
-### Arduino Diagnostics
-```bash
-python arduino_diagnostics.py
-```
+## 🔧 Key Features
 
-## Key Files
+### 📡 Serial Communication
+- **Auto-detection** - หา Arduino USB port อัตโนมัติ
+- **Reconnection** - เชื่อมต่อใหม่เมื่อขาดการติดต่อ
+- **JSON Processing** - แปลง Arduino data เป็น Firebase format
+- **Command Forwarding** - ส่งคำสั่งจาก Firebase ไป Arduino
 
-- `main.py` - Main server application
-- `firebase_config.py` - Firebase configuration and utilities
-- `arduino_diagnostics.py` - Arduino connection testing
-- `requirements.txt` - Python dependencies
-- `config.env` - Environment configuration
+### 🔥 Firebase Integration
+- **Realtime Database** - เก็บข้อมูลแบบ Real-time
+- **Auto Sync** - ซิงค์ข้อมูลอัตโนมัติ
+- **Offline Mode** - ทำงานได้เมื่อไม่มี internet
+- **Error Recovery** - กู้คืนเมื่อเกิดข้อผิดพลาด
 
-## Communication Protocol
+### 📹 Camera System
+- **Live Streaming** - ถ่ายทอดสดผ่าน HTTP
+- **Motion Detection** - ตรวจจับการเคลื่อนไหว
+- **Photo Capture** - ถ่ายรูปอัตโนมัติ
+- **AI Processing** - วิเคราะห์ภาพด้วย OpenCV
 
-### Arduino Commands (Pi → Arduino)
-```json
+### 💾 Local Database
+- **JSON Files** - เก็บข้อมูลแบบ JSON
+- **Daily Organization** - จัดเก็บตามวันที่
+- **Backup System** - สำรองข้อมูลอัตโนมัติ
+- **Query System** - ค้นหาข้อมูลได้
+
+## 📊 Data Flow
+
+### Arduino → Pi → Firebase
+```python
+# Arduino sends JSON via Serial
 {
-  "command": "control",
-  "device": "auger",
-  "action": "forward",
-  "value": 255
-}
-```
-
-### Sensor Data (Arduino → Pi → Firebase)
-```json
-{
-  "feedTemp": 27.5,
-  "feedHumidity": 64.5,
-  "boxTemp": 28.6,
-  "boxHumidity": 64.1,
-  "weight": 1.985,
+  "sensors": {...},
+  "controls": {...},
   "timestamp": 1672531200
 }
+
+# Pi processes and sends to Firebase
+firebase_db.child("sensors").set(sensor_data)
+firebase_db.child("controls").set(control_data)
 ```
 
-## Firebase Paths
+### Firebase → Pi → Arduino
+```python
+# Web sends command to Firebase
+firebase_db.child("commands").push(command)
 
-- `/controls/` - Control commands from web app
-- `/status/` - System status updates
-- `/sensors/` - Sensor data from Arduino
-- `/logs/` - System logs and events
+# Pi listens and forwards to Arduino
+arduino_comm.send_command(command)
+```
 
-## Serial Communication
+## 🛠️ Configuration
 
-- Port: Auto-detected or configured in `config.env`
-- Baud Rate: 115200
-- Protocol: JSON over Serial
-- Timeout: 1 second
-- Auto-reconnect: Enabled
-
-## System Services
-
-### Install as systemd service
+### Environment Variables (config.env)
 ```bash
-sudo cp fish-feeder.service /etc/systemd/system/
-sudo systemctl enable fish-feeder
-sudo systemctl start fish-feeder
+# Arduino Communication
+ARDUINO_PORT=auto
+ARDUINO_BAUDRATE=115200
+
+# Firebase Configuration
+FIREBASE_DATABASE_URL=https://your-project.firebaseio.com/
+FIREBASE_SERVICE_ACCOUNT=./firebase-service-account.json
+
+# Camera Settings
+CAMERA_ENABLED=true
+CAMERA_RESOLUTION=1920x1080
+CAMERA_FPS=30
+
+# Local Database
+LOCAL_DB_ENABLED=true
+LOCAL_DB_PATH=./fish_feeder_data/
+
+# Network Settings
+PAGEKITE_ENABLED=true
+PAGEKITE_SUBDOMAIN=your-subdomain
+
+# System Settings
+DEBUG_MODE=false
+LOG_LEVEL=INFO
 ```
 
-### Check service status
+### Firebase Database Structure
+```json
+{
+  "sensors": {
+    "current": {
+      "feed_tank": {"temperature": 27.5, "humidity": 64.5},
+      "control_box": {"temperature": 28.6, "humidity": 64.1},
+      "weight_kg": 1.985,
+      "power": {...}
+    },
+    "history": {
+      "2024-01-15": [...]
+    }
+  },
+  "controls": {
+    "current": {
+      "relays": {...},
+      "motors": {...}
+    },
+    "commands": {
+      "pending": [...]
+    }
+  },
+  "system": {
+    "status": "online",
+    "last_update": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+## 📹 Camera Features
+
+### Live Streaming
+```python
+# Start camera stream
+camera_stream = CameraStream(resolution=(1920,1080), fps=30)
+camera_stream.start()
+
+# Access stream at
+# http://pi-ip-address:8080/stream
+```
+
+### AI Processing
+```python
+# Motion detection
+motion_detector = MotionDetector(sensitivity=0.8)
+if motion_detector.detect_motion(frame):
+    camera.capture_photo()
+
+# Fish detection (if implemented)
+fish_detector = FishDetector()
+fish_count = fish_detector.count_fish(frame)
+```
+
+## 💾 Local Database
+
+### JSON Database Operations
+```python
+from database.local_json_db import SimpleJSONDatabase
+
+# Initialize database
+db = SimpleJSONDatabase("./fish_feeder_data/")
+
+# Save sensor data
+db.save_sensor_data(sensor_data)
+
+# Save control commands
+db.save_control_data(control_data)
+
+# Query data
+today_data = db.get_today_sensors()
+```
+
+### Daily File Structure
+```
+fish_feeder_data/
+├── sensors/
+│   ├── 2024-01-15.json
+│   ├── 2024-01-16.json
+│   └── ...
+├── controls/
+│   ├── 2024-01-15.json
+│   └── ...
+└── logs/
+    ├── 2024-01-15.json
+    └── ...
+```
+
+## 🌐 Web Interface Backend
+
+### WebSocket Events
+```python
+# Real-time sensor updates
+@socketio.on('request_sensor_data')
+def handle_sensor_request():
+    emit('sensor_update', current_sensor_data)
+
+# Control commands
+@socketio.on('send_command')
+def handle_command(data):
+    arduino_comm.send_command(data)
+```
+
+### HTTP API Endpoints
+```python
+# GET /api/sensors - Get current sensor data
+# POST /api/controls - Send control command
+# GET /api/camera/stream - Camera stream
+# GET /api/status - System status
+```
+
+## 🔧 System Management
+
+### Service Installation
 ```bash
-sudo systemctl status fish-feeder
-sudo journalctl -u fish-feeder -f
+# Install as systemd service
+sudo ./deploy.sh install
+
+# Start service
+sudo systemctl start fish-feeder-pi
+
+# Enable auto-start
+sudo systemctl enable fish-feeder-pi
+
+# Check status
+sudo systemctl status fish-feeder-pi
 ```
 
-## Monitoring
+### Monitoring
+```bash
+# View logs
+sudo journalctl -u fish-feeder-pi -f
 
-### Logs
-- Application logs: `fish_feeder.log`
-- System logs: `journalctl -u fish-feeder`
-- Firebase logs: Included in application logs
+# Check process status
+ps aux | grep python3
 
-### Health Checks
-- Arduino connection status
-- Firebase connection status
-- Memory usage monitoring
-- CPU usage tracking
+# Monitor resource usage
+htop
+```
 
-## Development
+## 🔒 Security Features
 
-### Adding New Commands
-1. Update command handler in `main.py`
-2. Add validation logic
-3. Implement Arduino communication
-4. Update Firebase response
+### Network Security
+- **Firewall** - iptables rules
+- **SSH Keys** - Key-based authentication
+- **VPN** - Optional VPN connection
+
+### Data Security
+- **Local Encryption** - Encrypt sensitive data
+- **Backup Integrity** - Checksums for backups
+- **Access Control** - User permissions
+
+## 📊 Performance Monitoring
+
+### System Metrics
+```python
+# CPU and Memory usage
+import psutil
+
+cpu_percent = psutil.cpu_percent()
+memory_percent = psutil.virtual_memory().percent
+disk_usage = psutil.disk_usage('/').percent
+```
+
+### Network Monitoring
+```python
+# Firebase connection status
+firebase_status = firebase_comm.check_connection()
+
+# Arduino connection status
+arduino_status = arduino_comm.is_connected()
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**1. Arduino ไม่เชื่อมต่อ**
+```bash
+# ตรวจสอบ USB devices
+lsusb | grep Arduino
+
+# ตรวจสอบ serial ports
+ls /dev/tty*
+
+# ตรวจสอบ permissions
+sudo usermod -a -G dialout $USER
+```
+
+**2. Firebase ไม่เชื่อมต่อ**
+```bash
+# ตรวจสอบ internet connection
+ping google.com
+
+# ตรวจสอบ Firebase credentials
+cat firebase-service-account.json
+```
+
+**3. Camera ไม่ทำงาน**
+```bash
+# ตรวจสอบ camera module
+vcgencmd get_camera
+
+# ทดสอบ camera
+raspistill -o test.jpg
+```
+
+**4. High CPU Usage**
+```bash
+# ตรวจสอบ processes
+top -p $(pgrep python3)
+
+# ลด camera resolution
+# แก้ไขใน config.env
+CAMERA_RESOLUTION=1280x720
+```
+
+## 📈 Performance Optimization
+
+### CPU Optimization
+- ใช้ multi-threading สำหรับ I/O operations
+- ลด camera resolution เมื่อไม่จำเป็น
+- Optimize JSON processing
+
+### Memory Optimization
+- จำกัด buffer size
+- ลบ old data files
+- Use generators แทน lists
+
+### Network Optimization
+- Compress data ก่อนส่ง Firebase
+- Use connection pooling
+- Implement retry logic
+
+## 🔧 Development
+
+### Adding New Features
+```python
+# 1. Add to communication module
+def new_feature_handler():
+    pass
+
+# 2. Add to Firebase structure
+firebase_db.child("new_feature").set(data)
+
+# 3. Add to local database
+db.save_new_feature_data(data)
+```
 
 ### Testing
 ```bash
-# Test Arduino connection
-python arduino_diagnostics.py
+# Unit tests
+python3 -m pytest tests/
 
-# Test Firebase connection
-python firebase_test_menu.py
+# Integration tests
+python3 tests/test_integration.py
 
-# Run simple test
-python simple_test.py
+# Performance tests
+python3 tests/test_performance.py
 ```
 
-## Architecture Rules
+## 📱 Mobile Access
 
-### FORBIDDEN
-- delay()/sleep() functions
-- Blocking operations
-- Mock data
-- Test files in production
+### PageKite Setup
+```bash
+# Install PageKite
+curl -s https://pagekite.net/pk/ | sudo bash
 
-### REQUIRED
-- Event-driven programming
-- Non-blocking operations
-- Firebase as message broker
-- JSON data format only
-- Proper error handling
+# Configure subdomain
+echo "your-subdomain.pagekite.me" > ~/.pagekite.rc
+```
 
-## Troubleshooting
+### Remote Access
+- **Web Interface**: https://your-subdomain.pagekite.me
+- **Camera Stream**: https://your-subdomain.pagekite.me:8080/stream
+- **API**: https://your-subdomain.pagekite.me/api/
 
-### Arduino Connection Issues
-1. Check USB connection
-2. Verify port permissions: `sudo usermod -a -G dialout $USER`
-3. Check Arduino IDE isn't using the port
-4. Try different USB ports
+## 📊 Data Analytics
 
-### Firebase Connection Issues
-1. Verify service account JSON file
-2. Check internet connection
-3. Confirm Firebase project is active
-4. Review security rules
+### Sensor Data Analysis
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
 
-### Performance Issues
-1. Monitor CPU usage: `htop`
-2. Check memory usage: `free -h`
-3. Review logs for errors
-4. Restart service if needed
+# Load sensor data
+df = pd.read_json('fish_feeder_data/sensors/2024-01-15.json')
 
-## Dependencies
+# Plot temperature trends
+plt.plot(df['timestamp'], df['feed_tank']['temperature'])
+plt.title('Feed Tank Temperature')
+plt.show()
+```
 
-Main Python packages:
-- `firebase-admin` - Firebase integration
-- `pyserial` - Serial communication
-- `flask` - Web server (if enabled)
-- `requests` - HTTP client
+### Feeding Pattern Analysis
+```python
+# Analyze feeding times
+feeding_data = db.get_feeding_history()
+feeding_patterns = analyze_feeding_patterns(feeding_data)
+```
 
-## Security
+## 🆘 Support
 
-- Firebase service account with minimal permissions
-- No hardcoded credentials
-- Environment variable configuration
-- Regular security updates
+### Log Files
+```bash
+# System logs
+tail -f /var/log/fish-feeder-pi.log
 
-## License
+# Application logs
+tail -f fish_feeder_data/logs/$(date +%Y-%m-%d).json
+```
 
-Private project - All rights reserved. 
+### Debug Mode
+```bash
+# Enable debug mode
+export DEBUG_MODE=true
+python3 main.py
+```
+
+---
+
+**อัพเดทล่าสุด:** 2024 - Complete IoT Bridge System
+**เวอร์ชัน:** 2.0.0 - Firebase + Camera + Local Database

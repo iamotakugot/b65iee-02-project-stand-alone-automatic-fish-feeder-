@@ -1,6 +1,15 @@
 #!/bin/bash
-# 🐟 Fish Feeder Pi Server - Deployment & Auto-Start Script
-# 🚀 Comprehensive system setup with monitoring and recovery
+# Fish Feeder Pi Server - Production Deployment Script
+# Automated setup for Raspberry Pi 4 with Firebase integration
+
+set -e  # Exit on any error
+
+# Configuration
+PROJECT_NAME="fish-feeder"
+SERVICE_NAME="fish-feeder"
+PYTHON_ENV="venv"
+BACKUP_DIR="fish_feeder_data/backups"
+ARCHIVE_DIR="fish_feeder_data/archives"
 
 # Colors for output
 RED='\033[0;31m'
@@ -9,6 +18,23 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Print functions
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 # Configuration
 SERVICE_NAME="fish-feeder"
 PROJECT_DIR="$(pwd)"
@@ -16,7 +42,7 @@ USER="$(whoami)"
 PYTHON_ENV="$PROJECT_DIR/venv"
 LOG_FILE="/var/log/fish-feeder.log"
 
-echo -e "${BLUE}🐟 Fish Feeder Pi Server Deployment Script${NC}"
+echo -e "${BLUE}Fish Feeder Pi Server Deployment Script${NC}"
 echo -e "${BLUE}==========================================${NC}"
 
 # Function to print colored output
@@ -64,7 +90,7 @@ check_requirements() {
         sudo apt install -y git
     fi
     
-    print_status "System requirements checked ✅"
+    print_status "System requirements checked"
 }
 
 # Function to setup Python virtual environment
@@ -85,7 +111,7 @@ setup_python_env() {
     pip install --upgrade pip
     pip install -r requirements.txt
     
-    print_status "Python environment setup complete ✅"
+    print_status "Python environment setup complete"
 }
 
 # Function to setup Firebase credentials
@@ -102,7 +128,7 @@ setup_firebase() {
             exit 1
         fi
     else
-        print_status "Firebase configuration found ✅"
+        print_status "Firebase configuration found"
     fi
 }
 
@@ -210,7 +236,7 @@ EOF
     sudo systemctl daemon-reload
     sudo systemctl enable "$SERVICE_NAME"
     
-    print_status "Systemd service created and enabled ✅"
+    print_status "Systemd service created and enabled"
 }
 
 # Function to create monitoring script
@@ -219,7 +245,7 @@ create_monitoring_script() {
     
     cat > monitor.sh <<'EOF'
 #!/bin/bash
-# 🔍 Fish Feeder Monitoring Script
+# Fish Feeder Monitoring Script
 
 SERVICE_NAME="fish-feeder"
 LOG_FILE="/var/log/fish-feeder.log"
@@ -227,23 +253,23 @@ LOG_FILE="/var/log/fish-feeder.log"
 # Function to check service status
 check_service() {
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        echo "✅ Service is running"
+        echo "Service is running"
         return 0
     else
-        echo "❌ Service is not running"
+        echo "Service is not running"
         return 1
     fi
 }
 
 # Function to show recent logs
 show_logs() {
-    echo "📋 Recent logs (last 20 lines):"
+    echo "Recent logs (last 20 lines):"
     tail -n 20 "$LOG_FILE" 2>/dev/null || echo "No logs available"
 }
 
 # Function to restart service
 restart_service() {
-    echo "🔄 Restarting service..."
+    echo "Restarting service..."
     sudo systemctl restart "$SERVICE_NAME"
     sleep 3
     check_service
@@ -251,7 +277,7 @@ restart_service() {
 
 # Function to show status
 show_status() {
-    echo "🐟 Fish Feeder Service Status"
+    echo "Fish Feeder Service Status"
     echo "=========================="
     systemctl status "$SERVICE_NAME" --no-pager -l
     echo ""
@@ -277,7 +303,7 @@ case "${1:-status}" in
         check_service
         ;;
     "monitor"|"m")
-        echo "🔍 Monitoring mode (Ctrl+C to exit)"
+        echo "Monitoring mode (Ctrl+C to exit)"
         while true; do
             clear
             show_status
@@ -287,7 +313,7 @@ case "${1:-status}" in
         done
         ;;
     *)
-        echo "🐟 Fish Feeder Monitor"
+        echo "Fish Feeder Monitor"
         echo "Usage: $0 [status|logs|restart|check|monitor]"
         echo ""
         echo "Commands:"
@@ -301,7 +327,7 @@ esac
 EOF
 
     chmod +x monitor.sh
-    print_status "Monitoring script created ✅"
+    print_status "Monitoring script created"
 }
 
 # Function to create backup script
@@ -310,14 +336,14 @@ create_backup_script() {
     
     cat > backup_manager.sh <<'EOF'
 #!/bin/bash
-# 📁 Fish Feeder Backup Manager
+# Fish Feeder Backup Manager
 
 BACKUP_DIR="data_backup"
 ARCHIVE_DIR="archived_backups"
 
 # Function to show backup statistics
 show_stats() {
-    echo "📊 Backup Statistics"
+    echo "Backup Statistics"
     echo "==================="
     
     if [ ! -d "$BACKUP_DIR" ]; then
@@ -331,18 +357,18 @@ show_stats() {
     echo "Total JSON files: $(find $BACKUP_DIR -name "*.json" | wc -l)"
     echo ""
     
-    echo "📅 Recent dates:"
+    echo "Recent dates:"
     find "$BACKUP_DIR" -maxdepth 1 -type d -name "????-??-??" | sort | tail -7
     echo ""
     
-    echo "💾 Disk usage by date:"
+    echo "Disk usage by date:"
     find "$BACKUP_DIR" -maxdepth 1 -type d -name "????-??-??" | sort | tail -5 | xargs -I {} du -sh {}
 }
 
 # Function to clean old backups
 clean_old() {
     local days=${1:-30}
-    echo "🧹 Cleaning backups older than $days days..."
+    echo "Cleaning backups older than $days days..."
     
     find "$BACKUP_DIR" -maxdepth 1 -type d -name "????-??-??" -mtime +$days -exec rm -rf {} \;
     echo "Cleanup complete"
@@ -351,7 +377,7 @@ clean_old() {
 # Function to archive backups
 archive_backups() {
     local days=${1:-7}
-    echo "📦 Archiving backups older than $days days..."
+    echo "Archiving backups older than $days days..."
     
     mkdir -p "$ARCHIVE_DIR"
     
@@ -381,7 +407,7 @@ restore_backup() {
         return 1
     fi
     
-    echo "📂 Restoring backup for $date..."
+    echo "Restoring backup for $date..."
     tar -xzf "$archive_file" -C "$BACKUP_DIR"
     echo "Restore complete"
 }
@@ -401,7 +427,7 @@ case "${1:-stats}" in
         restore_backup $2
         ;;
     *)
-        echo "📁 Fish Feeder Backup Manager"
+        echo "Fish Feeder Backup Manager"
         echo "Usage: $0 [stats|clean|archive|restore]"
         echo ""
         echo "Commands:"
@@ -414,7 +440,7 @@ esac
 EOF
 
     chmod +x backup_manager.sh
-    print_status "Backup manager created ✅"
+    print_status "Backup manager created"
 }
 
 # Function to test the installation
@@ -423,15 +449,15 @@ test_installation() {
     
     # Test Python environment
     if source "$PYTHON_ENV/bin/activate" && python -c "import serial, firebase_admin, flask" 2>/dev/null; then
-        print_status "Python dependencies test passed ✅"
+        print_status "Python dependencies test passed"
     else
-        print_error "Python dependencies test failed ❌"
+        print_error "Python dependencies test failed"
         return 1
     fi
     
     # Test service file
     if sudo systemctl status "$SERVICE_NAME" --no-pager >/dev/null 2>&1; then
-        print_status "Systemd service test passed ✅"
+        print_status "Systemd service test passed"
     else
         print_warning "Systemd service not yet started"
     fi
@@ -447,11 +473,11 @@ start_service() {
     sleep 3
     
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        print_status "Service started successfully ✅"
+        print_status "Service started successfully"
         print_status "View logs with: journalctl -u $SERVICE_NAME -f"
         print_status "Monitor with: ./monitor.sh"
     else
-        print_error "Service failed to start ❌"
+        print_error "Service failed to start"
         print_status "Check logs with: journalctl -u $SERVICE_NAME"
         return 1
     fi
@@ -480,7 +506,7 @@ main() {
     print_status "3. View logs: ./monitor.sh logs"
     print_status "4. Access web interface: https://b65iee-02-fishfeederstandalone.web.app/arduino-test"
     print_status ""
-    print_status "Service will auto-start on system boot ✅"
+    print_status "Service will auto-start on system boot"
 }
 
 # Handle command line arguments
@@ -511,7 +537,7 @@ case "${1:-deploy}" in
         print_status "Service uninstalled"
         ;;
     *)
-        echo "🐟 Fish Feeder Pi Server Deployment"
+        echo "Fish Feeder Pi Server Deployment"
         echo "Usage: $0 [deploy|start|stop|restart|status|uninstall]"
         echo ""
         echo "Commands:"

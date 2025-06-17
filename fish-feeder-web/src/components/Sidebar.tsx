@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { MdSpaceDashboard, MdDining, MdThermostat, MdSettings, MdTune, MdBugReport } from "react-icons/md";
 import { FiBarChart } from "react-icons/fi";
-import { HiCodeBracket } from "react-icons/hi2";
 import { MdChevronLeft, MdChevronRight } from "react-icons/md";
 
 import { ThemeSwitch } from "@/components/theme-switch";
@@ -62,13 +61,6 @@ const Sidebar = () => {
       shortLabel: "Charts",
       icon: <FiBarChart className="w-5 h-5 sm:w-6 sm:h-6" />,
     },
-    {
-      path: "/arduino-test",
-      label: "Arduino Test",
-      shortLabel: "Test",
-      icon: <HiCodeBracket className="w-5 h-5 sm:w-6 sm:h-6" />,
-    },
-
     { 
       path: "/settings", 
       label: "Settings", 

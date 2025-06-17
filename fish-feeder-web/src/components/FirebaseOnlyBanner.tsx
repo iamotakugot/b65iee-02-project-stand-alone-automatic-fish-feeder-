@@ -22,10 +22,10 @@ export const FirebaseOnlyBanner: React.FC<FirebaseOnlyBannerProps> = ({
           <FaFireAlt className="text-2xl text-blue-500" />
           <div>
             <h3 className="text-lg font-bold text-white">
-              🌍 Firebase-Only Mode Active
+              🌍 Firebase Unified Protocol Mode
             </h3>
             <p className="text-sm text-slate-300">
-              Global access ready - No Pi server required
+              Real-time control via /controls & /sensors paths
             </p>
           </div>
           <span className="ml-auto bg-green-500 text-white px-2 py-1 rounded-full text-xs">
@@ -57,8 +57,8 @@ export const FirebaseOnlyBanner: React.FC<FirebaseOnlyBannerProps> = ({
         <div className="bg-slate-800/50 rounded-lg p-3 mt-4">
           <p className="text-xs text-slate-400">
             <FaGlobe className="inline mr-1" />
-            <strong>Global Access:</strong> This web app uses Firebase Database for worldwide access. 
-            Commands are queued and will be processed when the Pi server comes online.
+            <strong>Unified Protocol:</strong> Web → Firebase(/controls) → Pi Server → Arduino Serial. 
+            JSON commands: relays, motors with PWM values. Real-time updates every 1 second.
           </p>
         </div>
       </div>

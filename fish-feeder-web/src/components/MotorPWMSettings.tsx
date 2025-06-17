@@ -124,22 +124,22 @@ const MotorPWMSettings = () => {
           const speed = action.speed || Math.round(augerPWM * 2.55);
           await setMotorPWM('auger', speed);
           updateMotorState("auger", `SPD:${speed}`, speed);
-          setConnectionStatus(`✅ Auger speed: ${speed} via Firebase`);
+          setConnectionStatus(`✅ Auger PWM: ${speed} → /controls/motors/auger_food_dispenser`);
           break;
         case "forward":
           await controlAuger('forward');
           updateMotorState("auger", "G:1");
-          setConnectionStatus(`✅ Auger forward via Firebase`);
+          setConnectionStatus(`✅ Auger forward → Unified Protocol`);
           break;
         case "reverse":
           await controlAuger('reverse');
           updateMotorState("auger", "G:2");
-          setConnectionStatus(`✅ Auger reverse via Firebase`);
+          setConnectionStatus(`✅ Auger reverse → Unified Protocol`);
           break;
         case "stop":
           await controlAuger('stop');
           updateMotorState("auger", "G:0");
-          setConnectionStatus(`✅ Auger stop via Firebase`);
+          setConnectionStatus(`✅ Auger stop → Unified Protocol`);
           break;
       }
 
@@ -158,7 +158,7 @@ const MotorPWMSettings = () => {
       setConnectionStatus("🔄 Moving actuator...");
 
       await controlActuator(action);
-      setConnectionStatus(`✅ Actuator ${action} via Firebase`);
+      setConnectionStatus(`✅ Actuator ${action} → /controls/motors/actuator_feeder`);
       setActuatorMoving(action === "stop" ? null : action);
 
     } catch (error) {
@@ -177,10 +177,10 @@ const MotorPWMSettings = () => {
       </div>
 
       <div className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-        Control motors via <strong>Web → Firebase → Pi Server → Arduino Serial</strong> | 
+        ✅ <strong>Unified Protocol</strong>: Web → Firebase(/controls) → Pi Server → Arduino | 
         Status: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
           {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
-        </code>
+        </code> | Real-time: 1 sec
       </div>
 
       {/* Connection Status */}

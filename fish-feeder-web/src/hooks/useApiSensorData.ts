@@ -16,7 +16,7 @@ interface SensorData {
   battery_current: number;
   solar_voltage: number;
   solar_current: number;
-  soil_moisture: number;
+
   led_status: boolean;
   fan_status: boolean;
   blower_status: boolean;

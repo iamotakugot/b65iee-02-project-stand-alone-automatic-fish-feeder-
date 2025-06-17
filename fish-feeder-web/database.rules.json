@@ -1,36 +1,6 @@
 {
   "rules": {
-    "fish_feeder": {
       ".read": true,
       ".write": true
-    },
-    "sensors": {
-      ".read": true,
-      ".write": true
-    },
-    "status": {
-      ".read": true,
-      ".write": true
-    },
-    "control": {
-      ".read": true,
-      ".write": true
-    },
-    "controls": {
-      ".read": true,
-      ".write": true
-    },
-    "commands": {
-      ".read": true,
-      ".write": true
-    },
-    "command_history": {
-      ".read": true,
-      ".write": true
-    },
-    "fan_settings": {
-      ".read": true,
-      ".write": true
-    }
   }
 } 

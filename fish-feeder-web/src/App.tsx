@@ -8,14 +8,14 @@ import { FirebaseOnlyBanner } from "./components/FirebaseOnlyBanner";
 import { uiSettings } from "./utils/modalSettings";
 
 // Import components
-import { Dashboard } from "./components/Dashboard";
+import Dashboard from "./pages/Dashboard";
 
 // Lazy load components for better performance
 const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
 const SimpleControl = lazy(() => import("@/pages/SimpleControl"));
 const FeedControl = lazy(() => import("@/pages/FeedControlPanel"));
 const FanTempControl = lazy(() => import("@/pages/FanTempControl"));
-const ArduinoTestUI = lazy(() => import("@/pages/ArduinoTestUI"));
+
 
 const Settings = lazy(() => import("@/pages/Settings"));
 const FirebaseDashboard = lazy(() => import("@/pages/FirebaseDashboard"));
@@ -157,7 +157,7 @@ const AppContent = () => {
     
             <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorCharts />} path="sensor-charts" />
-            <Route element={<ArduinoTestUI />} path="arduino-test" />
+
     
             <Route element={<Settings />} path="settings" />
             <Route element={<SimpleControl />} path="simple-control" />

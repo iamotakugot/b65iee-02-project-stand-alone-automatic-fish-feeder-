@@ -3,10 +3,11 @@ import { Slider } from "@heroui/slider";
 import { Switch } from "@heroui/switch";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
-import { FaTemperatureHigh, FaFan, FaDatabase, FaSync, FaRaspberryPi } from "react-icons/fa";
+import { FaTemperatureHigh, FaDatabase, FaSync, FaRaspberryPi } from "react-icons/fa";
 import { HiStatusOnline } from "react-icons/hi";
 import { RiBlazeFill } from "react-icons/ri";
 import { IoMdSettings } from "react-icons/io";
+import { BlowerFanIcon } from "../components/ui/icons";
 import {
   ResponsiveContainer,
   LineChart,
@@ -482,8 +483,36 @@ const FanTempControl = () => {
       {/* Fan Control Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex items-center text-blue-500 dark:text-blue-400 mb-6">
-          <FaFan className="mr-2 text-xl" />
+          <BlowerFanIcon 
+            size={24} 
+            spinning={
+              autoFanMode 
+                ? systemTemperature >= temperatureThreshold
+                : fanStatus
+            }
+            speed="normal"
+            temperature={systemTemperature}
+            className="mr-2 text-xl" 
+          />
           <span className="text-lg font-medium">Automatic Cooling Fan Control</span>
+          {/* Fan Status Indicator */}
+          <div className="ml-4 text-sm">
+            {autoFanMode && systemTemperature >= temperatureThreshold && (
+              <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">
+                🔥 AUTO ON ({systemTemperature.toFixed(1)}°C ≥ {temperatureThreshold}°C)
+              </span>
+            )}
+            {autoFanMode && systemTemperature < temperatureThreshold && systemTemperature > 0 && (
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                ✅ AUTO OFF ({systemTemperature.toFixed(1)}°C &lt; {temperatureThreshold}°C)
+              </span>
+            )}
+            {!autoFanMode && fanStatus && (
+              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                🔧 MANUAL ON
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -573,7 +602,12 @@ const FanTempControl = () => {
                   variant={fanStatus ? "solid" : "bordered"}
                   onPress={handleManualFanToggle}
                 >
-                  <FaFan className="mr-2" />
+                  <BlowerFanIcon 
+                    size={16} 
+                    spinning={fanStatus} 
+                    speed="fast"
+                    className="mr-2" 
+                  />
                   {fanStatus ? "Turn Fan OFF (R:0)" : "Turn Fan ON (R:2)"}
                 </Button>
               </div>
@@ -610,11 +644,41 @@ const FanTempControl = () => {
           <div className="space-y-6">
             {/* Current Status */}
             <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-              <FaFan
-                className={`mx-auto text-6xl mb-4 ${
-                  fanStatus ? "text-green-500 animate-spin" : "text-gray-400"
-                }`}
-              />
+              {/* Fan Icon with Enhanced Animation */}
+              <div className="relative">
+                <BlowerFanIcon
+                  size={96}
+                  spinning={
+                    autoFanMode 
+                      ? systemTemperature >= temperatureThreshold
+                      : fanStatus || (!autoFanMode && blowerSpeed > 0)
+                  }
+                  speed={
+                    blowerSpeed >= 200 ? "fast" : 
+                    blowerSpeed >= 100 ? "normal" : 
+                    "slow"
+                  }
+                  temperature={systemTemperature}
+                  className={`mx-auto mb-4 transition-all duration-300 ${
+                    autoFanMode && systemTemperature >= temperatureThreshold
+                      ? "text-red-500"
+                      : fanStatus 
+                      ? "text-green-500" 
+                      : blowerSpeed > 0 && !autoFanMode
+                      ? "text-blue-500" 
+                      : "text-gray-400"
+                  }`}
+                />
+                {/* Speed Indicator */}
+                {((autoFanMode && systemTemperature >= temperatureThreshold) || fanStatus || (!autoFanMode && blowerSpeed > 0)) && (
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-mono">
+                      {Math.round((blowerSpeed / 255) * 100)}%
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <div className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                 Relay IN1 (PIN 52): {fanStatus ? "ON" : "OFF"}
               </div>
@@ -625,11 +689,34 @@ const FanTempControl = () => {
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
                   fanStatus
                     ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                    : blowerSpeed > 0 && !autoFanMode
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                     : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
                 }`}
               >
-                {fanStatus ? "🌀 Fan Running" : "⏸️ Fan Stopped"}
+                {fanStatus 
+                  ? "🌀 Fan Running" 
+                  : blowerSpeed > 0 && !autoFanMode
+                  ? "🔧 Manual Mode Active"
+                  : "⏸️ Fan Stopped"
+                }
               </span>
+              
+              {/* Test Animation Button */}
+              {!autoFanMode && (
+                <div className="mt-4">
+                  <Button
+                    className="w-full"
+                    color={fanStatus ? "danger" : "success"}
+                    size="sm"
+                    variant="flat"
+                    onPress={handleManualFanToggle}
+                    isLoading={loading}
+                  >
+                    {fanStatus ? "🛑 Stop Test" : "🌀 Test Animation"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* System Status */}
@@ -640,7 +727,9 @@ const FanTempControl = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Current Temp:</span>
-                  <span className="font-mono">{systemTemperature.toFixed(1)}°C</span>
+                  <span className={`font-mono ${systemTemperature === 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    {systemTemperature === 0 ? 'No Data' : `${systemTemperature.toFixed(1)}°C`}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Threshold:</span>
@@ -654,8 +743,65 @@ const FanTempControl = () => {
                   <span>Fan Speed:</span>
                   <span className="font-mono">{blowerSpeed}/255</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Auto Trigger:</span>
+                  <span className={`font-mono text-xs ${
+                    systemTemperature >= temperatureThreshold 
+                      ? 'text-red-500' 
+                      : systemTemperature === 0 
+                      ? 'text-gray-500' 
+                      : 'text-green-500'
+                  }`}>
+                    {systemTemperature === 0 
+                      ? 'Waiting for data...' 
+                      : systemTemperature >= temperatureThreshold 
+                      ? 'SHOULD BE ON' 
+                      : 'Temp OK'
+                    }
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Demo Mode for Testing */}
+            {systemTemperature === 0 && (
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                  🧪 Demo Mode (No Real Data)
+                </h4>
+                <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-3">
+                  ไม่มีข้อมูลอุณหภูมิจาก Pi Server - ทดสอบอนิเมชั่นด้วย Manual Mode
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    color="primary"
+                    variant="flat"
+                    onPress={() => {
+                      setSystemTemperature(45); // Demo high temp
+                      setTimeout(() => setSystemTemperature(0), 10000); // Reset after 10s
+                    }}
+                  >
+                    🔥 Simulate High Temp (45°C)
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="secondary"
+                    variant="flat"
+                    onPress={() => {
+                      setAutoFanMode(false);
+                      setFanStatus(true);
+                      setTimeout(() => {
+                        setFanStatus(false);
+                        setAutoFanMode(true);
+                      }, 5000);
+                    }}
+                  >
+                    🌀 Test Animation (5s)
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Quick Actions */}
             <div className="space-y-3">

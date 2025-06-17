@@ -21,7 +21,7 @@ export interface SensorData {
   BATTERY_STATUS?: { voltage?: number; current?: number; percentage?: number };
   SOLAR_VOLTAGE?: { voltage?: number };
   SOLAR_CURRENT?: { current?: number };
-  SOIL_MOISTURE?: { moisture?: number };
+
   ROOM_TEMPERATURE?: { temperature?: number };
   ROOM_HUMIDITY?: { humidity?: number };
   LIGHT_LEVEL?: { light?: number };

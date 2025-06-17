@@ -8,7 +8,7 @@ export interface SensorData {
   temperature: number;
   humidity: number;
   weight: number;
-  soilMoisture: number;
+
   current: number;
   voltage: number;
   timestamp: number;

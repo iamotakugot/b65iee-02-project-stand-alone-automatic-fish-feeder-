@@ -1,79 +1,407 @@
-# 🌐 Fish Feeder Web Application
+# 🌐 Fish Feeder Web Interface
 
-<img src="https://img.shields.io/badge/React-18.2.0-blue" alt="React"/>
-<img src="https://img.shields.io/badge/TypeScript-5.0-blue" alt="TypeScript"/>
-<img src="https://img.shields.io/badge/Vite-4.4-purple" alt="Vite"/>
-<img src="https://img.shields.io/badge/Firebase-10.0-orange" alt="Firebase"/>
+**Modern React Web Application สำหรับควบคุมระบบ Fish Feeder แบบ Real-time**
 
-## 🎯 Overview
+## 📋 Overview
 
-Modern Web Application สำหรับควบคุมระบบให้อาหารปลาอัตโนมัติ ด้วย Real-time Firebase integration และ Responsive UI/UX
+Web Interface เป็นส่วนหน้าบ้านของระบบ Fish Feeder ที่ให้ผู้ใช้สามารถ:
+- ควบคุมระบบผ่านเว็บแบบ Real-time
+- ดูข้อมูลเซ็นเซอร์แบบทันที
+- จัดการการให้อาหารอัตโนมัติ
+- ดูกล้องแบบ Live Stream
+- ตั้งค่าระบบและตรวจสอบสถานะ
 
-## ✨ Features
+## 🏗️ Technology Stack
 
-- **🔄 Real-time Updates**: Firebase Realtime Database integration
-- **📱 Mobile Responsive**: PWA support with offline capabilities
-- **🎨 Modern UI**: Dark/Light mode with Tailwind CSS
-- **⚡ Fast Performance**: Vite build system
-- **🔒 Type Safe**: Full TypeScript implementation
-- **🎮 Interactive Controls**: Real-time device control interface
-- **📊 Data Visualization**: Charts and analytics dashboard
+```
+React 18 + TypeScript + Vite
+├── UI Framework: TailwindCSS
+├── State Management: React Hooks + Context
+├── Real-time: Firebase Realtime Database
+├── Routing: React Router v6
+├── Icons: Lucide React
+└── Build Tool: Vite
+```
+
+## 📁 Project Structure
+
+```
+fish-feeder-web/
+├── public/
+│   ├── index.html
+│   └── vite.svg
+├── src/
+│   ├── components/           # React Components
+│   │   ├── camera/          # Camera components
+│   │   ├── controls/        # Control components
+│   │   ├── dashboard/       # Dashboard components  
+│   │   ├── feed-control/    # Feeding control
+│   │   ├── monitoring/      # Monitoring components
+│   │   ├── settings/        # Settings components
+│   │   └── ui/             # UI utilities
+│   ├── hooks/              # Custom React Hooks
+│   │   ├── useFirebaseSensorData.ts
+│   │   ├── useOptimizedFirebase.ts
+│   │   ├── usePerformanceMonitor.ts
+│   │   └── useSensorCharts.ts
+│   ├── pages/              # Page components
+│   │   ├── Dashboard.tsx
+│   │   ├── Control.tsx
+│   │   ├── Sensors.tsx
+│   │   ├── Settings.tsx
+│   │   └── FeedControlPanel.tsx
+│   ├── contexts/           # React Contexts
+│   │   └── ApiContext.tsx
+│   ├── config/             # Configuration
+│   │   ├── firebase.ts
+│   │   └── api.ts
+│   ├── types/              # TypeScript types
+│   │   └── index.ts
+│   ├── utils/              # Utilities
+│   └── styles/             # Global styles
+├── package.json
+├── vite.config.ts
+├── tailwind.config.js
+├── tsconfig.json
+└── README.md
+```
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-
-### Installation
+### 1. Prerequisites
 ```bash
-# Clone repository
-git clone <repo-url>
+# Node.js 18+ และ npm
+node --version  # v18.0.0+
+npm --version   # 8.0.0+
+```
+
+### 2. Installation
+```bash
 cd fish-feeder-web
-
-# Install dependencies
 npm install
-
-# Create environment file
-cp .env.example .env
 ```
 
-### Development
+### 3. Firebase Configuration
 ```bash
-# Start development server
+# Create src/config/firebase.ts
+cp src/config/firebase.example.ts src/config/firebase.ts
+
+# แก้ไข Firebase config
+nano src/config/firebase.ts
+```
+
+### 4. Development Server
+```bash
 npm run dev
-
-# Open browser
-# http://localhost:5173
 ```
 
-### Production Build
+### 5. Build for Production
 ```bash
-# Build for production
 npm run build
-
-# Preview production build
 npm run preview
 ```
 
-## 🔧 Configuration
+## 🔧 Key Features
 
-### Environment Variables
-```env
-# Firebase Configuration
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_DATABASE_URL=https://your_project-default-rtdb.firebaseio.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-VITE_FIREBASE_APP_ID=1:123456789:web:abcdef123456
+### 📊 Dashboard
+- **System Overview** - ภาพรวมสถานะระบบ
+- **Real-time Charts** - กราฟข้อมูลแบบทันที
+- **Quick Controls** - ควบคุมด่วนผ่าน Dashboard
+- **Status Indicators** - แสดงสถานะการเชื่อมต่อ
 
-# API Configuration
-VITE_PI_SERVER_URL=http://your-pi-ip:5000
+### 🎮 Control Panel
+- **Motor Control** - ควบคุม Auger, Actuator, Blower
+- **Relay Control** - เปิด/ปิด LED และ Fan
+- **PWM Adjustment** - ปรับความเร็วมอเตอร์
+- **Emergency Stop** - หยุดระบบฉุกเฉิน
+
+### 🌡️ Sensor Monitoring
+- **Live Data** - ข้อมูลเซ็นเซอร์แบบ Real-time
+- **Historical Charts** - กราฟย้อนหลัง
+- **Alert System** - แจ้งเตือนเมื่อค่าผิดปกติ
+- **Data Export** - ส่งออกข้อมูลเป็น CSV
+
+### 🍽️ Feed Control
+- **Manual Feeding** - ให้อาหารด้วยตนเอง
+- **Scheduled Feeding** - ตั้งเวลาให้อาหาร
+- **Feed History** - ประวัติการให้อาหาร
+- **Portion Control** - ควบคุมปริมาณอาหาร
+
+### 📹 Camera System
+- **Live Stream** - ดูกล้องแบบ Real-time
+- **Photo Capture** - ถ่ายรูปและบันทึก
+- **Recording** - บันทึกวิดีโอ
+- **AI Analysis** - วิเคราะห์ภาพด้วย AI
+
+### ⚙️ Settings
+- **System Configuration** - ตั้งค่าระบบ
+- **Performance Modes** - เปลี่ยนโหมดประสิทธิภาพ
+- **Update Intervals** - ปรับความถี่การอัพเดต
+- **Calibration** - ปรับเทียบเซ็นเซอร์
+
+## 🔥 Firebase Integration
+
+### Real-time Database Structure
+```javascript
+const firebaseConfig = {
+  apiKey: "your-api-key",
+  authDomain: "your-project.firebaseapp.com",
+  databaseURL: "https://your-project.firebaseio.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "your-app-id"
+};
 ```
 
-### Firebase Setup
+### Data Synchronization
+```typescript
+// Real-time sensor data
+const sensorData = useFirebaseSensorData('/sensors/current');
+
+// Send control commands
+const sendCommand = (command: ControlCommand) => {
+  firebase.database().ref('/controls/commands').push(command);
+};
+
+// Listen for system status
+useEffect(() => {
+  const statusRef = firebase.database().ref('/system/status');
+  statusRef.on('value', (snapshot) => {
+    setSystemStatus(snapshot.val());
+  });
+}, []);
+```
+
+## 📱 Responsive Design
+
+### Mobile Support
+- **Touch-friendly** - ปุ่มขนาดเหมาะสำหรับสัมผัส
+- **Swipe Navigation** - เลื่อนดูข้อมูลได้
+- **Responsive Layout** - ปรับตามขนาดหน้าจอ
+- **PWA Ready** - ติดตั้งเป็น App ได้
+
+### Device Compatibility
+- **Desktop** - Windows, macOS, Linux
+- **Tablet** - iPad, Android tablets
+- **Mobile** - iPhone, Android phones
+- **Cross-browser** - Chrome, Firefox, Safari, Edge
+
+## 🎨 UI Components
+
+### Custom Components
+```typescript
+// Control Panel Component
+<ControlPanel>
+  <MotorControl motor="auger" />
+  <RelayControl relay="led" />
+  <EmergencyStop />
+</ControlPanel>
+
+// Sensor Display Component
+<SensorDisplay>
+  <TemperatureChart />
+  <HumidityIndicator />
+  <WeightDisplay />
+</SensorDisplay>
+
+// Camera Component
+<CameraViewer>
+  <LiveStream />
+  <CaptureControls />
+  <RecordingIndicator />
+</CameraViewer>
+```
+
+### Theme System
+```typescript
+// Light/Dark theme support
+const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState('light');
+  
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      <div className={`theme-${theme}`}>
+        {children}
+      </div>
+    </ThemeContext.Provider>
+  );
+};
+```
+
+## ⚡ Performance Optimization
+
+### React Optimization
+```typescript
+// Memoized components
+const SensorChart = React.memo(({ data }) => {
+  return <Chart data={data} />;
+});
+
+// Custom hooks for data fetching
+const useSensorData = () => {
+  const [data, setData] = useState(null);
+  
+  useEffect(() => {
+    // Optimized Firebase listener
+    const unsubscribe = firebase.database()
+      .ref('/sensors/current')
+      .on('value', throttle(setData, 1000));
+    
+    return unsubscribe;
+  }, []);
+  
+  return data;
+};
+```
+
+### Bundle Optimization
+```javascript
+// vite.config.ts
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/database'],
+          charts: ['recharts', 'd3']
+        }
+      }
+    }
+  }
+});
+```
+
+## 🔒 Security Features
+
+### Authentication
+```typescript
+// Firebase Auth integration
+const useAuth = () => {
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    const unsubscribe = firebase.auth().onAuthStateChanged(setUser);
+    return unsubscribe;
+  }, []);
+  
+  return { user, signIn, signOut };
+};
+```
+
+### API Security
+```typescript
+// Secure API calls
+const apiCall = async (endpoint: string, data: any) => {
+  const token = await firebase.auth().currentUser?.getIdToken();
+  
+  return fetch(endpoint, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+};
+```
+
+## 📊 Data Visualization
+
+### Chart Components
+```typescript
+// Temperature trend chart
+<LineChart width={800} height={300} data={temperatureData}>
+  <XAxis dataKey="timestamp" />
+  <YAxis />
+  <CartesianGrid strokeDasharray="3 3" />
+  <Line type="monotone" dataKey="temperature" stroke="#8884d8" />
+  <Tooltip />
+</LineChart>
+
+// Battery status gauge
+<RadialBarChart cx={150} cy={150} innerRadius="40%" outerRadius="80%">
+  <RadialBar dataKey="battery_percent" cornerRadius={10} />
+</RadialBarChart>
+```
+
+### Real-time Updates
+```typescript
+// Live data updates
+const LiveSensorDisplay = () => {
+  const sensors = useRealtimeSensors();
+  
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <MetricCard 
+        title="Feed Tank Temp" 
+        value={sensors?.feed_tank?.temperature} 
+        unit="°C"
+        animate={true}
+      />
+      <MetricCard 
+        title="Weight" 
+        value={sensors?.weight_kg} 
+        unit="kg"
+        animate={true}
+      />
+    </div>
+  );
+};
+```
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+# Run tests
+npm run test
+
+# Test coverage
+npm run test:coverage
+
+# E2E tests
+npm run test:e2e
+```
+
+### Testing Structure
+```typescript
+// Component testing
+describe('ControlPanel', () => {
+  test('renders control buttons', () => {
+    render(<ControlPanel />);
+    expect(screen.getByText('LED Control')).toBeInTheDocument();
+  });
+  
+  test('sends command on button click', async () => {
+    const mockSendCommand = jest.fn();
+    render(<ControlPanel onSendCommand={mockSendCommand} />);
+    
+    fireEvent.click(screen.getByText('Turn On LED'));
+    expect(mockSendCommand).toHaveBeenCalledWith({
+      type: 'relay',
+      device: 'led',
+      state: true
+    });
+  });
+});
+```
+
+## 🚀 Deployment
+
+### Build Process
+```bash
+# Production build
+npm run build
+
+# Preview build
+npm run preview
+
+# Type checking
+npm run type-check
+```
+
+### Firebase Hosting
 ```bash
 # Install Firebase CLI
 npm install -g firebase-tools
@@ -81,200 +409,151 @@ npm install -g firebase-tools
 # Login to Firebase
 firebase login
 
-# Initialize project
-firebase init
+# Initialize hosting
+firebase init hosting
 
-# Deploy to Firebase Hosting
-npm run deploy
+# Deploy
+firebase deploy
 ```
 
-## 📱 Application Structure
-
-```
-src/
-├── components/          # Reusable UI components
-│   ├── Dashboard.tsx    # Main dashboard
-│   ├── ControlPanel.tsx # Device controls
-│   ├── SensorDisplay.tsx # Sensor data display
-│   └── Charts.tsx       # Data visualization
-├── hooks/              # Custom React hooks
-│   ├── useFirebase.ts  # Firebase integration
-│   ├── useSensors.ts   # Sensor data handling
-│   └── useControls.ts  # Device control logic
-├── utils/              # Utility functions
-│   ├── firebase.ts     # Firebase configuration
-│   └── api.ts          # API helpers
-├── types/              # TypeScript type definitions
-│   └── index.ts        # Type exports
-├── styles/             # CSS and styling
-│   └── globals.css     # Global styles
-└── App.tsx             # Main application component
+### Environment Variables
+```bash
+# .env.production
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
+VITE_API_BASE_URL=https://your-pi-server.com/api
 ```
 
-## 🎮 Features & Controls
+## 🔧 Development
 
-### Device Controls
-- **💡 LED Control**: On/Off toggle with status indicator
-- **🌪️ Fan Control**: Variable speed control (0-255)
-- **🔄 Blower Control**: Start/Stop with power level
-- **⬆️⬇️ Actuator Control**: Up/Down movement control
-- **🐟 Feeding System**: Manual feed trigger with amount control
+### Development Commands
+```bash
+npm run dev          # Start dev server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Lint code
+npm run format       # Format code
+npm run type-check   # TypeScript type checking
+```
 
-### Sensor Monitoring
-- **🌡️ Temperature**: DHT22 x2 sensors (°C)
-- **💧 Humidity**: DHT22 x2 sensors (%RH)
-- **⚖️ Weight**: HX711 load cell (grams)
-- **🔋 Battery**: Voltage and current monitoring
-- **☀️ Solar**: Voltage and current monitoring
-- **🌱 Soil Moisture**: Analog sensor reading
-
-### Data Visualization
-- **📈 Real-time Charts**: Live sensor data plotting
-- **📊 Historical Data**: Time-series data analysis
-- **⚠️ Alerts**: System status and error notifications
-- **📱 Mobile Charts**: Touch-friendly mobile interface
-
-## 🔥 Firebase Integration
-
-### Database Structure
+### Hot Reload
 ```typescript
-interface FirebaseData {
-  'fish-feeder-system': {
-    status: {
-      sensors: SensorData;
-      system: SystemStatus;
+// Vite HMR support
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
+```
+
+## 📈 Analytics & Monitoring
+
+### Performance Monitoring
+```typescript
+// Performance tracking
+const usePerformanceMonitor = () => {
+  const [metrics, setMetrics] = useState({});
+  
+  useEffect(() => {
+    const observer = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        console.log('Performance:', entry);
+      });
+    });
+    
+    observer.observe({ entryTypes: ['measure', 'navigation'] });
+  }, []);
+  
+  return metrics;
+};
+```
+
+### User Analytics
+```typescript
+// Usage tracking
+const trackUserAction = (action: string, data?: any) => {
+  firebase.analytics().logEvent(action, {
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+};
+```
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**1. Firebase Connection**
+```bash
+# Check Firebase config
+console.log(firebase.apps.length); // Should be > 0
+
+# Test database connection
+firebase.database().ref('/.info/connected').once('value');
+```
+
+**2. Build Errors**
+```bash
+# Clear cache
+rm -rf node_modules dist
+npm install
+
+# Check TypeScript errors
+npm run type-check
+```
+
+**3. Performance Issues**
+```bash
+# Analyze bundle size
+npm run build -- --analyze
+
+# Check memory usage
+Performance Monitor in Chrome DevTools
+```
+
+## 📚 API Reference
+
+### Control Commands
+```typescript
+interface ControlCommand {
+  controls: {
+    relays?: {
+      led_pond_light?: boolean;
+      control_box_fan?: boolean;
     };
-    controls: {
-      relay: RelayControls;
-      motors: MotorControls;
-      feeding: FeedingControls;
+    motors?: {
+      auger_food_dispenser?: number;  // 0-255
+      actuator_feeder?: number;       // -255 to 255
+      blower_ventilation?: number;    // 0-255
     };
-    logs: LogEntry[];
   };
 }
 ```
 
-### Real-time Listeners
+### Sensor Data
 ```typescript
-// Sensor data listener
-useEffect(() => {
-  const sensorRef = ref(database, 'fish-feeder-system/status/sensors');
-  return onValue(sensorRef, (snapshot) => {
-    setSensorData(snapshot.val());
-  });
-}, []);
-
-// Control commands
-const sendCommand = async (command: ControlCommand) => {
-  const controlRef = ref(database, 'fish-feeder-system/controls');
-  await set(controlRef, command);
-};
+interface SensorData {
+  sensors: {
+    feed_tank: {
+      temperature: number;
+      humidity: number;
+    };
+    control_box: {
+      temperature: number;
+      humidity: number;
+    };
+    weight_kg: number;
+    soil_moisture_percent: number;
+    power: {
+      solar_voltage: number;
+      load_voltage: number;
+      battery_status: string;
+    };
+  };
+}
 ```
-
-## 📊 Performance Metrics
-
-- **🚀 Build Time**: < 6 seconds
-- **📦 Bundle Size**: < 500KB gzipped
-- **⚡ First Paint**: < 1 second
-- **🔄 Update Latency**: < 500ms
-- **📱 Mobile Score**: 95+ (Lighthouse)
-
-## 🧪 Testing
-
-### Unit Tests
-```bash
-# Run unit tests
-npm run test
-
-# Run with coverage
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
-```
-
-### E2E Tests
-```bash
-# Run Playwright tests
-npm run test:e2e
-
-# Run specific test
-npm run test:e2e -- --grep "control panel"
-```
-
-### Testing Structure
-```
-tests/
-├── unit/                # Unit tests
-│   ├── components/      # Component tests
-│   ├── hooks/           # Custom hook tests
-│   └── utils/           # Utility function tests
-├── integration/         # Integration tests
-│   └── firebase.test.ts # Firebase integration
-└── e2e/                 # End-to-end tests
-    ├── dashboard.spec.ts
-    └── controls.spec.ts
-```
-
-## 🔐 Security
-
-- **🛡️ Firebase Security Rules**: Configured for production
-- **🔐 Environment Variables**: Sensitive data protection
-- **✅ Input Validation**: All user inputs validated
-- **🚫 XSS Protection**: Sanitized data rendering
-- **🔒 HTTPS Only**: Secure communication
-
-## 📱 PWA Features
-
-- **📱 Installable**: Add to home screen
-- **🔄 Offline Support**: Service worker caching
-- **📢 Push Notifications**: Device status alerts
-- **🎯 App-like Experience**: Full-screen mode
-
-## 🎨 UI/UX Features
-
-- **🌙 Dark/Light Mode**: Automatic theme switching
-- **📱 Responsive Design**: Mobile-first approach
-- **♿ Accessibility**: WCAG 2.1 AA compliant
-- **🎮 Interactive Elements**: Smooth animations
-- **🔄 Loading States**: Skeleton screens and spinners
-
-## 📋 Scripts
-
-```bash
-npm run dev          # Development server
-npm run build        # Production build
-npm run preview      # Preview production build
-npm run test         # Unit tests
-npm run test:e2e     # E2E tests
-npm run lint         # ESLint check
-npm run type-check   # TypeScript check
-npm run deploy       # Deploy to Firebase
-```
-
-## 🛠️ Tech Stack
-
-- **⚛️ React 18**: Component library
-- **📘 TypeScript**: Type safety
-- **⚡ Vite**: Build tool
-- **🎨 Tailwind CSS**: Styling
-- **🔥 Firebase**: Backend services
-- **📊 Chart.js**: Data visualization
-- **🧪 Vitest**: Unit testing
-- **🎭 Playwright**: E2E testing
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
-
-## 📄 License
-
-MIT License - see [LICENSE](../LICENSE) file
 
 ---
 
-**🐟 Built with ❤️ for Fish Feeding Automation** 
+**อัพเดทล่าสุด:** 2024 - Modern React Application
+**เวอร์ชัน:** 2.0.0 - Real-time Firebase Integration
+**สถานะ:** 🚀 Ready for Production 

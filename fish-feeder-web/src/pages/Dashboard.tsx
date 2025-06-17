@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useFirebaseSensorData } from "../hooks/useFirebaseSensorData";
 import { hasSensorData } from "../utils/firebaseSensorUtils";
-import DashboardSensorPanel from "../components/DashboardSensorPanel";
+import DashboardSensorPanel from "../components/dashboard/DashboardSensorPanel";
 import { motion } from "framer-motion";
 
 const Dashboard = () => {
