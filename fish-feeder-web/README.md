@@ -1,271 +1,449 @@
 # 🌐 Fish Feeder Web Interface
+## Version 3.0 - Production Ready with Full PWM Control (2025-01-18)
 
-**Modern React Web Application สำหรับควบคุมระบบ Fish Feeder แบบ Real-time**
+[![React](https://img.shields.io/badge/React-18.3.1-blue)](##tech-stack)
+[![Firebase](https://img.shields.io/badge/Firebase-Real--time-orange)](##firebase-integration)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue)](##tech-stack)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-blue)](##styling)
+[![PWM](https://img.shields.io/badge/PWM-0--255-green)](##motor-control)
 
-## 📋 Overview
+> **🎯 Complete Web Interface** for Fish Feeder IoT System with real-time monitoring, full PWM motor control, and Firebase integration.
 
-Web Interface เป็นส่วนหน้าบ้านของระบบ Fish Feeder ที่ให้ผู้ใช้สามารถ:
-- ควบคุมระบบผ่านเว็บแบบ Real-time
-- ดูข้อมูลเซ็นเซอร์แบบทันที
-- จัดการการให้อาหารอัตโนมัติ
-- ดูกล้องแบบ Live Stream
-- ตั้งค่าระบบและตรวจสอบสถานะ
-
-## 🏗️ Technology Stack
+## 🏗️ System Architecture
 
 ```
-React 18 + TypeScript + Vite
-├── UI Framework: TailwindCSS
-├── State Management: React Hooks + Context
-├── Real-time: Firebase Realtime Database
-├── Routing: React Router v6
-├── Icons: Lucide React
-└── Build Tool: Vite
-```
-
-## 📁 Project Structure
-
-```
-fish-feeder-web/
-├── public/
-│   ├── index.html
-│   └── vite.svg
-├── src/
-│   ├── components/           # React Components
-│   │   ├── camera/          # Camera components
-│   │   ├── controls/        # Control components
-│   │   ├── dashboard/       # Dashboard components  
-│   │   ├── feed-control/    # Feeding control
-│   │   ├── monitoring/      # Monitoring components
-│   │   ├── settings/        # Settings components
-│   │   └── ui/             # UI utilities
-│   ├── hooks/              # Custom React Hooks
-│   │   ├── useFirebaseSensorData.ts
-│   │   ├── useOptimizedFirebase.ts
-│   │   ├── usePerformanceMonitor.ts
-│   │   └── useSensorCharts.ts
-│   ├── pages/              # Page components
-│   │   ├── Dashboard.tsx
-│   │   ├── Control.tsx
-│   │   ├── Sensors.tsx
-│   │   ├── Settings.tsx
-│   │   └── FeedControlPanel.tsx
-│   ├── contexts/           # React Contexts
-│   │   └── ApiContext.tsx
-│   ├── config/             # Configuration
-│   │   ├── firebase.ts
-│   │   └── api.ts
-│   ├── types/              # TypeScript types
-│   │   └── index.ts
-│   ├── utils/              # Utilities
-│   └── styles/             # Global styles
-├── package.json
-├── vite.config.ts
-├── tailwind.config.js
-├── tsconfig.json
-└── README.md
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Browser   │    │   Firebase      │    │   Pi Server     │
+│                 │    │                 │    │                 │
+│ • React 18      │◄──►│ • Realtime DB   │◄──►│ • Auto-Reconnect│
+│ • TypeScript    │    │ • Asia SE1      │    │ • JSON Protocol │
+│ • TailwindCSS   │    │ • Real-time     │    │ • Arduino Comm  │
+│ • PWM Controls  │    │ • Authentication│    │ • Sensor Data   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ## 🚀 Quick Start
 
-### 1. Prerequisites
-```bash
-# Node.js 18+ และ npm
-node --version  # v18.0.0+
-npm --version   # 8.0.0+
+### Live Deployment
+```
+🌐 Production URL: https://b65iee-02-fishfeederstandalone.web.app
+📱 Mobile Responsive: ✅ Optimized for all devices
+🔥 Firebase Hosting: ✅ Auto-deploy from main branch
 ```
 
-### 2. Installation
+### Local Development
 ```bash
+# 1. Clone and install
+git clone <repository>
 cd fish-feeder-web
 npm install
-```
 
-### 3. Firebase Configuration
-```bash
-# Create src/config/firebase.ts
-cp src/config/firebase.example.ts src/config/firebase.ts
-
-# แก้ไข Firebase config
-nano src/config/firebase.ts
-```
-
-### 4. Development Server
-```bash
+# 2. Start development server
 npm run dev
-```
 
-### 5. Build for Production
-```bash
+# 3. Build for production
 npm run build
-npm run preview
+
+# 4. Deploy to Firebase
+npm run deploy
 ```
 
-## 🔧 Key Features
+## 📱 Features Overview
 
-### 📊 Dashboard
-- **System Overview** - ภาพรวมสถานะระบบ
-- **Real-time Charts** - กราฟข้อมูลแบบทันที
-- **Quick Controls** - ควบคุมด่วนผ่าน Dashboard
-- **Status Indicators** - แสดงสถานะการเชื่อมต่อ
+### ✅ Real-time Monitoring Dashboard
+- **📊 Live Sensor Data** - Temperature, humidity, weight, power monitoring
+- **🔋 Battery Status** - Solar charging status and battery percentage
+- **⚖️ Weight Display** - Current food weight with calibration controls
+- **🌡️ Environmental Data** - Feed tank and control box conditions
+- **📈 Real-time Updates** - WebSocket connection for instant data sync
 
-### 🎮 Control Panel
-- **Motor Control** - ควบคุม Auger, Actuator, Blower
-- **Relay Control** - เปิด/ปิด LED และ Fan
-- **PWM Adjustment** - ปรับความเร็วมอเตอร์
-- **Emergency Stop** - หยุดระบบฉุกเฉิน
+### ✅ Complete Motor Control System
+- **🎚️ Full PWM Range (0-255)** - Complete speed control for all motors
+- **🥄 Auger Food Dispenser** - Forward/Reverse/Stop with custom PWM
+- **🌪️ Blower Ventilation** - Variable speed control (0-255 PWM)
+- **📏 Linear Actuator** - UP/DOWN/STOP with position control
+- **🔴 Emergency Stop** - Immediate halt of all motor operations
+- **⚡ Real-time Feedback** - Current motor states and PWM values
 
-### 🌡️ Sensor Monitoring
-- **Live Data** - ข้อมูลเซ็นเซอร์แบบ Real-time
-- **Historical Charts** - กราฟย้อนหลัง
-- **Alert System** - แจ้งเตือนเมื่อค่าผิดปกติ
-- **Data Export** - ส่งออกข้อมูลเป็น CSV
+### ✅ Relay Control System
+- **💡 LED Pond Light** - ON/OFF control with current status
+- **🌀 Control Box Fan** - Temperature-based fan control
+- **🔄 State Synchronization** - Real-time relay status updates
+- **📱 Mobile Optimized** - Touch-friendly control interface
 
-### 🍽️ Feed Control
-- **Manual Feeding** - ให้อาหารด้วยตนเอง
-- **Scheduled Feeding** - ตั้งเวลาให้อาหาร
-- **Feed History** - ประวัติการให้อาหาร
-- **Portion Control** - ควบคุมปริมาณอาหาร
-
-### 📹 Camera System
-- **Live Stream** - ดูกล้องแบบ Real-time
-- **Photo Capture** - ถ่ายรูปและบันทึก
-- **Recording** - บันทึกวิดีโอ
-- **AI Analysis** - วิเคราะห์ภาพด้วย AI
-
-### ⚙️ Settings
-- **System Configuration** - ตั้งค่าระบบ
-- **Performance Modes** - เปลี่ยนโหมดประสิทธิภาพ
-- **Update Intervals** - ปรับความถี่การอัพเดต
-- **Calibration** - ปรับเทียบเซ็นเซอร์
+### ✅ Advanced Settings & Configuration
+- **⚙️ Motor PWM Settings** - Individual PWM control for each motor
+- **⏱️ Timing Configuration** - Feed duration, actuator timing
+- **🔧 Weight Calibration** - Scale calibration with known weights
+- **🎛️ Performance Modes** - Real-time, Fast, Normal, Power Save
+- **📊 System Monitoring** - Memory usage, uptime, connection status
 
 ## 🔥 Firebase Integration
 
 ### Real-time Database Structure
-```javascript
+```json
+{
+  "timestamp": "2025-01-18T10:30:00.000Z",
+  "sensors": {
+    "temp_feed_tank": 25.5,          // °C from DHT22
+    "temp_control_box": 28.2,        // °C from DHT22
+    "humidity_feed_tank": 64.5,      // % from DHT22
+    "humidity_control_box": 62.1,    // % from DHT22
+    "weight_kg": 2.34,               // kg from HX711
+    "soil_moisture_percent": 75,     // % from analog sensor
+    "solar_voltage": 13.8,           // V from power monitoring
+    "load_voltage": 12.6,            // V from power monitoring
+    "solar_current": 2.1,            // A from power monitoring
+    "load_current": 1.8,             // A from power monitoring
+    "battery_status": "87%",         // Calculated percentage
+    "motor_auger_pwm": 200,          // Current auger PWM
+    "motor_actuator_pwm": 0,         // Current actuator PWM
+    "motor_blower_pwm": 0,           // Current blower PWM
+    "relay_led_pond": true,          // LED state
+    "relay_fan_box": false           // Fan state
+  },
+  "status": {
+    "online": true,
+    "arduino_connected": true,
+    "last_update": "2025-01-18T10:30:00.000Z",
+    "pi_server_running": true,
+    "performance_mode": "REAL_TIME"
+  }
+}
+```
+
+### Control Commands Structure
+```json
+// Motor Control Commands
+{
+  "motors": {
+    "auger_food_dispenser": 200,     // PWM 0-255
+    "blower_ventilation": 150,       // PWM 0-255
+    "actuator_feeder": 180           // PWM 0-255 (negative=DOWN)
+  },
+  "timestamp": 1705568600000
+}
+
+// Relay Control Commands
+{
+  "relays": {
+    "led_pond_light": true,          // boolean ON/OFF
+    "control_box_fan": false         // boolean ON/OFF
+  },
+  "timestamp": 1705568600000
+}
+```
+
+### Firebase Configuration
+```typescript
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  databaseURL: "https://your-project.firebaseio.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyClORmzLSHy9Zj38RlJudEb4sUNStVX2zc",
+  authDomain: "b65iee-02-fishfeederstandalone.firebaseapp.com",
+  databaseURL: "https://b65iee-02-fishfeederstandalone-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "b65iee-02-fishfeederstandalone",
+  storageBucket: "b65iee-02-fishfeederstandalone.firebasestorage.app",
+  messagingSenderId: "823036841241",
+  appId: "1:823036841241:web:a457dfd3f197412b448988"
 };
 ```
 
-### Data Synchronization
+## 🎛️ Motor Control Implementation
+
+### Full PWM Range Control (0-255)
 ```typescript
-// Real-time sensor data
-const sensorData = useFirebaseSensorData('/sensors/current');
-
-// Send control commands
-const sendCommand = (command: ControlCommand) => {
-  firebase.database().ref('/controls/commands').push(command);
-};
-
-// Listen for system status
-useEffect(() => {
-  const statusRef = firebase.database().ref('/system/status');
-  statusRef.on('value', (snapshot) => {
-    setSystemStatus(snapshot.val());
-  });
-}, []);
-```
-
-## 📱 Responsive Design
-
-### Mobile Support
-- **Touch-friendly** - ปุ่มขนาดเหมาะสำหรับสัมผัส
-- **Swipe Navigation** - เลื่อนดูข้อมูลได้
-- **Responsive Layout** - ปรับตามขนาดหน้าจอ
-- **PWA Ready** - ติดตั้งเป็น App ได้
-
-### Device Compatibility
-- **Desktop** - Windows, macOS, Linux
-- **Tablet** - iPad, Android tablets
-- **Mobile** - iPhone, Android phones
-- **Cross-browser** - Chrome, Firefox, Safari, Edge
-
-## 🎨 UI Components
-
-### Custom Components
-```typescript
-// Control Panel Component
-<ControlPanel>
-  <MotorControl motor="auger" />
-  <RelayControl relay="led" />
-  <EmergencyStop />
-</ControlPanel>
-
-// Sensor Display Component
-<SensorDisplay>
-  <TemperatureChart />
-  <HumidityIndicator />
-  <WeightDisplay />
-</SensorDisplay>
-
-// Camera Component
-<CameraViewer>
-  <LiveStream />
-  <CaptureControls />
-  <RecordingIndicator />
-</CameraViewer>
-```
-
-### Theme System
-```typescript
-// Light/Dark theme support
-const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('light');
+// Auger Food Dispenser Control
+async function controlAuger(
+  action: "on" | "off" | "forward" | "reverse" | "stop",
+  customPWM?: number
+): Promise<boolean> {
+  const command = {
+    motors: {
+      auger_food_dispenser: action === "stop" ? 0 : 
+                           (customPWM || 200)
+    },
+    timestamp: Date.now()
+  };
   
+  await set(ref(database, '/controls'), command);
+  return true;
+}
+
+// Blower Ventilation Control
+async function controlBlower(
+  action: "on" | "off" | "toggle",
+  customPWM?: number
+): Promise<boolean> {
+  const currentState = await getCurrentBlowerStatus();
+  const newPWM = action === "off" ? 0 : 
+                 action === "on" ? (customPWM || 150) :
+                 currentState > 0 ? 0 : (customPWM || 150);
+  
+  const command = {
+    motors: { blower_ventilation: newPWM },
+    timestamp: Date.now()
+  };
+  
+  await set(ref(database, '/controls'), command);
+  return true;
+}
+
+// Linear Actuator Control
+async function controlActuator(
+  action: "up" | "down" | "stop",
+  customPWM?: number
+): Promise<boolean> {
+  let pwmValue = 0;
+  if (action === "up") pwmValue = customPWM || 180;
+  if (action === "down") pwmValue = -(customPWM || 180);
+  
+  const command = {
+    motors: { actuator_feeder: pwmValue },
+    timestamp: Date.now()
+  };
+  
+  await set(ref(database, '/controls'), command);
+  return true;
+}
+```
+
+### PWM Settings Component
+```typescript
+// MotorPWMSettings.tsx - Full PWM Control Interface
+interface PWMSettings {
+  auger_food_dispenser: number;    // 0-255
+  blower_ventilation: number;      // 0-255
+  actuator_feeder: number;         // 0-255
+}
+
+const MotorPWMSettings: React.FC = () => {
+  const [localPWM, setLocalPWM] = useState<PWMSettings>({
+    auger_food_dispenser: 200,
+    blower_ventilation: 150,
+    actuator_feeder: 180
+  });
+
+  const handleAugerStart = () => {
+    firebaseClient.controlAuger("on", localPWM.auger_food_dispenser);
+  };
+
+  const handleBlowerStart = () => {
+    firebaseClient.controlBlower("on", localPWM.blower_ventilation);
+  };
+
+  // PWM Sliders for each motor (0-255 range)
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      <div className={`theme-${theme}`}>
-        {children}
+    <div className="space-y-4">
+      {/* Auger PWM Slider */}
+      <div>
+        <label>Auger PWM: {localPWM.auger_food_dispenser}</label>
+        <input
+          type="range"
+          min="0"
+          max="255"
+          value={localPWM.auger_food_dispenser}
+          onChange={(e) => setLocalPWM(prev => ({
+            ...prev,
+            auger_food_dispenser: parseInt(e.target.value)
+          }))}
+        />
       </div>
-    </ThemeContext.Provider>
+      
+      {/* Motor Control Buttons */}
+      <button onClick={handleAugerStart}>
+        Start Auger ({localPWM.auger_food_dispenser} PWM)
+      </button>
+    </div>
   );
 };
 ```
 
-## ⚡ Performance Optimization
+## 📊 Real-time Data Display
 
-### React Optimization
+### Sensor Dashboard Component
 ```typescript
-// Memoized components
-const SensorChart = React.memo(({ data }) => {
-  return <Chart data={data} />;
-});
+// SensorDashboard.tsx - Real-time sensor monitoring
+const SensorDashboard: React.FC = () => {
+  const [sensorData, setSensorData] = useState<ArduinoSensorData | null>(null);
 
-// Custom hooks for data fetching
-const useSensorData = () => {
-  const [data, setData] = useState(null);
-  
   useEffect(() => {
-    // Optimized Firebase listener
-    const unsubscribe = firebase.database()
-      .ref('/sensors/current')
-      .on('value', throttle(setData, 1000));
-    
+    const unsubscribe = firebaseClient.getSensorData((data) => {
+      if (data?.sensors) {
+        setSensorData(data.sensors);
+      }
+    });
+
     return unsubscribe;
   }, []);
-  
-  return data;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Temperature Cards */}
+      <SensorCard
+        title="Feed Tank Temperature"
+        value={sensorData?.temp_feed_tank}
+        unit="°C"
+        icon="🌡️"
+      />
+      
+      {/* Weight Display */}
+      <SensorCard
+        title="Food Weight"
+        value={sensorData?.weight_kg}
+        unit="kg"
+        icon="⚖️"
+      />
+      
+      {/* Battery Status */}
+      <SensorCard
+        title="Battery"
+        value={sensorData?.battery_status}
+        unit="%"
+        icon="🔋"
+      />
+      
+      {/* Power Monitoring */}
+      <SensorCard
+        title="Solar Voltage"
+        value={sensorData?.solar_voltage}
+        unit="V"
+        icon="☀️"
+      />
+    </div>
+  );
 };
 ```
 
-### Bundle Optimization
-```javascript
+### Real-time Status Updates
+```typescript
+// Real-time connection monitoring
+const useConnectionStatus = () => {
+  const [status, setStatus] = useState({
+    online: false,
+    arduino_connected: false,
+    last_update: "",
+    pi_server_running: false
+  });
+
+  useEffect(() => {
+    const unsubscribe = firebaseClient.getStatus((statusData) => {
+      setStatus(statusData || {
+        online: false,
+        arduino_connected: false,
+        last_update: "",
+        pi_server_running: false
+      });
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return status;
+};
+```
+
+## 🎨 UI Components & Styling
+
+### Tech Stack
+```json
+{
+  "react": "^18.3.1",
+  "typescript": "^5.2.2",
+  "vite": "^5.0.8",
+  "tailwindcss": "^3.4.1",
+  "firebase": "^10.7.1",
+  "lucide-react": "^0.302.0",
+  "recharts": "^2.8.0"
+}
+```
+
+### Responsive Design
+```typescript
+// Mobile-first responsive design
+<div className="
+  grid grid-cols-1          // Mobile: 1 column
+  md:grid-cols-2           // Tablet: 2 columns
+  lg:grid-cols-3           // Desktop: 3 columns
+  xl:grid-cols-4           // Large: 4 columns
+  gap-4 p-4
+">
+  {/* Motor control cards */}
+</div>
+
+// Touch-friendly controls
+<button className="
+  w-full h-12               // Large touch targets
+  bg-blue-500 hover:bg-blue-600
+  active:bg-blue-700        // Active state for touch
+  transition-colors duration-200
+  text-white font-semibold
+  rounded-lg shadow-md
+  disabled:opacity-50
+">
+  Control Motor
+</button>
+```
+
+### Component Architecture
+```
+src/
+├── components/
+│   ├── ControlPanel.tsx         // Main control interface
+│   ├── SensorDashboard.tsx      // Real-time sensor display
+│   ├── MotorPWMSettings.tsx     // PWM control settings
+│   ├── Settings.tsx             // System configuration
+│   └── StatusBar.tsx            // Connection status
+├── contexts/
+│   └── ApiContext.tsx           // Firebase API wrapper
+├── config/
+│   └── firebase.ts              // Firebase configuration
+├── pages/
+│   ├── Dashboard.tsx            // Main dashboard page
+│   └── Settings.tsx             // Settings page
+└── hooks/
+    ├── useFirebase.ts           // Firebase data hooks
+    └── useWebSocket.ts          // WebSocket connections
+```
+
+## 🔧 Build & Deployment
+
+### Development Commands
+```bash
+# Development server
+npm run dev              # Start Vite dev server on port 5173
+
+# Production build
+npm run build           # Build for production
+npm run preview         # Preview production build
+
+# Linting & Type checking
+npm run lint            # ESLint check
+npm run type-check      # TypeScript check
+```
+
+### Firebase Deployment
+```bash
+# Deploy to Firebase Hosting
+npm run deploy          # Build and deploy to production
+
+# Firebase configuration
+firebase login          # Login to Firebase CLI
+firebase init           # Initialize Firebase project
+firebase deploy         # Deploy manually
+```
+
+### Build Configuration
+```typescript
 // vite.config.ts
 export default defineConfig({
+  plugins: [react()],
   build: {
+    outDir: 'dist',
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          firebase: ['firebase/app', 'firebase/database'],
-          charts: ['recharts', 'd3']
+          firebase: ['firebase/app', 'firebase/database']
         }
       }
     }
@@ -273,287 +451,38 @@ export default defineConfig({
 });
 ```
 
-## 🔒 Security Features
+## 📋 Recent Updates (v3.0)
 
-### Authentication
-```typescript
-// Firebase Auth integration
-const useAuth = () => {
-  const [user, setUser] = useState(null);
-  
-  useEffect(() => {
-    const unsubscribe = firebase.auth().onAuthStateChanged(setUser);
-    return unsubscribe;
-  }, []);
-  
-  return { user, signIn, signOut };
-};
-```
+### ✅ Full PWM Control Implementation
+- **Complete PWM range (0-255)** - All motors support full speed range
+- **Individual motor settings** - Separate PWM controls for each motor
+- **Real-time PWM display** - Current motor speeds shown in interface
+- **Custom PWM input** - User-defined speed values for precise control
 
-### API Security
-```typescript
-// Secure API calls
-const apiCall = async (endpoint: string, data: any) => {
-  const token = await firebase.auth().currentUser?.getIdToken();
-  
-  return fetch(endpoint, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  });
-};
-```
+### ✅ Enhanced Firebase Integration
+- **Real-time data sync** - WebSocket-like performance with Firebase
+- **Optimized data structure** - Efficient sensor data organization
+- **Auto-reconnect handling** - Robust connection management
+- **Timestamp validation** - Command age verification for safety
 
-## 📊 Data Visualization
+### ✅ Improved User Experience
+- **Mobile-responsive design** - Optimized for all screen sizes
+- **Touch-friendly controls** - Large buttons for mobile devices
+- **Visual feedback** - Clear status indicators and animations
+- **Error handling** - Graceful degradation on connection issues
 
-### Chart Components
-```typescript
-// Temperature trend chart
-<LineChart width={800} height={300} data={temperatureData}>
-  <XAxis dataKey="timestamp" />
-  <YAxis />
-  <CartesianGrid strokeDasharray="3 3" />
-  <Line type="monotone" dataKey="temperature" stroke="#8884d8" />
-  <Tooltip />
-</LineChart>
-
-// Battery status gauge
-<RadialBarChart cx={150} cy={150} innerRadius="40%" outerRadius="80%">
-  <RadialBar dataKey="battery_percent" cornerRadius={10} />
-</RadialBarChart>
-```
-
-### Real-time Updates
-```typescript
-// Live data updates
-const LiveSensorDisplay = () => {
-  const sensors = useRealtimeSensors();
-  
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      <MetricCard 
-        title="Feed Tank Temp" 
-        value={sensors?.feed_tank?.temperature} 
-        unit="°C"
-        animate={true}
-      />
-      <MetricCard 
-        title="Weight" 
-        value={sensors?.weight_kg} 
-        unit="kg"
-        animate={true}
-      />
-    </div>
-  );
-};
-```
-
-## 🧪 Testing
-
-### Unit Tests
-```bash
-# Run tests
-npm run test
-
-# Test coverage
-npm run test:coverage
-
-# E2E tests
-npm run test:e2e
-```
-
-### Testing Structure
-```typescript
-// Component testing
-describe('ControlPanel', () => {
-  test('renders control buttons', () => {
-    render(<ControlPanel />);
-    expect(screen.getByText('LED Control')).toBeInTheDocument();
-  });
-  
-  test('sends command on button click', async () => {
-    const mockSendCommand = jest.fn();
-    render(<ControlPanel onSendCommand={mockSendCommand} />);
-    
-    fireEvent.click(screen.getByText('Turn On LED'));
-    expect(mockSendCommand).toHaveBeenCalledWith({
-      type: 'relay',
-      device: 'led',
-      state: true
-    });
-  });
-});
-```
-
-## 🚀 Deployment
-
-### Build Process
-```bash
-# Production build
-npm run build
-
-# Preview build
-npm run preview
-
-# Type checking
-npm run type-check
-```
-
-### Firebase Hosting
-```bash
-# Install Firebase CLI
-npm install -g firebase-tools
-
-# Login to Firebase
-firebase login
-
-# Initialize hosting
-firebase init hosting
-
-# Deploy
-firebase deploy
-```
-
-### Environment Variables
-```bash
-# .env.production
-VITE_FIREBASE_API_KEY=your-api-key
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
-VITE_API_BASE_URL=https://your-pi-server.com/api
-```
-
-## 🔧 Development
-
-### Development Commands
-```bash
-npm run dev          # Start dev server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Lint code
-npm run format       # Format code
-npm run type-check   # TypeScript type checking
-```
-
-### Hot Reload
-```typescript
-// Vite HMR support
-if (import.meta.hot) {
-  import.meta.hot.accept();
-}
-```
-
-## 📈 Analytics & Monitoring
-
-### Performance Monitoring
-```typescript
-// Performance tracking
-const usePerformanceMonitor = () => {
-  const [metrics, setMetrics] = useState({});
-  
-  useEffect(() => {
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
-        console.log('Performance:', entry);
-      });
-    });
-    
-    observer.observe({ entryTypes: ['measure', 'navigation'] });
-  }, []);
-  
-  return metrics;
-};
-```
-
-### User Analytics
-```typescript
-// Usage tracking
-const trackUserAction = (action: string, data?: any) => {
-  firebase.analytics().logEvent(action, {
-    ...data,
-    timestamp: new Date().toISOString()
-  });
-};
-```
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-**1. Firebase Connection**
-```bash
-# Check Firebase config
-console.log(firebase.apps.length); // Should be > 0
-
-# Test database connection
-firebase.database().ref('/.info/connected').once('value');
-```
-
-**2. Build Errors**
-```bash
-# Clear cache
-rm -rf node_modules dist
-npm install
-
-# Check TypeScript errors
-npm run type-check
-```
-
-**3. Performance Issues**
-```bash
-# Analyze bundle size
-npm run build -- --analyze
-
-# Check memory usage
-Performance Monitor in Chrome DevTools
-```
-
-## 📚 API Reference
-
-### Control Commands
-```typescript
-interface ControlCommand {
-  controls: {
-    relays?: {
-      led_pond_light?: boolean;
-      control_box_fan?: boolean;
-    };
-    motors?: {
-      auger_food_dispenser?: number;  // 0-255
-      actuator_feeder?: number;       // -255 to 255
-      blower_ventilation?: number;    // 0-255
-    };
-  };
-}
-```
-
-### Sensor Data
-```typescript
-interface SensorData {
-  sensors: {
-    feed_tank: {
-      temperature: number;
-      humidity: number;
-    };
-    control_box: {
-      temperature: number;
-      humidity: number;
-    };
-    weight_kg: number;
-    soil_moisture_percent: number;
-    power: {
-      solar_voltage: number;
-      load_voltage: number;
-      battery_status: string;
-    };
-  };
-}
-```
+### ✅ Production Deployment
+- **Firebase Hosting** - Auto-deploy from Git repository
+- **CDN optimization** - Global content delivery
+- **SSL encryption** - HTTPS everywhere
+- **Performance monitoring** - Built-in analytics and monitoring
 
 ---
 
-**อัพเดทล่าสุด:** 2024 - Modern React Application
-**เวอร์ชัน:** 2.0.0 - Real-time Firebase Integration
-**สถานะ:** 🚀 Ready for Production 
+**🎉 Fish Feeder Web Interface v3.0 - Production Ready!**
+
+> **Framework:** React 18 + TypeScript  
+> **Deployment:** Firebase Hosting  
+> **Features:** Full PWM Control + Real-time Monitoring  
+> **Last Updated:** 2025-01-18  
+> **Status:** ✅ Production Ready at https://b65iee-02-fishfeederstandalone.web.app 

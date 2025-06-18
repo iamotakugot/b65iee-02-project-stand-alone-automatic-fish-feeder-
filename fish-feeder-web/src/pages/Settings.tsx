@@ -55,6 +55,17 @@ const Settings: React.FC = () => {
     control_box_fan: false
   });
 
+  // Debouncing state to prevent rapid button presses
+  const [isProcessing, setIsProcessing] = useState<{[key: string]: boolean}>({});
+  const [lastCommandTime, setLastCommandTime] = useState<{[key: string]: number}>({});
+
+  // Local PWM settings for non-realtime control (0-255 full range)
+  const [localPWM, setLocalPWM] = useState({
+    actuator_feeder: 180,    // Default PWM for actuator
+    auger_food_dispenser: 200,  // Default PWM for auger (0-255)
+    blower_ventilation: 150     // Default PWM for blower (0-255)
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -74,6 +85,7 @@ const Settings: React.FC = () => {
   useEffect(() => {
     loadDeviceTiming();
     checkConnection();
+    setupFirebaseListeners();
   }, []);
 
   // Check for changes
@@ -81,6 +93,68 @@ const Settings: React.FC = () => {
     const changed = JSON.stringify(timing) !== JSON.stringify(originalTiming);
     setHasChanges(changed);
   }, [timing, originalTiming]);
+
+  // Setup Firebase real-time listeners
+  const setupFirebaseListeners = () => {
+    try {
+      // Listen to sensor data for motor states
+      const unsubscribeStatus = firebaseClient.getSensorData((data: any) => {
+        if (data) {
+          console.log('🔥 Received Firebase sensor update:', data);
+          setIsConnected(true);
+          
+          // Update motor states from sensor data
+          if (data.motor_auger_pwm !== undefined) {
+            setMotorState(prev => ({
+              ...prev,
+              auger_food_dispenser: data.motor_auger_pwm || 0
+            }));
+          }
+          
+          if (data.motor_actuator_pwm !== undefined) {
+            setMotorState(prev => ({
+              ...prev,
+              actuator_feeder: data.motor_actuator_pwm || 0
+            }));
+          }
+          
+          if (data.motor_blower_pwm !== undefined) {
+            setMotorState(prev => ({
+              ...prev,
+              blower_ventilation: data.motor_blower_pwm || 0
+            }));
+          }
+          
+          // Update relay states
+          if (data.relay_led_pond !== undefined) {
+            setRelayState(prev => ({
+              ...prev,
+              led_pond_light: data.relay_led_pond || false
+            }));
+          }
+          
+          if (data.relay_fan_box !== undefined) {
+            setRelayState(prev => ({
+              ...prev,
+              control_box_fan: data.relay_fan_box || false
+            }));
+          }
+        } else {
+          setIsConnected(false);
+        }
+      });
+
+      // Cleanup on unmount
+      return () => {
+        if (unsubscribeStatus) {
+          unsubscribeStatus();
+        }
+      };
+    } catch (error) {
+      console.error('❌ Failed to setup Firebase listeners:', error);
+      setIsConnected(false);
+    }
+  };
 
   const checkConnection = async () => {
     console.log('Checking Firebase connection...');
@@ -142,38 +216,171 @@ const Settings: React.FC = () => {
     }));
   };
 
-  // Motor Control Functions using Firebase
-  const handleMotorControl = async (motorName: keyof MotorState, value: number) => {
-    setActiveMotor(motorName);
-    setMotorState(prev => ({ ...prev, [motorName]: value }));
+  // Auger Control Functions with custom PWM (non-realtime)
+  const handleAugerStart = async () => {
+    const pwmValue = localPWM.auger_food_dispenser;
+    setActiveMotor('auger_food_dispenser');
+    setMotorState(prev => ({ ...prev, auger_food_dispenser: pwmValue }));
 
     try {
-      console.log(`Sending unified motor command for ${motorName}: ${value}`);
-      
-      let success = false;
-      if (motorName === 'auger_food_dispenser') {
-        success = await firebaseClient.controlAuger(value > 0 ? 'on' : 'off');
-      } else if (motorName === 'actuator_feeder') {
-        success = await firebaseClient.controlActuator(value > 0 ? 'up' : 'stop');
-      } else if (motorName === 'blower_ventilation') {
-        success = await firebaseClient.controlBlower(value > 0 ? 'on' : 'off');
-      }
-      
-      console.log(`Motor control result for ${motorName}:`, success);
+      console.log(`Starting Auger with custom PWM: ${pwmValue}`);
+      const success = await firebaseClient.controlAuger('on', pwmValue);
+      console.log(`Auger START result:`, success);
     } catch (error) {
-      console.error(`Failed to control ${motorName}:`, error);
+      console.error(`Failed to start Auger:`, error);
     } finally {
-      setTimeout(() => setActiveMotor(null), 1000);
+      setTimeout(() => setActiveMotor(null), 50);
     }
   };
 
-  // Relay Control Functions using Firebase
+  const handleAugerStop = async () => {
+    setActiveMotor('auger_food_dispenser');
+    setMotorState(prev => ({ ...prev, auger_food_dispenser: 0 }));
+
+    try {
+      console.log(`Stopping Auger`);
+      const success = await firebaseClient.controlAuger('off');
+      console.log(`Auger STOP result:`, success);
+    } catch (error) {
+      console.error(`Failed to stop Auger:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50);
+    }
+  };
+
+  // Blower Control Functions with custom PWM (non-realtime)
+  const handleBlowerStart = async () => {
+    const pwmValue = localPWM.blower_ventilation;
+    setActiveMotor('blower_ventilation');
+    setMotorState(prev => ({ ...prev, blower_ventilation: pwmValue }));
+
+    try {
+      console.log(`Starting Blower with custom PWM: ${pwmValue}`);
+      const success = await firebaseClient.controlBlower('on', pwmValue);
+      console.log(`Blower START result:`, success);
+    } catch (error) {
+      console.error(`Failed to start Blower:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50);
+    }
+  };
+
+  const handleBlowerStop = async () => {
+    setActiveMotor('blower_ventilation');
+    setMotorState(prev => ({ ...prev, blower_ventilation: 0 }));
+
+    try {
+      console.log(`Stopping Blower`);
+      const success = await firebaseClient.controlBlower('off');
+      console.log(`Blower STOP result:`, success);
+    } catch (error) {
+      console.error(`Failed to stop Blower:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50);
+    }
+  };
+
+  const handleMotorStop = async (motorName: keyof MotorState) => {
+    setActiveMotor(motorName);
+    setMotorState(prev => ({ ...prev, [motorName]: 0 }));
+
+    try {
+      console.log(`Stopping ${motorName}`);
+      
+      let success = false;
+      if (motorName === 'auger_food_dispenser') {
+        success = await firebaseClient.controlAuger('off');
+      } else if (motorName === 'actuator_feeder') {
+        success = await firebaseClient.controlActuator('stop');
+      } else if (motorName === 'blower_ventilation') {
+        success = await firebaseClient.controlBlower('off');
+      }
+      
+      console.log(`Motor stop result for ${motorName}:`, success);
+    } catch (error) {
+      console.error(`Failed to stop ${motorName}:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50); // ⚡ ลดจาก 1000ms เป็น 50ms เพื่อความปลอดภัย
+    }
+  };
+
+  // Actuator Control Functions with custom PWM (non-realtime)
+  const handleActuatorUp = async () => {
+    const pwmValue = localPWM.actuator_feeder;
+    setActiveMotor('actuator_feeder');
+    setMotorState(prev => ({ ...prev, actuator_feeder: pwmValue }));
+
+    try {
+      console.log(`Moving actuator UP with PWM: ${pwmValue}`);
+      const success = await firebaseClient.controlActuator('up', pwmValue);
+      console.log(`Actuator UP result:`, success);
+    } catch (error) {
+      console.error(`Failed to move actuator UP:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50); // ⚡ ลดจาก 1000ms เป็น 50ms เพื่อความปลอดภัย
+    }
+  };
+
+  const handleActuatorDown = async () => {
+    const pwmValue = localPWM.actuator_feeder;
+    setActiveMotor('actuator_feeder');
+    setMotorState(prev => ({ ...prev, actuator_feeder: -pwmValue })); // Negative for UI display
+
+    try {
+      console.log(`Moving actuator DOWN with PWM: ${pwmValue}`);
+      const success = await firebaseClient.controlActuator('down', pwmValue);
+      console.log(`Actuator DOWN result:`, success);
+    } catch (error) {
+      console.error(`Failed to move actuator DOWN:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50); // ⚡ ลดจาก 1000ms เป็น 50ms เพื่อความปลอดภัย
+    }
+  };
+
+  const handleActuatorStop = async () => {
+    setActiveMotor('actuator_feeder');
+    setMotorState(prev => ({ ...prev, actuator_feeder: 0 }));
+
+    try {
+      console.log(`Stopping actuator`);
+      const success = await firebaseClient.controlActuator('stop');
+      console.log(`Actuator STOP result:`, success);
+    } catch (error) {
+      console.error(`Failed to stop actuator:`, error);
+    } finally {
+      setTimeout(() => setActiveMotor(null), 50); // ⚡ ลดจาก 1000ms เป็น 50ms เพื่อความปลอดภัย
+    }
+  };
+
+  // Relay Control Functions using Firebase with Debouncing
   const handleRelayControl = async (relayName: keyof RelayState, state: boolean) => {
+    const now = Date.now();
+    const commandKey = `${relayName}_${state}`;
+    
+    // Check if command is already being processed
+    if (isProcessing[commandKey]) {
+      console.log(`🚫 Debounced duplicate command: ${relayName} = ${state}`);
+      return;
+    }
+    
+    // Check if too soon after last command (minimum 500ms interval for safety)
+    const lastTime = lastCommandTime[relayName] || 0;
+    const timeSinceLastCommand = now - lastTime;
+    if (timeSinceLastCommand < 500) {
+      console.log(`🚫 Debounced rapid command: ${relayName} (${timeSinceLastCommand}ms ago)`);
+      return;
+    }
+
+    // Set processing state
+    setIsProcessing(prev => ({ ...prev, [commandKey]: true }));
+    setLastCommandTime(prev => ({ ...prev, [relayName]: now }));
     setActiveMotor(relayName);
+    
+    // Update local UI state immediately for responsive feedback
     setRelayState(prev => ({ ...prev, [relayName]: state }));
 
     try {
-      console.log(`Sending unified relay command for ${relayName}: ${state ? 'on' : 'off'}`);
+      console.log(`✅ Sending debounced relay command for ${relayName}: ${state ? 'on' : 'off'}`);
       
       let success = false;
       if (relayName === 'led_pond_light') {
@@ -182,11 +389,17 @@ const Settings: React.FC = () => {
         success = await firebaseClient.controlFan(state ? 'on' : 'off');
       }
       
-      console.log(`Relay control result for ${relayName}:`, success);
+      console.log(`✅ Relay control result for ${relayName}:`, success);
     } catch (error) {
-      console.error(`Failed to control ${relayName}:`, error);
+      console.error(`❌ Failed to control ${relayName}:`, error);
+      // Revert UI state on error
+      setRelayState(prev => ({ ...prev, [relayName]: !state }));
     } finally {
-      setTimeout(() => setActiveMotor(null), 1000);
+      // Clear processing state after delay
+      setTimeout(() => {
+        setIsProcessing(prev => ({ ...prev, [commandKey]: false }));
+        setActiveMotor(null);
+      }, 100); // ⚡ ลดจาก 1500ms เป็น 100ms เพื่อความปลอดภัย
     }
   };
 
@@ -208,7 +421,7 @@ const Settings: React.FC = () => {
     setRemainingTime(0);
 
     try {
-      console.log('Sending unified STOP ALL commands');
+      console.log('🚨 EMERGENCY STOP ALL - No delay command');
       
       // Use unified emergency shutdown
       const success = await firebaseClient.turnOffAll();
@@ -217,7 +430,41 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('Failed to stop all motors:', error);
     } finally {
-      setTimeout(() => setActiveMotor(null), 1000);
+      // ⚡ IMMEDIATE clear for emergency stop - no timeout!
+      setActiveMotor(null);
+    }
+  };
+
+  // ⚡ NEW: Instant Emergency Stop (ไม่มี delay เลย)
+  const handleEmergencyStop = async () => {
+    console.log('🚨🚨 INSTANT EMERGENCY STOP - BYPASSING ALL DELAYS 🚨🚨');
+    
+    // Immediate UI update
+    setActiveMotor(null);
+    setMotorState({
+      auger_food_dispenser: 0,
+      actuator_feeder: 0,
+      blower_ventilation: 0
+    });
+    setRelayState({
+      led_pond_light: false,
+      control_box_fan: false
+    });
+
+    // Clear all timers immediately
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      setTimerInterval(null);
+    }
+    setIsTimerRunning(false);
+    setCurrentTimer('');
+    setRemainingTime(0);
+
+    try {
+      // Send emergency stop without waiting
+      await firebaseClient.turnOffAll();
+    } catch (error) {
+      console.error('Emergency stop error (but UI already updated):', error);
     }
   };
 
@@ -234,7 +481,7 @@ const Settings: React.FC = () => {
     
     // Start Actuator if selected
     if (useActuatorTimer) {
-      await handleMotorControl('actuator_feeder', 180);
+      await handleActuatorUp();
       setCurrentTimer('Actuator running...');
       setRemainingTime(timing.actuatorUp);
       
@@ -246,7 +493,7 @@ const Settings: React.FC = () => {
         
         if (timeLeft <= 0) {
           clearInterval(interval);
-          handleMotorControl('actuator_feeder', 0);
+          handleMotorStop('actuator_feeder');
           
           // Check if need to start Auger next
           if (useAugerTimer) {
@@ -265,7 +512,7 @@ const Settings: React.FC = () => {
   };
 
   const startAugerTimer = async () => {
-    await handleMotorControl('auger_food_dispenser', 180);
+    await handleAugerStart();
     setCurrentTimer('Auger running...');
     setRemainingTime(timing.augerDuration);
     
@@ -276,7 +523,7 @@ const Settings: React.FC = () => {
       
       if (timeLeft <= 0) {
         clearInterval(interval);
-        handleMotorControl('auger_food_dispenser', 0);
+        handleMotorStop('auger_food_dispenser');
         finishTimedControl();
       }
     }, 100);
@@ -359,69 +606,10 @@ const Settings: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Quick Start Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg shadow-lg p-6"
-      >
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">
-            <FaPlay className="inline mr-2" />
-            Quick Start Controls
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button
-              color="success"
-              variant="solid"
-              size="lg"
-              onPress={() => handleMotorControl('auger_food_dispenser', 180)}
-              startContent={<FaPlay />}
-              className="bg-white text-green-600 hover:bg-green-50"
-            >
-              START AUGER (180)
-            </Button>
-            <Button
-              color="warning"
-              variant="solid"
-              size="lg"
-              onPress={() => handleMotorControl('actuator_feeder', 180)}
-              startContent={<FaArrowUp />}
-              className="bg-white text-orange-600 hover:bg-orange-50"
-            >
-              START ACTUATOR (180)
-            </Button>
-            <Button
-              color="secondary"
-              variant="solid"
-              size="lg"
-              onPress={() => handleMotorControl('blower_ventilation', 150)}
-              startContent={<FaPlay />}
-              className="bg-white text-purple-600 hover:bg-purple-50"
-            >
-              START BLOWER (150)
-            </Button>
-            <Button
-              color="danger"
-              variant="solid"
-              size="lg"
-              onPress={handleStopAll}
-              isLoading={activeMotor === 'all'}
-              startContent={<FaStop />}
-              className="bg-white text-red-600 hover:bg-red-50"
-            >
-              STOP ALL
-            </Button>
-          </div>
-          <div className="mt-4 text-sm opacity-90">
-            🚀 Start motors with Arduino minimum PWM values (Auger: 180, Actuator: 180, Blower: 150)
-          </div>
-        </div>
-      </motion.div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Motor Control Panel */}
+        {/* Motor Control Panel - Simplified */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -445,127 +633,241 @@ const Settings: React.FC = () => {
           </div>
           
           <div className="space-y-6">
-            {/* Auger Motor */}
+            {/* Auger Food Dispenser with PWM Control (0-255) */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Auger Food Dispenser
-                </label>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {motorState.auger_food_dispenser}/255 ({Math.round((motorState.auger_food_dispenser/255)*100)}%)
-                </span>
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div>
+                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Auger Food Dispenser
+                  </label>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Current PWM: {motorState.auger_food_dispenser}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    color="success"
+                    variant="solid"
+                    onPress={handleAugerStart}
+                    isLoading={activeMotor === 'auger_food_dispenser'}
+                    startContent={<FaPlay />}
+                    isDisabled={motorState.auger_food_dispenser > 0}
+                  >
+                    START
+                  </Button>
+                  <Button
+                    color="danger"
+                    variant="flat"
+                    onPress={handleAugerStop}
+                    isLoading={activeMotor === 'auger_food_dispenser'}
+                    startContent={<FaStop />}
+                    isDisabled={motorState.auger_food_dispenser === 0}
+                  >
+                    STOP
+                  </Button>
+                </div>
               </div>
-              <Slider
-                size="lg"
-                step={1}
-                maxValue={255}
-                minValue={0}
-                value={motorState.auger_food_dispenser}
-                onChange={(value) => handleMotorControl('auger_food_dispenser', Array.isArray(value) ? value[0] : value)}
-                className="max-w-full"
-                color="success"
-              />
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" color="success" variant="solid" onPress={() => handleMotorControl('auger_food_dispenser', 100)}>
-                  <FaPlay /> START (100)
-                </Button>
-                <Button size="sm" color="success" variant="flat" onPress={() => handleMotorControl('auger_food_dispenser', 180)}>
-                  Min (180)
-                </Button>
-                <Button size="sm" color="success" variant="flat" onPress={() => handleMotorControl('auger_food_dispenser', 200)}>
-                  Med (200)
-                </Button>
-                <Button size="sm" color="success" variant="flat" onPress={() => handleMotorControl('auger_food_dispenser', 255)}>
-                  Max (255)
-                </Button>
-                <Button size="sm" color="danger" variant="flat" onPress={() => handleMotorControl('auger_food_dispenser', 0)}>
-                  <FaStop /> Stop
-                </Button>
+              
+              {/* PWM Slider - Non-realtime (0-255) */}
+              <div className="px-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                    PWM Speed (Non-realtime)
+                  </label>
+                  <span className="text-sm text-green-600 dark:text-green-400">
+                    PWM: {localPWM.auger_food_dispenser}
+                  </span>
+                </div>
+                <Slider
+                  size="md"
+                  step={5}
+                  maxValue={255}
+                  minValue={0}
+                  value={localPWM.auger_food_dispenser}
+                  onChange={(value) => setLocalPWM(prev => ({ 
+                    ...prev, 
+                    auger_food_dispenser: Array.isArray(value) ? value[0] : value 
+                  }))}
+                  className="max-w-full"
+                  color="success"
+                  showTooltip={true}
+                  tooltipProps={{
+                    offset: 10,
+                    placement: "top",
+                    color: "success",
+                    content: `PWM: ${localPWM.auger_food_dispenser}`,
+                  }}
+                />
+                <div className="flex justify-between text-xs text-green-600 dark:text-green-400 mt-1">
+                  <span>Min (0)</span>
+                  <span>Max (255)</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  📝 Adjust slider then press START to send command (not realtime)
+                </p>
               </div>
             </div>
 
-            <Divider />
-
-            {/* Actuator Motor */}
+            {/* Linear Actuator Feeder - UP/DOWN/STOP with PWM Control */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Linear Actuator Feeder
-                </label>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {motorState.actuator_feeder}/255 ({Math.round((Math.abs(motorState.actuator_feeder)/255)*100)}%)
-                </span>
+              <div className="flex items-center justify-between p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+                <div>
+                  <label className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                    Linear Actuator Feeder
+                  </label>
+                  <p className="text-xs text-orange-600 dark:text-orange-400">
+                    Current PWM: {motorState.actuator_feeder}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    color="success"
+                    variant="solid"
+                    onPress={handleActuatorUp}
+                    isLoading={activeMotor === 'actuator_feeder'}
+                    startContent={<FaArrowUp />}
+                    isDisabled={motorState.actuator_feeder > 0}
+                    size="sm"
+                  >
+                    UP
+                  </Button>
+                  <Button
+                    color="warning"
+                    variant="solid"
+                    onPress={handleActuatorDown}
+                    isLoading={activeMotor === 'actuator_feeder'}
+                    startContent={<FaArrowDown />}
+                    isDisabled={motorState.actuator_feeder < 0}
+                    size="sm"
+                  >
+                    DOWN
+                  </Button>
+                  <Button
+                    color="danger"
+                    variant="flat"
+                    onPress={handleActuatorStop}
+                    isLoading={activeMotor === 'actuator_feeder'}
+                    startContent={<FaStop />}
+                    isDisabled={motorState.actuator_feeder === 0}
+                    size="sm"
+                  >
+                    STOP
+                  </Button>
+                </div>
               </div>
-              <Slider
-                size="lg"
-                step={1}
-                maxValue={255}
-                minValue={-255}
-                value={motorState.actuator_feeder}
-                onChange={(value) => handleMotorControl('actuator_feeder', Array.isArray(value) ? value[0] : value)}
-                className="max-w-full"
-                color="warning"
-              />
-              <div className="flex gap-2">
-                <Button size="sm" color="warning" variant="solid" onPress={() => handleMotorControl('actuator_feeder', 180)}>
-                  <FaPlay /> START UP (180)
-                </Button>
-                <Button size="sm" color="warning" variant="flat" onPress={() => handleMotorControl('actuator_feeder', 255)}>
-                  <FaArrowUp /> UP (255)
-                </Button>
-                <Button size="sm" color="warning" variant="flat" onPress={() => handleMotorControl('actuator_feeder', 200)}>
-                  <FaArrowUp /> UP (200)
-                </Button>
-                <Button size="sm" color="danger" variant="flat" onPress={() => handleMotorControl('actuator_feeder', 0)}>
-                  <FaStop /> Stop
-                </Button>
-                <Button size="sm" color="warning" variant="flat" onPress={() => handleMotorControl('actuator_feeder', -200)}>
-                  <FaArrowDown /> DOWN (-200)
-                </Button>
-                <Button size="sm" color="warning" variant="flat" onPress={() => handleMotorControl('actuator_feeder', -255)}>
-                  <FaArrowDown /> DOWN (-255)
-                </Button>
+              
+              {/* PWM Slider - Non-realtime */}
+              <div className="px-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                    PWM Speed (Non-realtime)
+                  </label>
+                  <span className="text-sm text-orange-600 dark:text-orange-400">
+                    {localPWM.actuator_feeder}
+                  </span>
+                </div>
+                <Slider
+                  size="md"
+                  step={5}
+                  maxValue={255}
+                  minValue={0}
+                  value={localPWM.actuator_feeder}
+                  onChange={(value) => setLocalPWM(prev => ({ 
+                    ...prev, 
+                    actuator_feeder: Array.isArray(value) ? value[0] : value 
+                  }))}
+                  className="max-w-full"
+                  color="warning"
+                  showTooltip={true}
+                  tooltipProps={{
+                    offset: 10,
+                    placement: "top",
+                    color: "warning",
+                    content: `PWM: ${localPWM.actuator_feeder}`,
+                  }}
+                />
+                <div className="flex justify-between text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  <span>Min (0)</span>
+                  <span>Max (255)</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  📝 Adjust slider then press UP/DOWN to send command (not realtime)
+                </p>
               </div>
             </div>
 
-            <Divider />
-
-            {/* Blower Motor */}
+            {/* Blower Ventilation with PWM Control (0-255) */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Blower Ventilation
-                </label>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {motorState.blower_ventilation}/255 ({Math.round((motorState.blower_ventilation/255)*100)}%)
-                </span>
+              <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                <div>
+                  <label className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                    Blower Ventilation
+                  </label>
+                  <p className="text-xs text-purple-600 dark:text-purple-400">
+                    Current PWM: {motorState.blower_ventilation}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    color="secondary"
+                    variant="solid"
+                    onPress={handleBlowerStart}
+                    isLoading={activeMotor === 'blower_ventilation'}
+                    startContent={<FaPlay />}
+                    isDisabled={motorState.blower_ventilation > 0}
+                  >
+                    START
+                  </Button>
+                  <Button
+                    color="danger"
+                    variant="flat"
+                    onPress={handleBlowerStop}
+                    isLoading={activeMotor === 'blower_ventilation'}
+                    startContent={<FaStop />}
+                    isDisabled={motorState.blower_ventilation === 0}
+                  >
+                    STOP
+                  </Button>
+                </div>
               </div>
-              <Slider
-                size="lg"
-                step={1}
-                maxValue={255}
-                minValue={0}
-                value={motorState.blower_ventilation}
-                onChange={(value) => handleMotorControl('blower_ventilation', Array.isArray(value) ? value[0] : value)}
-                className="max-w-full"
-                color="secondary"
-              />
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" color="secondary" variant="solid" onPress={() => handleMotorControl('blower_ventilation', 100)}>
-                  <FaPlay /> START (100)
-                </Button>
-                <Button size="sm" color="secondary" variant="flat" onPress={() => handleMotorControl('blower_ventilation', 150)}>
-                  Min (150)
-                </Button>
-                <Button size="sm" color="secondary" variant="flat" onPress={() => handleMotorControl('blower_ventilation', 200)}>
-                  Med (200)
-                </Button>
-                <Button size="sm" color="secondary" variant="flat" onPress={() => handleMotorControl('blower_ventilation', 255)}>
-                  Max (255)
-                </Button>
-                <Button size="sm" color="danger" variant="flat" onPress={() => handleMotorControl('blower_ventilation', 0)}>
-                  <FaStop /> Stop
-                </Button>
+              
+              {/* PWM Slider - Non-realtime (0-255) */}
+              <div className="px-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                    PWM Speed (Non-realtime)
+                  </label>
+                  <span className="text-sm text-purple-600 dark:text-purple-400">
+                    PWM: {localPWM.blower_ventilation}
+                  </span>
+                </div>
+                <Slider
+                  size="md"
+                  step={5}
+                  maxValue={255}
+                  minValue={0}
+                  value={localPWM.blower_ventilation}
+                  onChange={(value) => setLocalPWM(prev => ({ 
+                    ...prev, 
+                    blower_ventilation: Array.isArray(value) ? value[0] : value 
+                  }))}
+                  className="max-w-full"
+                  color="secondary"
+                  showTooltip={true}
+                  tooltipProps={{
+                    offset: 10,
+                    placement: "top",
+                    color: "secondary",
+                    content: `PWM: ${localPWM.blower_ventilation}`,
+                  }}
+                />
+                <div className="flex justify-between text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  <span>Min (0)</span>
+                  <span>Max (255)</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  📝 Adjust slider then press START to send command (not realtime)
+                </p>
               </div>
             </div>
           </div>
@@ -1007,116 +1309,7 @@ const Settings: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* Protocol Testing Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6"
-      >
-        <div className="text-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            🧪 Protocol Testing
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Test Firebase communication with example commands
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button
-            color="success"
-            variant="bordered"
-            onPress={() => handleMotorControl('auger_food_dispenser', 180)}
-            className="h-auto flex-col p-4"
-          >
-            <div className="font-bold mb-1">Test Auger (Min PWM)</div>
-            <code className="text-xs">{`{"controls": {"motors": {"auger_food_dispenser": 180}}}`}</code>
-          </Button>
-          
-          <Button
-            color="warning"
-            variant="bordered"
-            onPress={() => handleMotorControl('actuator_feeder', 180)}
-            className="h-auto flex-col p-4"
-          >
-            <div className="font-bold mb-1">Test Actuator (Min PWM)</div>
-            <code className="text-xs">{`{"controls": {"motors": {"actuator_feeder": 180}}}`}</code>
-          </Button>
-          
-          <Button
-            color="secondary"
-            variant="bordered"
-            onPress={() => handleMotorControl('blower_ventilation', 150)}
-            className="h-auto flex-col p-4"
-          >
-            <div className="font-bold mb-1">Test Blower (Min PWM)</div>
-            <code className="text-xs">{`{"controls": {"motors": {"blower_ventilation": 150}}}`}</code>
-          </Button>
-        </div>
-
-        <div className="mt-4 text-center">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            💡 Open browser console (F12) to see Firebase communication logs
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Footer Info */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6"
-      >
-        <div className="text-center">
-          <div className="font-medium text-gray-900 dark:text-white mb-4">
-            Fish Feeder Control Protocol
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
-            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded">
-              <div className="font-medium text-green-800 dark:text-green-200 mb-1">
-                Auger Control
-              </div>
-              <code className="text-green-600 dark:text-green-400 text-xs">
-                {`{"controls": {"motors": {"auger_food_dispenser": 200}}}`}
-              </code>
-            </div>
-            <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded">
-              <div className="font-medium text-orange-800 dark:text-orange-200 mb-1">
-                Actuator Control
-              </div>
-              <code className="text-orange-600 dark:text-orange-400 text-xs">
-                {`{"controls": {"motors": {"actuator_feeder": 255}}}`}
-              </code>
-            </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded">
-              <div className="font-medium text-purple-800 dark:text-purple-200 mb-1">
-                Blower Control
-              </div>
-              <code className="text-purple-600 dark:text-purple-400 text-xs">
-                {`{"controls": {"motors": {"blower_ventilation": 200}}}`}
-              </code>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
-              <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">
-                Control Box Fan
-              </div>
-              <code className="text-blue-600 dark:text-blue-400 text-xs">
-                {`{"controls": {"relays": {"control_box_fan": true}}}`}
-              </code>
-            </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded">
-              <div className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                LED Pond Light
-              </div>
-              <code className="text-yellow-600 dark:text-yellow-400 text-xs">
-                {`{"controls": {"relays": {"led_pond_light": false}}}`}
-              </code>
-            </div>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 };

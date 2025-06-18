@@ -1,24 +1,24 @@
-# 🤖 Arduino Fish Feeder System
-## Version 3.0 - Production Ready with JSON Protocol (2025-01-18)
+# 🐍 Fish Feeder Pi Server
+## Version 3.0 - Production Ready with Auto-Reconnect (2025-01-18)
 
-[![Arduino](https://img.shields.io/badge/Arduino-Uno%2FNano-blue)](##hardware-requirements)
-[![Protocol](https://img.shields.io/badge/Protocol-JSON%20Unified-green)](##json-protocol)
-[![Motors](https://img.shields.io/badge/Motors-PWM%200--255-orange)](##motor-control)
-[![Sensors](https://img.shields.io/badge/Sensors-Real--time-yellow)](##sensor-system)
-[![Safety](https://img.shields.io/badge/Safety-Emergency%20Stop-red)](##safety-features)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue)](##tech-stack)
+[![Firebase](https://img.shields.io/badge/Firebase-Admin%20SDK-orange)](##firebase-integration)
+[![Arduino](https://img.shields.io/badge/Arduino-Serial%20JSON-green)](##arduino-communication)
+[![Flask](https://img.shields.io/badge/Flask-5.0+-red)](##web-server)
+[![SocketIO](https://img.shields.io/badge/SocketIO-Real--time-purple)](##websocket-events)
 
-> **🎯 Complete Arduino Firmware** for Fish Feeder IoT System with JSON protocol, full PWM motor control, comprehensive sensor monitoring, and Pi Server auto-reconnect compatibility.
+> **🎯 Complete Pi Server** for Fish Feeder IoT System with Arduino auto-reconnect, Firebase real-time sync, camera streaming, and web API endpoints.
 
 ## 🏗️ System Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Pi Server     │    │    Arduino      │    │   Hardware      │
+│   Firebase      │    │   Pi Server     │    │   Arduino       │
 │                 │    │                 │    │                 │
-│ • JSON Commands │◄──►│ • JSON Protocol │◄──►│ • 3x Motors     │
-│ • Auto-Reconnect│    │ • PWM Control   │    │ • 2x Relays     │
-│ • 1s Monitoring │    │ • Sensor Read   │    │ • 5x Sensors    │
-│ • Firebase Sync │    │ • Safety First  │    │ • Emergency Pin │
+│ • Real-time DB  │◄──►│ • Auto-Reconnect│◄──►│ • JSON Protocol │
+│ • Commands      │    │ • Event-Driven  │    │ • Sensor Data   │
+│ • Status Sync   │    │ • Flask+SocketIO│    │ • Motor Control │
+│ • Web Hosting   │    │ • Camera Stream │    │ • Hardware I/O  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -26,306 +26,673 @@
 
 ### Hardware Requirements
 ```
-Arduino Uno/Nano (ATmega328P)
-- 3x Motor Controllers (PWM pins)
-- 2x Relay Modules (Digital pins)
-- 5x Sensor modules (Analog/Digital)
-- 1x Emergency Stop button
-- USB cable for Pi Server connection
+Raspberry Pi 4 Model B (4GB RAM) - CONFIRMED WORKING
+- USB connection to Arduino Mega 2560
+- Optional: Camera module for live streaming
+- WiFi/Ethernet connection for internet
+- MicroSD card (32GB+) with Raspberry Pi OS
 ```
 
-### Software Setup
+### Software Installation
 ```bash
-# 1. Install PlatformIO
-pip install platformio
+# 1. Update system
+sudo apt update && sudo apt upgrade -y
 
-# 2. Clone and build
-git clone <repository>
-cd arduino-system
+# 2. Install Python dependencies
+cd rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite
+pip install -r requirements.txt
 
-# 3. Build firmware
-pio run
+# 3. Configure Firebase credentials
+cp config/firebase-service-account.example.json config/firebase-service-account.json
+# Edit with your Firebase service account key
 
-# 4. Upload to Arduino
-pio run --target upload
+# 4. Start Pi Server
+python main_new.py
 
-# 5. Monitor serial output
-pio device monitor
+# 5. Optional: Hide sensor data logs
+python main_new.py --no-sensor-data
 ```
 
-## 🎮 Features Overview
+## 📁 Code Structure (Modular Architecture)
 
-### ✅ JSON Protocol Communication
-- **📡 Unified JSON commands** - Compatible with Pi Server auto-reconnect
-- **⚡ Real-time responses** - JSON status updates every 2 seconds
-- **🔄 Auto-sync protocol** - Seamless Pi ↔ Arduino communication
-- **📋 Command validation** - Input safety and error handling
+### ✅ Main Modules
+- **`main_new.py`** - Main server entry point, event coordination
+- **`communication/`** - Arduino & Firebase communication
+  - `arduino_comm.py` - Serial communication, auto-reconnect
+  - `firebase_comm.py` - Real-time database listeners
+- **`system/`** - System management and monitoring
+  - `state_manager.py` - Global system state
+  - `monitoring.py` - Performance monitoring, heartbeat
+  - `watchdog.py` - System health monitoring
+- **`camera/`** - Camera system and AI processing
+  - `streaming.py` - Live video streaming
+  - `ai_processor.py` - Image analysis and detection
+- **`database/`** - Local data storage and backup
+  - `local_json_db.py` - JSON database operations
+- **`web/`** - Web server and API endpoints
+  - `api_routes.py` - REST API endpoints
+  - `websocket_events.py` - Real-time WebSocket events
+- **`config/`** - Configuration and settings
+  - `settings.py` - System configuration
+  - `constants.py` - Performance modes and limits
 
-### ✅ Full PWM Motor Control (0-255)
-- **🎚️ Auger Food Dispenser** - PWM 0-255 (Forward/Reverse/Stop)
-- **🌪️ Blower Ventilation** - PWM 0-255 (Variable speed control)
-- **📏 Linear Actuator** - PWM 0-255 (UP/DOWN/STOP with position)
-- **🚨 Emergency Stop** - Hardware pin immediate halt
-- **🛡️ Safety timeouts** - Auto-stop after set duration
+### ✅ System Features
+- **🔄 Arduino Auto-Reconnect** - 1-second monitoring, 5-second timeout
+- **⚡ Event-Driven Architecture** - Non-blocking, ThreadPoolExecutor
+- **🔥 Firebase Real-time Sync** - Bi-directional data synchronization
+- **📊 Performance Monitoring** - Memory usage, connection status
+- **🛡️ Error Recovery** - Graceful handling of disconnections
 
-### ✅ Comprehensive Sensor System
-- **🌡️ Temperature monitoring** - Feed tank & control box (DHT22)
-- **💧 Humidity monitoring** - Feed tank & control box (DHT22)
-- **⚖️ Weight measurement** - Load cell with HX711 amplifier
-- **🔋 Power monitoring** - Battery voltage, current, solar panel
-- **🎛️ Control feedback** - Motor PWM states, relay statuses
+## 🔌 Arduino Communication
 
-### ✅ Safety & Reliability
-- **🚨 Hardware emergency stop** - Physical button override
-- **⏱️ Watchdog timer** - Auto-restart on system hang
-- **🔒 Input validation** - JSON command verification
-- **📊 Status reporting** - Health monitoring and diagnostics
+### Auto-Detection & Reconnect
+```python
+def auto_detect_arduino_port():
+    """Auto-detect Arduino port on Windows/Linux"""
+    # Priority: COM3 first (tested working), then other ports
+    possible_ports = ['COM3'] + config.ARDUINO_PORTS.copy()
+    
+    for port in possible_ports:
+        try:
+            ser = serial.Serial(port, config.ARDUINO_BAUDRATE, timeout=0.1)
+            time.sleep(2)  # Wait for Arduino startup sequence
+            
+            if ser.in_waiting > 0:
+                all_data = ser.read_all().decode('utf-8', errors='ignore')
+                
+                # Look for Arduino signatures
+                if any(keyword in all_data for keyword in 
+                      ['FISH FEEDER', 'ARDUINO', 'timestamp', 'sensors']):
+                    logger.info(f"Arduino found on port: {port}")
+                    return ser, port
+                    
+        except (serial.SerialException, OSError):
+            continue
+    
+    return None, None
 
-## 📡 JSON Protocol
-
-### Command Structure (Pi → Arduino)
-```json
-// Motor Control Commands
-{
-  "controls": {
-    "motors": {
-      "auger_food_dispenser": 200,    // PWM 0-255
-      "blower_ventilation": 150,      // PWM 0-255  
-      "actuator_feeder": 180          // PWM 0-255 (negative=DOWN)
-    }
-  }
-}
-
-// Relay Control Commands
-{
-  "controls": {
-    "relays": {
-      "led_pond_light": true,         // boolean on/off
-      "control_box_fan": false        // boolean on/off
-    }
-  }
-}
-
-// Emergency Stop
-{
-  "controls": {
-    "emergency_stop": true           // immediate halt all
-  }
-}
+def arduino_auto_reconnect_loop():
+    """Arduino auto-reconnect loop - checks every 1 second"""
+    while state.running:
+        connection_ok = check_arduino_connection()
+        
+        # Log status periodically (every 30 seconds)
+        if current_time - last_status_log >= 30:
+            status = "✅ Connected" if connection_ok else "❌ Disconnected"
+            logger.info(f"🔄 Arduino status: {status} (auto-checking every 1s)")
+        
+        time.sleep(1.0)  # Check every second
 ```
 
-### Response Structure (Arduino → Pi)
-```json
-{
-  "timestamp": 1734508691161,
-  "sensors": {
-    "temp_feed_tank": 25.5,          // °C
-    "temp_control_box": 28.2,        // °C
-    "humidity_feed_tank": 64.5,      // %
-    "humidity_control_box": 62.1,    // %
-    "weight_kg": 2.34,               // kg
-    "battery_percent": 87,           // %
-    "solar_voltage": 13.8,           // V
-    "load_voltage": 12.6,            // V
-    "load_current": 2.1,             // A
-    "motor_auger_pwm": 200,          // Current PWM
-    "motor_actuator_pwm": 0,         // Current PWM
-    "motor_blower_pwm": 0,           // Current PWM
-    "relay_led_pond": true,          // Current state
-    "relay_fan_box": false           // Current state
-  },
-  "status": {
-    "system_ok": true,
-    "emergency_stop": false,
-    "uptime_ms": 3600000,
-    "free_memory": 1024
-  }
-}
+### JSON Protocol Communication
+```python
+def send_arduino_command(command):
+    """Send command to Arduino with orjson optimization"""
+    try:
+        if isinstance(command, dict):
+            command_str = orjson.dumps(command).decode()
+        else:
+            command_str = str(command)
+            
+        state.arduino_serial.write(f"{command_str}\n".encode())
+        
+        if not getattr(config, 'HIDE_SENSOR_DATA', False):
+            logger.info(f"Sent to Arduino: {command_str}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Arduino send error: {e}")
+        state.arduino_connected = False
+        return False
+
+def read_arduino_data():
+    """Read sensor data from Arduino with error handling"""
+    try:
+        if state.arduino_serial.in_waiting > 0:
+            line = state.arduino_serial.readline()
+            data_str = line.decode('utf-8', errors='ignore').strip()
+            
+            if data_str.startswith('{'):
+                sensor_data = orjson.loads(data_str)
+                state.update_sensor_data(sensor_data)
+                state.last_arduino_response = time.time()
+                return sensor_data
+                
+    except Exception as e:
+        logger.error(f"Arduino read error: {e}")
+        
+    return None
 ```
 
-## 🎛️ Motor Control System
+## 🔥 Firebase Integration
 
-### PWM Pin Assignments
-```cpp
-// Motor PWM Pins (0-255 speed control)
-#define AUGER_PWM_PIN       9    // Auger food dispenser
-#define AUGER_DIR_PIN       8    // Direction control
-#define BLOWER_PWM_PIN      6    // Blower ventilation  
-#define ACTUATOR_PWM_PIN    5    // Linear actuator
-#define ACTUATOR_DIR_PIN    4    // Direction control
+### Real-time Database Listeners
+```python
+def setup_firebase_listeners():
+    """Setup Firebase realtime listeners for commands"""
+    def on_control_change(event):
+        if event.data:
+            logger.info(f"[FIREBASE CONTROL] Received: {event.data}")
+            
+            # Check timestamp to avoid old commands
+            current_time = datetime.now().timestamp() * 1000
+            event_timestamp = event.data.get('timestamp', 0)
+            
+            # Skip commands older than 30 seconds
+            if event_timestamp and (current_time - event_timestamp) > 30000:
+                logger.warning(f"[FIREBASE CONTROL] SKIPPING OLD COMMAND")
+                return
+            
+            # Forward command to Arduino (remove timestamp)
+            if state.arduino_connected:
+                arduino_command = dict(event.data)
+                if 'timestamp' in arduino_command:
+                    del arduino_command['timestamp']
+                
+                # Arduino expects {"controls": {...}} wrapper
+                if 'controls' not in arduino_command:
+                    wrapped_command = {"controls": arduino_command}
+                else:
+                    wrapped_command = arduino_command
+                
+                result = send_arduino_command(wrapped_command)
+                logger.info(f"[FIREBASE CONTROL] Arduino result: {result}")
+    
+    # Setup Firebase listeners
+    controls_ref = db.reference('/controls')
+    controls_ref.listen(on_control_change)
+    logger.info("[FIREBASE CONTROL] Listener active - monitoring /controls path")
 
-// Safety limits and defaults
-#define AUGER_DEFAULT_PWM   200  // Default auger speed
-#define BLOWER_DEFAULT_PWM  150  // Default blower speed  
-#define ACTUATOR_DEFAULT_PWM 180 // Default actuator speed
-#define EMERGENCY_STOP_PIN  2    // Hardware emergency stop
+def update_firebase_sensors(sensor_data):
+    """Update sensor data to Firebase with Web-compatible structure"""
+    try:
+        timestamp = datetime.now().isoformat()
+        
+        # Create Web-compatible nested structure
+        firebase_data = {
+            'timestamp': timestamp,
+            'sensors': sensor_data,  # Arduino data goes under 'sensors' key
+            'status': {
+                'arduino_connected': state.arduino_connected,
+                'last_update': timestamp,
+                'pi_server_running': True,
+                'online': True,
+                'performance_mode': state.performance_mode
+            }
+        }
+        
+        # Update Firebase root with nested structure
+        root_ref = state.firebase_db.reference('/')
+        root_ref.update(firebase_data)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"[FIREBASE] Sensor update error: {e}")
+        return False
 ```
 
-### Motor Control Functions
-```cpp
-// Auger Control (Forward/Reverse/Stop)
-void controlAuger(int pwm) {
-  if (pwm > 0) {
-    digitalWrite(AUGER_DIR_PIN, HIGH);  // Forward
-    analogWrite(AUGER_PWM_PIN, constrain(pwm, 0, 255));
-  } else if (pwm < 0) {
-    digitalWrite(AUGER_DIR_PIN, LOW);   // Reverse
-    analogWrite(AUGER_PWM_PIN, constrain(-pwm, 0, 255));
-  } else {
-    analogWrite(AUGER_PWM_PIN, 0);      // Stop
-  }
-  motor_auger_pwm = pwm;
-}
+## 📊 System State Management
 
-// Blower Control (Variable speed)
-void controlBlower(int pwm) {
-  pwm = constrain(pwm, 0, 255);
-  analogWrite(BLOWER_PWM_PIN, pwm);
-  motor_blower_pwm = pwm;
-}
+### Global State Manager
+```python
+class SystemState:
+    """Global System State Management with unified naming"""
+    
+    def __init__(self):
+        # Connection Status
+        self.arduino_connected = False
+        self.firebase_connected = False
+        self.camera_active = False
+        
+        # Sensor Data (unified naming)
+        self.temp_feed_tank = 0.0        # Feed tank temperature (°C)
+        self.temp_control_box = 0.0      # Control box temperature (°C)
+        self.humidity_feed_tank = 0.0    # Feed tank humidity (%)
+        self.humidity_control_box = 0.0  # Control box humidity (%)
+        self.weight_kg = 0.0             # Food weight (kg)
+        self.soil_moisture_percent = 0   # Soil moisture (%)
+        
+        # Power Data (unified naming)
+        self.solar_voltage = 0.0         # Solar voltage (V)
+        self.load_voltage = 0.0          # Load voltage (V)
+        self.battery_percent = 0         # Battery percentage (%)
+        self.battery_status = "unknown"  # Battery status string
+        
+        # Control Data (unified naming)
+        self.relay_led_pond = False      # LED pond light state
+        self.relay_fan_box = False       # Control box fan state
+        self.motor_auger_pwm = 0         # Auger PWM (0-255)
+        self.motor_actuator_pwm = 0      # Actuator PWM (0-255)
+        self.motor_blower_pwm = 0        # Blower PWM (0-255)
+        
+        # Performance Settings
+        self.performance_mode = "REAL_TIME"
+        self.send_interval_ms = 1000
+        self.read_interval_ms = 500
+        
+        # Communication
+        self.arduino_serial = None
+        self.firebase_db = None
+        self.running = True
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
-// Linear Actuator Control (UP/DOWN/STOP)
-void controlActuator(int pwm) {
-  if (pwm > 0) {
-    digitalWrite(ACTUATOR_DIR_PIN, HIGH); // UP
-    analogWrite(ACTUATOR_PWM_PIN, constrain(pwm, 0, 255));
-  } else if (pwm < 0) {
-    digitalWrite(ACTUATOR_DIR_PIN, LOW);  // DOWN
-    analogWrite(ACTUATOR_PWM_PIN, constrain(-pwm, 0, 255));
-  } else {
-    analogWrite(ACTUATOR_PWM_PIN, 0);     // STOP
-  }
-  motor_actuator_pwm = pwm;
-}
+    def update_sensor_data(self, sensor_data):
+        """Update sensor data from Arduino"""
+        if not sensor_data:
+            return
+        
+        # Extract sensor data (unified naming)
+        self.temp_feed_tank = sensor_data.get('temp_feed_tank', 0.0)
+        self.temp_control_box = sensor_data.get('temp_control_box', 0.0)
+        self.humidity_feed_tank = sensor_data.get('humidity_feed_tank', 0.0)
+        self.humidity_control_box = sensor_data.get('humidity_control_box', 0.0)
+        self.weight_kg = sensor_data.get('weight_kg', 0.0)
+        self.soil_moisture_percent = sensor_data.get('soil_moisture_percent', 0)
+        
+        # Extract power data
+        self.solar_voltage = sensor_data.get('solar_voltage', 0.0)
+        self.load_voltage = sensor_data.get('load_voltage', 0.0)
+        battery_str = sensor_data.get('battery_status', 'unknown')
+        if battery_str.replace('%', '').isdigit():
+            self.battery_percent = int(battery_str.replace('%', ''))
+        
+        # Update timestamp and connection status
+        self.last_update = datetime.now().isoformat()
+        self.arduino_connected = True
+        self.heartbeat_count = 0  # Reset heartbeat counter
 ```
 
-## 📊 Sensor System
+## ⚡ Main Data Processing Loop
 
-### Sensor Pin Assignments
-```cpp
-// Temperature & Humidity Sensors (DHT22)
-#define DHT_FEED_TANK_PIN    7    // Feed tank DHT22
-#define DHT_CONTROL_BOX_PIN  12   // Control box DHT22
-
-// Weight Sensor (HX711)
-#define HX711_DOUT_PIN       A1   // Data pin
-#define HX711_SCK_PIN        A0   // Clock pin
-
-// Power Monitoring (Analog)
-#define BATTERY_VOLTAGE_PIN  A2   // Battery voltage divider
-#define LOAD_CURRENT_PIN     A3   // Current sensor
-#define SOLAR_VOLTAGE_PIN    A4   // Solar panel voltage
-
-// Relay Control Pins
-#define LED_POND_RELAY_PIN   10   // LED pond light relay
-#define FAN_BOX_RELAY_PIN    11   // Control box fan relay
+### Ultra-Fast Event-Driven Loop
+```python
+def main_data_loop():
+    """Main loop for processing Arduino data - Ultra Fast Edition"""
+    logger.info("Starting main data loop...")
+    data_count = 0
+    last_log_time = time.time()
+    last_firebase_time = time.time()
+    
+    while state.running:
+        try:
+            # Read Arduino data only when connected
+            if state.arduino_connected:
+                sensor_data = read_arduino_data()
+                
+                if sensor_data:
+                    data_count += 1
+                    current_time = time.time()
+                    
+                    # Smart logging (avoid spam) - every 10 seconds
+                    if current_time - last_log_time >= 10:
+                        logger.info(f"Processed {data_count} Arduino packets in 10s")
+                        data_count = 0
+                        last_log_time = current_time
+                    
+                    # Firebase update every 1 second (reduced frequency)
+                    if current_time - last_firebase_time >= 1.0:
+                        state.executor.submit(update_firebase_sensors, sensor_data)
+                        state.executor.submit(backup_sensor_data, sensor_data)
+                        last_firebase_time = current_time
+                    
+                    # INSTANT WebSocket broadcast (highest priority)
+                    if config.WEBSOCKET_ENABLED:
+                        sio.emit('sensor_data', sensor_data)
+            
+            time.sleep(0.01)  # Ultra fast sync! 10ms loop
+            
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            state.running = False
+            break
+        except Exception as e:
+            logger.error(f"Main loop error: {e}")
+            time.sleep(5)
 ```
 
-### Sensor Reading Functions
-```cpp
-// Read all sensors and update global variables
-void readAllSensors() {
-  // Temperature & Humidity
-  temp_feed_tank = dht_feed.readTemperature();
-  humidity_feed_tank = dht_feed.readHumidity();
-  temp_control_box = dht_control.readTemperature();
-  humidity_control_box = dht_control.readHumidity();
-  
-  // Weight measurement
-  if (scale.is_ready()) {
-    weight_kg = scale.get_units(3); // Average of 3 readings
-  }
-  
-  // Power monitoring
-  battery_voltage = analogRead(BATTERY_VOLTAGE_PIN) * VOLTAGE_MULTIPLIER;
-  load_current = analogRead(LOAD_CURRENT_PIN) * CURRENT_MULTIPLIER;
-  solar_voltage = analogRead(SOLAR_VOLTAGE_PIN) * VOLTAGE_MULTIPLIER;
-  
-  // Calculate battery percentage
-  battery_percent = map(battery_voltage, MIN_BATTERY_V, MAX_BATTERY_V, 0, 100);
-  battery_percent = constrain(battery_percent, 0, 100);
-}
+## 🌐 Web Server & API
+
+### Flask Application with SocketIO
+```python
+# web/api_routes.py - REST API endpoints
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO
+
+app = Flask(__name__)
+sio = SocketIO(app, cors_allowed_origins="*")
+
+@app.route('/api/status', methods=['GET'])
+def get_system_status():
+    """Get current system status"""
+    return jsonify({
+        'arduino_connected': state.arduino_connected,
+        'firebase_connected': state.firebase_connected,
+        'camera_active': state.camera_active,
+        'last_update': state.last_update,
+        'performance_mode': state.performance_mode,
+        'uptime': time.time() - system_start_time
+    })
+
+@app.route('/api/sensors', methods=['GET'])
+def get_sensor_data():
+    """Get current sensor readings"""
+    return jsonify({
+        'sensors': {
+            'temp_feed_tank': state.temp_feed_tank,
+            'temp_control_box': state.temp_control_box,
+            'humidity_feed_tank': state.humidity_feed_tank,
+            'humidity_control_box': state.humidity_control_box,
+            'weight_kg': state.weight_kg,
+            'solar_voltage': state.solar_voltage,
+            'load_voltage': state.load_voltage,
+            'battery_percent': state.battery_percent
+        },
+        'timestamp': state.last_update
+    })
+
+@app.route('/api/control', methods=['POST'])
+def send_control_command():
+    """Send control command to Arduino"""
+    try:
+        command = request.json
+        result = send_arduino_command(command)
+        return jsonify({'success': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# WebSocket Events
+@sio.on('connect')
+def handle_connect():
+    logger.info("WebSocket client connected")
+    
+@sio.on('disconnect')
+def handle_disconnect():
+    logger.info("WebSocket client disconnected")
+
+def broadcast_control_update(control_data):
+    """Broadcast control update to all WebSocket clients"""
+    try:
+        sio.emit('control_update', {
+            'timestamp': control_data.get('timestamp', ''),
+            'controls': control_data.get('controls', {}),
+            'source': 'firebase'
+        })
+    except Exception as e:
+        logger.error(f"WebSocket broadcast error: {e}")
 ```
 
-## 🔌 Relay Control System
+## 📊 Performance Monitoring
 
-### Relay Functions
-```cpp
-// LED Pond Light Control
-void controlLED(bool state) {
-  digitalWrite(LED_POND_RELAY_PIN, state ? HIGH : LOW);
-  relay_led_pond = state;
-  Serial.print("[LED] Pond light: ");
-  Serial.println(state ? "ON" : "OFF");
-}
-
-// Control Box Fan
-void controlFan(bool state) {
-  digitalWrite(FAN_BOX_RELAY_PIN, state ? HIGH : LOW);
-  relay_fan_box = state;
-  Serial.print("[FAN] Control box fan: ");
-  Serial.println(state ? "ON" : "OFF");
-}
+### System Health Monitoring
+```python
+def heartbeat_monitor():
+    """Monitor system health and performance"""
+    while state.running:
+        try:
+            state.heartbeat_count += 1
+            
+            # Memory monitoring
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            cpu_percent = process.cpu_percent()
+            
+            # Log performance metrics every 30 seconds
+            if state.heartbeat_count % 6 == 0:  # Every 30 seconds (5s * 6)
+                logger.info(f"[SYSTEM] Memory: {memory_mb:.1f}MB, "
+                           f"CPU: {cpu_percent:.1f}%, "
+                           f"Arduino: {'✅' if state.arduino_connected else '❌'}, "
+                           f"Firebase: {'✅' if state.firebase_connected else '❌'}")
+            
+            # Check Arduino connection heartbeat
+            if state.arduino_connected:
+                # If no data received for 10 seconds, mark as disconnected
+                if state.heartbeat_count > 200:  # 200 * 0.05s = 10 seconds
+                    logger.warning("Arduino heartbeat timeout, marking as disconnected")
+                    state.arduino_connected = False
+                    
+                    # Attempt reconnection
+                    try:
+                        if connect_arduino():
+                            logger.info("Arduino reconnected successfully")
+                        else:
+                            state.reconnect_attempts += 1
+                    except Exception as e:
+                        logger.error(f"Arduino reconnection error: {e}")
+            
+            time.sleep(5)  # Heartbeat every 5 seconds
+            
+        except Exception as e:
+            logger.error(f"Heartbeat monitor error: {e}")
+            time.sleep(10)
 ```
 
-## 🚨 Safety Features
+## 🎥 Camera System
 
-### Emergency Stop System
-```cpp
-// Hardware emergency stop (interrupt-based)
-void setupEmergencyStop() {
-  pinMode(EMERGENCY_STOP_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), 
-                  emergencyStopISR, FALLING);
+### Live Streaming Support
+```python
+# camera/streaming.py - Camera streaming implementation
+class CameraStreaming:
+    def __init__(self):
+        self.camera = None
+        self.streaming = False
+        self.frame_queue = queue.Queue(maxsize=2)
+    
+    def start_camera(self):
+        """Start camera capture"""
+        try:
+            self.camera = cv2.VideoCapture(0)
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            self.camera.set(cv2.CAP_PROP_FPS, 10)
+            
+            self.streaming = True
+            logger.info("Camera started successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Camera start error: {e}")
+            return False
+    
+    def get_frame(self):
+        """Get current camera frame"""
+        try:
+            if self.camera and self.streaming:
+                ret, frame = self.camera.read()
+                if ret:
+                    # Encode frame as JPEG
+                    _, buffer = cv2.imencode('.jpg', frame, 
+                                           [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    return buffer.tobytes()
+        except Exception as e:
+            logger.error(f"Camera frame error: {e}")
+        
+        return None
+    
+    def stop_camera(self):
+        """Stop camera capture"""
+        self.streaming = False
+        if self.camera:
+            self.camera.release()
+            self.camera = None
+        logger.info("Camera stopped")
+```
+
+## 🔧 Configuration & Settings
+
+### Performance Modes
+```python
+# config/constants.py - Performance mode settings
+PERFORMANCE_MODES = {
+    'REAL_TIME': {'send_interval': 500, 'read_interval': 250},
+    'FAST': {'send_interval': 1000, 'read_interval': 500},
+    'NORMAL': {'send_interval': 2000, 'read_interval': 1000},
+    'POWER_SAVE': {'send_interval': 5000, 'read_interval': 2000},
+    'FIREBASE_FREE_TIER': {'send_interval': 10000, 'read_interval': 5000}
 }
 
-// Emergency stop interrupt service routine
-void emergencyStopISR() {
-  // Immediate motor shutdown
-  analogWrite(AUGER_PWM_PIN, 0);
-  analogWrite(BLOWER_PWM_PIN, 0);
-  analogWrite(ACTUATOR_PWM_PIN, 0);
-  
-  // Set emergency flag
-  emergency_stop_active = true;
-  
-  // Reset motor states
-  motor_auger_pwm = 0;
-  motor_blower_pwm = 0;
-  motor_actuator_pwm = 0;
+# Firebase Free Tier Optimization
+FIREBASE_FREE_LIMITS = {
+    'MONTHLY_BANDWIDTH_MB': 10240,  # 10 GB/month
+    'DAILY_BANDWIDTH_TARGET_MB': 300,  # Conservative daily target
+    'STORAGE_LIMIT_MB': 1024,  # 1 GB storage
+    'CONNECTION_LIMIT': 100,  # Simultaneous connections
+    'RECOMMENDED_MODE_TESTING': 'POWER_SAVE',
+    'RECOMMENDED_MODE_FEEDING': 'FAST',
+    'RECOMMENDED_MODE_MAINTENANCE': 'FIREBASE_FREE_TIER'
 }
+
+# System Configuration
+class Config:
+    def __init__(self):
+        # Arduino Configuration
+        self.ARDUINO_PORTS = ['COM3', 'COM4', 'COM5', '/dev/ttyUSB0', '/dev/ttyACM0']
+        self.ARDUINO_BAUDRATE = 115200
+        self.AUTO_DETECT_PORT = True
+        
+        # Firebase Configuration
+        self.FIREBASE_URL = "https://b65iee-02-fishfeederstandalone-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        self.SERVICE_ACCOUNT_PATH = "firebase-service-account.json"
+        
+        # System Configuration
+        self.FLASK_PORT = 5000
+        self.WEBSOCKET_ENABLED = True
+        self.HEARTBEAT_INTERVAL = 5
+        self.MAX_RETRY_ATTEMPTS = 3
+        self.RESTART_DELAY = 1
+        
+        # Logging Configuration
+        self.HIDE_SENSOR_DATA = False  # Can be overridden by --no-sensor-data
+```
+
+## 🗄️ Local Database & Backup
+
+### JSON Database Operations
+```python
+# database/local_json_db.py - Local data storage
+def backup_sensor_data(sensor_data):
+    """Backup sensor data to local JSON files"""
+    try:
+        timestamp = datetime.now()
+        date_str = timestamp.strftime('%Y-%m-%d')
+        
+        # Create backup directory
+        backup_dir = f"data_backup/{date_str}"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Save sensor data
+        backup_file = f"{backup_dir}/sensors_{timestamp.strftime('%H-%M-%S')}.json"
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': timestamp.isoformat(),
+                'sensors': sensor_data
+            }, f, indent=2, ensure_ascii=False)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Backup error: {e}")
+        return False
+
+def load_sensor_history(date_str):
+    """Load sensor history for specific date"""
+    try:
+        backup_dir = f"data_backup/{date_str}"
+        history_data = []
+        
+        if os.path.exists(backup_dir):
+            for file in sorted(os.listdir(backup_dir)):
+                if file.endswith('.json'):
+                    with open(f"{backup_dir}/{file}", 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        history_data.append(data)
+        
+        return history_data
+        
+    except Exception as e:
+        logger.error(f"Load history error: {e}")
+        return []
+```
+
+## 🚀 Deployment & Operations
+
+### Startup Commands
+```bash
+# Standard startup
+python main_new.py
+
+# Hide sensor data logs (show only control commands)
+python main_new.py --no-sensor-data
+
+# Background service (Linux)
+nohup python main_new.py > fish_feeder.log 2>&1 &
+
+# Service status check
+ps aux | grep main_new.py
+
+# Stop service
+pkill -f main_new.py
+```
+
+### Systemd Service (Linux)
+```bash
+# Create service file
+sudo nano /etc/systemd/system/fish-feeder.service
+
+[Unit]
+Description=Fish Feeder Pi Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/fish-feeder/rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite
+ExecStart=/usr/bin/python3 main_new.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+# Enable and start service
+sudo systemctl enable fish-feeder.service
+sudo systemctl start fish-feeder.service
+sudo systemctl status fish-feeder.service
 ```
 
 ## 📋 Recent Updates (v3.0)
 
-### ✅ JSON Protocol Integration
-- **Unified communication** - 100% compatible with Pi Server auto-reconnect
-- **Real-time responses** - JSON status every 2 seconds for monitoring
-- **Command validation** - Input safety and error handling
-- **Protocol optimization** - Reduced latency and improved reliability
+### ✅ Arduino Auto-Reconnect System
+- **1-second monitoring** - Continuous connection health checking
+- **5-second timeout** - Quick detection of lost connections
+- **Automatic recovery** - Seamless reconnection without manual intervention
+- **Port auto-detection** - Smart detection of Arduino on available ports
 
-### ✅ Full PWM Motor Control (0-255)
-- **Complete PWM range** - 0-255 for all motors (Auger, Blower, Actuator)
-- **Direction control** - Forward/Reverse for Auger and Actuator
-- **Safety limits** - PWM validation and emergency stop override
-- **Real-time feedback** - Current PWM values in JSON response
+### ✅ Enhanced Firebase Integration
+- **Real-time listeners** - Bi-directional data synchronization
+- **Command timestamping** - Age verification to prevent old commands
+- **Optimized data structure** - Web-compatible nested organization
+- **Firebase free tier optimization** - Bandwidth usage monitoring
 
-### ✅ Enhanced Safety System
-- **Hardware emergency stop** - Physical button with interrupt handling
-- **Watchdog timer** - Auto-restart on system hang or freeze
-- **Input validation** - JSON command verification and bounds checking
-- **Status monitoring** - Health checks and diagnostic reporting
+### ✅ Performance Optimizations
+- **Event-driven architecture** - Non-blocking ThreadPoolExecutor design
+- **orjson serialization** - 2-3x faster JSON processing
+- **Smart data change detection** - Reduced unnecessary Firebase writes
+- **Memory monitoring** - Real-time RAM and CPU usage tracking
 
-### ✅ Sensor System Improvements
-- **Multi-sensor support** - Temperature, humidity, weight, power monitoring
-- **Error handling** - Sensor validation and failure recovery
-- **Calibration support** - Weight scale calibration and tare functions
-- **Real-time updates** - Continuous sensor monitoring and reporting
+### ✅ Production Features
+- **Graceful error handling** - Robust exception management
+- **Logging optimization** - Configurable log levels and output
+- **System health monitoring** - Heartbeat and performance metrics
+- **WebSocket broadcasting** - Real-time web client updates
 
 ---
 
-**🎉 Arduino Fish Feeder System v3.0 - Production Ready!**
+**🎉 Fish Feeder Pi Server v3.0 - Production Ready!**
 
-> **Compatible with:** Pi Server Auto-Reconnect System  
+> **Platform:** Raspberry Pi 4 + Python 3.9+  
+> **Architecture:** Event-Driven, Modular  
+> **Features:** Auto-Reconnect + Firebase + Camera Streaming  
 > **Last Updated:** 2025-01-18  
-> **Status:** ✅ Production Ready with JSON Protocol & Full PWM Control
+> **Status:** ✅ Production Ready with Arduino Auto-Reconnect

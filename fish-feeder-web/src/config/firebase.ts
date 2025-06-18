@@ -429,10 +429,8 @@ class FirebaseClient {
 
       // Send unified JSON format matching Pi Server protocol
       const command = {
-        controls: {
-          relays: {
-            led_pond_light: action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus())
-          }
+        relays: {
+          led_pond_light: action === "on" ? true : (action === "off" ? false : !await this.getCurrentLEDStatus())
         },
         timestamp: Date.now()
       };
@@ -454,10 +452,8 @@ class FirebaseClient {
 
       // Send unified JSON format matching Pi Server protocol
       const command = {
-        controls: {
-          relays: {
-            control_box_fan: action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus())
-          }
+        relays: {
+          control_box_fan: action === "on" ? true : (action === "off" ? false : !await this.getCurrentFanStatus())
         },
         timestamp: Date.now()
       };
@@ -472,25 +468,24 @@ class FirebaseClient {
   }
 
   // Control Feeder - UNIFIED PROTOCOL
-  async controlFeeder(action: "on" | "off" | "small" | "medium" | "large" | "auto" | "stop"): Promise<boolean> {
+  async controlFeeder(action: "on" | "off" | "small" | "medium" | "large" | "auto" | "stop", customPWM?: number): Promise<boolean> {
     try {
-      console.log(`🐟 [WEB] Sending Feeder command: ${action}`);
+      console.log(`🐟 [WEB] Sending Feeder command: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
       const controlRef = ref(this.database, "/controls");
 
       // Convert action to PWM value for auger motor
       let pwmValue = 0;
       if (action === "small") pwmValue = 100;
-      else if (action === "medium" || action === "on") pwmValue = 150;
+      else if (action === "medium") pwmValue = 150;
       else if (action === "large") pwmValue = 200;
       else if (action === "auto") pwmValue = 150;
+      else if (action === "on") pwmValue = customPWM || 200; // Use custom PWM or default
       else pwmValue = 0; // stop/off
 
       // Send unified JSON format matching Pi Server protocol
       const command = {
-        controls: {
-          motors: {
-            auger_food_dispenser: pwmValue
-          }
+        motors: {
+          auger_food_dispenser: pwmValue
         },
         timestamp: Date.now()
       };
@@ -504,24 +499,22 @@ class FirebaseClient {
     }
   }
 
-  // Control Blower - UNIFIED PROTOCOL
-  async controlBlower(action: "on" | "off" | "toggle"): Promise<boolean> {
+  // Control Blower - UNIFIED PROTOCOL with custom PWM (0-255)
+  async controlBlower(action: "on" | "off" | "toggle", customPWM?: number): Promise<boolean> {
     try {
-      console.log(`💨 [WEB] Sending Blower command: ${action}`);
+      console.log(`💨 [WEB] Sending Blower command: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
       const controlRef = ref(this.database, "/controls");
 
-      // Convert action to PWM value
+      // Convert action to PWM value (0-255 full range)
       let pwmValue = 0;
-      if (action === "on") pwmValue = 200;
-      else if (action === "toggle") pwmValue = await this.getCurrentBlowerStatus() ? 0 : 200;
+      if (action === "on") pwmValue = customPWM || 150; // Default 150 for blower
+      else if (action === "toggle") pwmValue = await this.getCurrentBlowerStatus() ? 0 : (customPWM || 150);
       else pwmValue = 0; // off
 
       // Send unified JSON format matching Pi Server protocol
       const command = {
-        controls: {
-          motors: {
-            blower_ventilation: pwmValue
-          }
+        motors: {
+          blower_ventilation: pwmValue
         },
         timestamp: Date.now()
       };
@@ -535,24 +528,24 @@ class FirebaseClient {
     }
   }
 
-  // Control Actuator - UNIFIED PROTOCOL
-  async controlActuator(action: "up" | "down" | "stop"): Promise<boolean> {
+  // Control Actuator - UNIFIED PROTOCOL with custom PWM
+  async controlActuator(action: "up" | "down" | "stop", customPWM?: number): Promise<boolean> {
     try {
-      console.log(`📏 [WEB] Sending Actuator command: ${action}`);
+      console.log(`📏 [WEB] Sending Actuator command: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
       const controlRef = ref(this.database, "/controls");
 
-      // Convert action to PWM value
+      // Convert action to PWM value with direction
       let pwmValue = 0;
-      if (action === "up") pwmValue = 200;
-      else if (action === "down") pwmValue = 200; // Same speed, direction handled by Pi
+      const pwm = customPWM || 255; // Use custom PWM or default 255
+      
+      if (action === "up") pwmValue = pwm;        // Positive for UP
+      else if (action === "down") pwmValue = -pwm; // Negative for DOWN  
       else pwmValue = 0; // stop
 
       // Send unified JSON format matching Pi Server protocol
       const command = {
-        controls: {
-          motors: {
-            actuator_feeder: pwmValue
-          }
+        motors: {
+          actuator_feeder: pwmValue
         },
         timestamp: Date.now()
       };
@@ -566,23 +559,21 @@ class FirebaseClient {
     }
   }
 
-  // Control Auger - UNIFIED PROTOCOL
-  async controlAuger(action: "on" | "off" | "forward" | "reverse" | "stop"): Promise<boolean> {
+  // Control Auger - UNIFIED PROTOCOL with custom PWM (0-255)
+  async controlAuger(action: "on" | "off" | "forward" | "reverse" | "stop", customPWM?: number): Promise<boolean> {
     try {
-      console.log(`🌀 [WEB] Sending Auger command: ${action}`);
+      console.log(`🌀 [WEB] Sending Auger command: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
       const controlRef = ref(this.database, "/controls");
 
-      // Send unified JSON format
+      // Send unified JSON format with full PWM range (0-255)
       let augerValue = 0;
-      if (action === "on" || action === "forward") augerValue = 200;
-      if (action === "reverse") augerValue = -200;
+      if (action === "on" || action === "forward") augerValue = customPWM || 200; // Default 200 for auger
+      if (action === "reverse") augerValue = -(customPWM || 200);
       if (action === "stop" || action === "off") augerValue = 0;
 
       const command = {
-        controls: {
-          motors: {
-            auger_food_dispenser: Math.abs(augerValue) // Pi Server handles direction separately
-          }
+        motors: {
+          auger_food_dispenser: Math.abs(augerValue) // Pi Server handles direction separately
         },
         timestamp: Date.now()
       };
@@ -724,16 +715,14 @@ class FirebaseClient {
 
       // Send unified shutdown command
       const command = {
-        controls: {
-          relays: {
-            led_pond_light: false,
-            control_box_fan: false
-          },
-          motors: {
-            auger_food_dispenser: 0,
-            actuator_feeder: 0,
-            blower_ventilation: 0
-          }
+        relays: {
+          led_pond_light: false,
+          control_box_fan: false
+        },
+        motors: {
+          auger_food_dispenser: 0,
+          actuator_feeder: 0,
+          blower_ventilation: 0
         },
         timestamp: Date.now()
       };

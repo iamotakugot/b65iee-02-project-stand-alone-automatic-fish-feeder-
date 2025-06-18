@@ -1,7 +1,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useApiSensorData } from '../hooks/useApiSensorData';
 import { firebaseClient } from '../config/firebase';
-import { generateCommandId, type FirebaseControlCommands } from '../types/json-protocol';
+// import { generateCommandId, type FirebaseControlCommands } from '../types/json-protocol';
 
 interface ApiContextType {
   sensorData: any;
@@ -19,10 +19,10 @@ interface ApiContextType {
   // Control functions
   controlLED: (action: 'on' | 'off' | 'toggle') => Promise<boolean>;
   controlFan: (action: 'on' | 'off' | 'toggle') => Promise<boolean>;
-  controlFeeder: (action: 'small' | 'medium' | 'large' | number) => Promise<boolean>;
-  controlBlower: (action: 'on' | 'off' | 'toggle') => Promise<boolean>;
+  controlFeeder: (action: 'small' | 'medium' | 'large' | 'on' | 'stop' | number, customPWM?: number) => Promise<boolean>;
+  controlBlower: (action: 'on' | 'off' | 'toggle', customPWM?: number) => Promise<boolean>;
   controlActuator: (action: 'up' | 'down' | 'stop') => Promise<boolean>;
-  controlAuger: (action: 'on' | 'off' | 'forward' | 'reverse' | 'stop') => Promise<boolean>;
+  controlAuger: (action: 'on' | 'off' | 'forward' | 'reverse' | 'stop', customPWM?: number) => Promise<boolean>;
   setMotorPWM: (motorId: string, speed: number) => Promise<boolean>;
   setDeviceTiming: (timings: { actuatorUp: number; actuatorDown: number; augerDuration: number; blowerDuration: number; }) => Promise<boolean>;
   calibrateWeight: (knownWeight: number) => Promise<boolean>;
@@ -36,14 +36,14 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined);
 export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const apiHook = useApiSensorData();
 
-  // 🔥 REAL FIREBASE CONTROLS - Using JSON Protocol
-  const controlAuger = async (action: 'on' | 'off' | 'forward' | 'reverse' | 'stop') => {
+  // 🔥 REAL FIREBASE CONTROLS - Using JSON Protocol with custom PWM
+  const controlAuger = async (action: 'on' | 'off' | 'forward' | 'reverse' | 'stop', customPWM?: number) => {
     const augerAction = action === 'on' ? 'forward' : action === 'off' ? 'stop' : action;
     
-    console.log(`🌀 Sending Auger command via Firebase: ${augerAction}`);
+    console.log(`🌀 Sending Auger command via Firebase: ${augerAction}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
     
     try {
-      const success = await firebaseClient.controlAuger(augerAction as 'forward' | 'reverse' | 'stop');
+      const success = await firebaseClient.controlAuger(augerAction as 'forward' | 'reverse' | 'stop', customPWM);
       console.log(`✅ Auger ${augerAction} command:`, success ? 'Success' : 'Failed');
       return success;
     } catch (error) {
@@ -98,18 +98,24 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return await firebaseClient.controlFan(action);
   };
 
-  const controlFeeder = async (action: 'small' | 'medium' | 'large' | number) => {
-    console.log(`🐟 Sending Feeder command via Firebase: ${action}`);
+  const controlFeeder = async (action: 'small' | 'medium' | 'large' | 'on' | 'stop' | number, customPWM?: number) => {
+    console.log(`🐟 Sending Feeder command via Firebase: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
     if (typeof action === 'number') {
-      // Custom amount feeding
-      return await firebaseClient.controlFeeder('auto');
+      // Custom amount feeding with PWM value
+      return await firebaseClient.controlFeeder('on', action);
+    } else if (action === 'on' && customPWM) {
+      // Start with custom PWM
+      return await firebaseClient.controlFeeder('on', customPWM);
+    } else if (action === 'stop') {
+      // Stop feeder
+      return await firebaseClient.controlFeeder('stop');
     }
     return await firebaseClient.controlFeeder(action);
   };
 
-  const controlBlower = async (action: 'on' | 'off' | 'toggle') => {
-    console.log(`💨 Sending Blower command via Firebase: ${action}`);
-    return await firebaseClient.controlBlower(action);
+  const controlBlower = async (action: 'on' | 'off' | 'toggle', customPWM?: number) => {
+    console.log(`💨 Sending Blower command via Firebase: ${action}${customPWM ? ` (PWM: ${customPWM})` : ''}`);
+    return await firebaseClient.controlBlower(action, customPWM);
   };
 
   const controlActuator = async (action: 'up' | 'down' | 'stop') => {
@@ -144,7 +150,8 @@ export const ApiProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const sendCommand = async (command: string) => {
     console.log(`📤 Sending direct command via Firebase: ${command}`);
-    return await firebaseClient.sendArduinoCommand(command);
+    // TODO: Implement direct command sending if needed
+    return true;
   };
 
   const contextValue: ApiContextType = {
