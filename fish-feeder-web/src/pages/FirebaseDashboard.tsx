@@ -15,7 +15,7 @@ import {
 } from "../utils/firebaseSensorUtils";
 import { useApi } from "../contexts/ApiContext";
 import { useState } from "react";
-import LogViewer from "../components/LogViewer";
+
 import { logger } from "../utils/logger";
 
 const FirebaseDashboard = () => {
@@ -391,11 +391,14 @@ const FirebaseDashboard = () => {
 
       {/* Main Grid Layout */}
       <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Sensor Data */}
-          <div className="space-y-6">
-            {/* Sensor Averaging Control Panel */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Full Width Top Section - Sensor Averaging Control */}
+          <div className="xl:col-span-3">
             <SensorAveragingControl />
+          </div>
+          
+          {/* Left Section (2/3 width on XL screens) - Sensor Data */}
+          <div className="xl:col-span-2 space-y-6">
             
             {/* Environmental Monitoring Section */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-100 dark:border-gray-700">
@@ -403,7 +406,7 @@ const FirebaseDashboard = () => {
                 <FaTemperatureHigh className="mr-2 text-green-500" />
                 🌡️ Environmental Monitoring
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
                 {/* Feeder Temperature */}
                 <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 rounded-lg p-4 border border-red-200 dark:border-red-700">
@@ -478,7 +481,7 @@ const FirebaseDashboard = () => {
                 <FiZap className="mr-2 text-yellow-500" />
                 ⚡ Power & Energy System
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
                 
                 {/* Battery Voltage */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4 border border-green-200 dark:border-green-700">
@@ -605,8 +608,8 @@ const FirebaseDashboard = () => {
                   </div>
                 </div>
 
-                {/* Load Current - Second Row */}
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-700 md:col-span-2 lg:col-span-1">
+                {/* Load Current */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-700">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Load Current
@@ -624,13 +627,16 @@ const FirebaseDashboard = () => {
               </div>
             </div>
 
-            {/* System Status & Monitoring Section */}
+          </div>
+
+          {/* Right Section (1/3 width on XL screens) - System Status & Monitoring */}
+          <div className="xl:col-span-1">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-100 dark:border-gray-700">
               <h2 className="text-xl font-semibold mb-4 flex items-center text-gray-800 dark:text-gray-100">
                 <FiActivity className="mr-2 text-purple-500" />
                 📊 System Status & Monitoring
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 
                 {/* Food Weight */}
                 <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-700">
@@ -648,11 +654,11 @@ const FirebaseDashboard = () => {
                   </div>
                 </div>
 
-                {/* Soil Moisture */}
+                {/* Food Moisture */}
                 <div className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-lg p-4 border border-green-200 dark:border-green-700">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Soil Moisture
+                      Food Moisture
                     </span>
                     <FiDroplet className="text-green-500 dark:text-green-400" />
                   </div>
@@ -660,62 +666,17 @@ const FirebaseDashboard = () => {
                     {formatSensorValue(values.soilMoisture, "%")}
                   </div>
                   <div className={`text-xs mt-1 ${values.soilMoisture && values.soilMoisture > 30 ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"}`}>
-                    {values.soilMoisture && values.soilMoisture > 30 ? "Moist" : "Dry"}
+                    {values.soilMoisture && values.soilMoisture > 30 ? "Good Moisture" : "Dry Food"}
                   </div>
                 </div>
 
               </div>
             </div>
-
-          </div>
-
-          {/* Right Column - System Status Only */}
-          <div className="space-y-6">
-            
-            {/* System Status Panel */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-semibold mb-4 flex items-center text-gray-800 dark:text-gray-100">
-                <FiActivity className="mr-2 text-green-500" />
-                📡 System Status
-              </h2>
-              
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Firebase:</span>
-                  <span className={`font-medium ${isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {isConnected ? 'Connected' : 'Disconnected'}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Arduino:</span>
-                  <span className={`font-medium ${firebaseData?.status?.arduino_connected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {firebaseData?.status?.arduino_connected ? 'Connected' : 'Disconnected'}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Last Update:</span>
-                  <span className="font-medium text-gray-800 dark:text-gray-200">
-                    {summary.lastUpdate}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Active Sensors:</span>
-                  <span className="font-medium text-blue-600 dark:text-blue-400">
-                    {summary.activeSensors}/{summary.totalSensors}
-                  </span>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
 
-      {/* Log Viewer Component */}
-      <LogViewer />
+
     </div>
   );
 };

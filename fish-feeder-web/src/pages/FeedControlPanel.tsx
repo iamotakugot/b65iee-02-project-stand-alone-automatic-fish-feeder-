@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Switch } from "@heroui/switch";
+import { Slider } from "@heroui/slider";
 import { BsPlus, BsTrash, BsCamera } from "react-icons/bs";
-import { FaWeight, FaPlay } from "react-icons/fa";
+import { FaWeight, FaPlay, FaStop, FaSave } from "react-icons/fa";
+import { FaRotateLeft } from "react-icons/fa6";
 
 import { useApi } from "../contexts/ApiContext";
 import { FishFeederApiClient } from "../config/api";
@@ -69,6 +71,8 @@ const FeedControlPanel = () => {
   const [actuatorDown, setActuatorDown] = useState("2");
   const [augerDuration, setAugerDuration] = useState("20");
   const [blowerDuration, setBlowerDuration] = useState("15");
+
+
 
   // Preset timing editor state
   const [editingPreset, setEditingPreset] = useState<string | null>(null);
@@ -588,86 +592,7 @@ const FeedControlPanel = () => {
             )}
           </div>
 
-          {/* Device Timing Controls */}
-          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 mb-6 border border-orange-200 dark:border-orange-700">
-            <h3 className="text-lg font-medium text-orange-700 dark:text-orange-300 mb-4">
-              ⏱️ Device Timing Controls
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="actuator-up-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Actuator Up (s)
-                </label>
-                <Input
-                  id="actuator-up-input"
-                  name="actuatorUp"
-                  placeholder="3"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={actuatorUp}
-                  onChange={(e) => handleTimingChange('actuator_up', e.target.value)}
-                  aria-label="Actuator up duration in seconds"
-                />
-              </div>
-              <div>
-                <label htmlFor="actuator-down-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Actuator Down (s)
-                </label>
-                <Input
-                  id="actuator-down-input"
-                  name="actuatorDown"
-                  placeholder="2"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={actuatorDown}
-                  onChange={(e) => handleTimingChange('actuator_down', e.target.value)}
-                  aria-label="Actuator down duration in seconds"
-                />
-              </div>
-              <div>
-                <label htmlFor="auger-duration-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Auger Duration (s)
-                </label>
-                <Input
-                  id="auger-duration-input"
-                  name="augerDuration"
-                  placeholder="20"
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={augerDuration}
-                  onChange={(e) => handleTimingChange('auger_duration', e.target.value)}
-                  aria-label="Auger motor duration in seconds"
-                />
-              </div>
-              <div>
-                <label htmlFor="blower-duration-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Blower Duration (s)
-                </label>
-                <Input
-                  id="blower-duration-input"
-                  name="blowerDuration"
-                  placeholder="15"
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={blowerDuration}
-                  onChange={(e) => handleTimingChange('blower_duration', e.target.value)}
-                  aria-label="Blower fan duration in seconds"
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-xs text-orange-600 dark:text-orange-400">
-                💡 Configure device operation timing for auto-stop control
-              </div>
-              <div className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
-                ✅ Auto-saved for {feedType}
-              </div>
-            </div>
-          </div>
+
 
           {/* Camera Feed Section */}
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6 border border-gray-200 dark:border-gray-700">
@@ -719,6 +644,8 @@ const FeedControlPanel = () => {
             </div>
           </div>
         </div>
+
+
 
         {/* Auto Schedule */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-100 dark:border-gray-700">

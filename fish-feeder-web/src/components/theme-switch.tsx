@@ -1,6 +1,6 @@
 import { FC, useState, useEffect } from "react";
 import { Switch } from "@heroui/switch";
-import { useTheme } from "@heroui/use-theme";
+import { useTheme } from "../provider";
 
 import { SunFilledIcon, MoonFilledIcon } from "./ui/icons";
 

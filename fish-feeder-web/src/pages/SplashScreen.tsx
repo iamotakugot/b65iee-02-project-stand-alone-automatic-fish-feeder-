@@ -6,6 +6,7 @@ const SplashScreen = () => {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [showTeam, setShowTeam] = useState(false);
+  const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
     // ⚡ IMMEDIATE TEAM DISPLAY - No setTimeout delays!
@@ -14,38 +15,65 @@ const SplashScreen = () => {
     // ⚡ IMMEDIATE PROGRESS COMPLETION - Event-driven UI
     setProgress(100);
 
-    // ⚡ MANUAL NAVIGATION ONLY - No auto setTimeout navigation!
-    // User-controlled navigation via Skip button only
+    // ⚡ COUNTDOWN NAVIGATION - Auto skip after 10 seconds
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          localStorage.setItem("splash-seen", "true");
+          
+          // Dispatch splash completion event
+          const splashCompleteEvent = new CustomEvent('splashComplete');
+          window.dispatchEvent(splashCompleteEvent);
+          
+          navigate("/");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     
     // Check URL parameter for auto-skip
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('nosplash') === 'true') {
       localStorage.setItem("splash-seen", "true");
+      
+      // Dispatch splash completion event
+      const splashCompleteEvent = new CustomEvent('splashComplete');
+      window.dispatchEvent(splashCompleteEvent);
+      
       navigate("/");
     }
+
+    return () => clearInterval(countdownInterval);
   }, [navigate]);
 
   const handleSkip = () => {
     localStorage.setItem("splash-seen", "true");
+    
+    // Dispatch splash completion event
+    const splashCompleteEvent = new CustomEvent('splashComplete');
+    window.dispatchEvent(splashCompleteEvent);
+    
     navigate("/");
   };
 
   const teamMembers = [
-    { id: "B6523404", name: "นาย พีรวัฒน์ ทองล้วน" },
     { id: "B6523442", name: "นาย ภัทรพงษ์ พิศเพ็ง" },
-    { id: "B6523497", name: "นาย สุริวัชร์ แสนทวีสุข" }
+    { id: "B6523497", name: "นาย สุริวัชร์ แสนทวีสุข" },
+    { id: "B6523404", name: "นาย พีรวัฒน์ ทองล้วน" }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 text-white flex flex-col items-center justify-center relative overflow-hidden font-inter">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 text-white relative overflow-hidden font-inter">
       {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/2 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-indigo-400/30 rounded-full blur-2xl animate-ping delay-500"></div>
       </div>
-
-      {/* Skip button - More prominent */}
+      
+      {/* Skip button with countdown */}
       <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -53,21 +81,13 @@ const SplashScreen = () => {
         onClick={handleSkip}
         className="absolute top-4 right-4 px-6 py-3 bg-white/20 backdrop-blur-md rounded-full text-sm hover:bg-white/30 transition-colors z-10 border border-white/30 font-semibold"
       >
-        ข้าม
+        ข้าม ({countdown})
       </motion.button>
 
-      {/* Quick access button */}
-      <motion.button
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        onClick={handleSkip}
-        className="absolute top-4 left-4 px-4 py-2 bg-green-600/80 backdrop-blur-md rounded-full text-sm hover:bg-green-600 transition-colors z-10 border border-green-500/50"
-      >
-        🚀 เข้าระบบ
-      </motion.button>
-
-      <div className="relative z-10 text-center max-w-4xl mx-auto px-6">
+      {/* Main Container Grid */}
+      <div className="min-h-screen grid grid-rows-[1fr_auto] items-center justify-center relative z-10">
+        {/* Main Content */}
+        <div className="text-center max-w-4xl mx-auto px-6 flex flex-col justify-center">
         {/* University Info - Smaller */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
@@ -204,8 +224,7 @@ const SplashScreen = () => {
               onClick={handleSkip}
               className="relative px-8 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-xl font-bold text-lg shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 border-2 border-white/20 backdrop-blur-sm group overflow-hidden"
             >
-              {/* Animated background */}
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
               
               {/* Button text */}
               <span className="relative z-10 flex items-center gap-2">
@@ -220,22 +239,23 @@ const SplashScreen = () => {
             </motion.button>
           </motion.div>
         )}
-      </div>
+        </div>
 
-      {/* Copyright - Fixed at bottom */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
-        className="absolute bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 text-center z-10"
-      >
-        <p className="text-xs text-gray-300 font-medium">
-          © 2024 Suranaree University of Technology
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Industrial Electrical Engineering
-        </p>
-      </motion.div>
+        {/* Copyright - Fixed at bottom */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="text-center z-10 pb-4"
+        >
+          <p className="text-xs text-gray-300 font-medium">
+            © 2024 Suranaree University of Technology
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Industrial Electrical Engineering
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 };
