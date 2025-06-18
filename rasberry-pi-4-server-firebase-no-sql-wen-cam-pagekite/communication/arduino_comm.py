@@ -62,13 +62,44 @@ def connect_arduino():
     if state.arduino_serial:
         state.arduino_connected = True
         state.reconnect_attempts = 0
-        logger.info(f"Arduino connected successfully on {port}")
+        state.last_arduino_response = time.time()  # Track last response time
+        logger.info(f"✅ Arduino connected successfully on {port}")
         logger.info("Waiting for sensor data... (Arduino sends JSON every 2 seconds)")
         return True
     else:
         state.arduino_connected = False
         state.reconnect_attempts += 1
-        logger.error(f"Arduino not found (attempt {state.reconnect_attempts})")
+        logger.error(f"❌ Arduino not found (attempt {state.reconnect_attempts})")
+        return False
+
+def check_arduino_connection():
+    """Check if Arduino connection is alive and auto-reconnect if needed"""
+    try:
+        current_time = time.time()
+        
+        # Check if we haven't received data for more than 5 seconds
+        if hasattr(state, 'last_arduino_response'):
+            time_since_last_response = current_time - state.last_arduino_response
+            if time_since_last_response > 5 and state.arduino_connected:
+                logger.warning(f"⚠️  Arduino silent for {time_since_last_response:.1f}s - connection may be lost")
+                state.arduino_connected = False
+                if state.arduino_serial:
+                    state.arduino_serial.close()
+                    state.arduino_serial = None
+        
+        # Auto-reconnect if disconnected
+        if not state.arduino_connected:
+            logger.info("🔄 Attempting Arduino auto-reconnect...")
+            success = connect_arduino()
+            if success:
+                logger.info("✅ Arduino auto-reconnect successful!")
+            return success
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Arduino connection check error: {e}")
+        state.arduino_connected = False
         return False
 
 def read_arduino_data():
@@ -93,6 +124,9 @@ def read_arduino_data():
             # Parse JSON data
             try:
                 arduino_data = orjson.loads(line)
+                
+                # Update last response time for connection monitoring
+                state.last_arduino_response = time.time()
                 
                 # Update system state
                 state.update_sensor_data(arduino_data)

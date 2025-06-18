@@ -22,13 +22,20 @@ app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
 @sio.event
 def connect(sid, environ):
     """WebSocket client connected"""
-    logger.info(f"WebSocket client connected: {sid}")
+    client_origin = environ.get('HTTP_ORIGIN', 'Unknown')
+    logger.info(f"[WEBSOCKET] Client connected: {sid} from {client_origin}")
+    
     # Send current status
-    sio.emit('status', {
+    status_data = {
         'arduino_connected': state.arduino_connected,
         'firebase_connected': state.firebase_connected,
-        'last_sensor_data': state.last_sensor_data
-    }, room=sid)
+        'last_sensor_data': state.last_sensor_data,
+        'server_time': datetime.now().isoformat(),
+        'websocket_server_ready': True
+    }
+    
+    sio.emit('status', status_data, room=sid)
+    logger.info(f"[WEBSOCKET] Status sent to {sid}: Arduino={state.arduino_connected}, Firebase={state.firebase_connected}")
 
 @sio.event
 def disconnect(sid):
@@ -40,14 +47,15 @@ def send_command(sid, data):
     """Receive command from WebSocket client"""
     from config import config
     
-    # Only log WebSocket commands if sensor data is not hidden
-    if not getattr(config, 'HIDE_SENSOR_DATA', False):
-        logger.info(f"WebSocket command from {sid}: {data}")
+    # ALWAYS log WebSocket commands (important for debugging)
+    logger.info(f"[WEBSOCKET COMMAND] From {sid}: {data}")
     
     from communication.arduino_comm import send_arduino_command
     if send_arduino_command(data):
+        logger.info(f"[WEBSOCKET COMMAND] SUCCESS - Sent to Arduino: {data}")
         sio.emit('command_result', {'success': True, 'message': 'Command sent'}, room=sid)
     else:
+        logger.warning(f"[WEBSOCKET COMMAND] FAILED - Arduino not connected")
         sio.emit('command_result', {'success': False, 'message': 'Arduino not connected'}, room=sid)
 
 @sio.event
@@ -133,4 +141,26 @@ def camera_control(sid, data):
             'success': False,
             'error': str(e),
             'message': 'Camera control failed'
-        }, room=sid) 
+        }, room=sid)
+
+# ===== BROADCAST FUNCTIONS =====
+def broadcast_control_update(control_data):
+    """Broadcast control update to all connected WebSocket clients"""
+    try:
+        if control_data:
+            sio.emit('control_update', {
+                'timestamp': control_data.get('timestamp', ''),
+                'controls': control_data.get('controls', {}),
+                'source': 'firebase'
+            })
+            logger.info(f"[WEBSOCKET] Broadcasted control update to all clients")
+    except Exception as e:
+        logger.error(f"[WEBSOCKET] Broadcast error: {e}")
+
+def broadcast_sensor_update(sensor_data):
+    """Broadcast sensor update to all connected WebSocket clients"""
+    try:
+        if sensor_data:
+            sio.emit('sensor_data', sensor_data)
+    except Exception as e:
+        logger.error(f"[WEBSOCKET] Sensor broadcast error: {e}")

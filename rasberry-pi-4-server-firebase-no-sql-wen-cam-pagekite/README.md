@@ -1,492 +1,331 @@
-# 🐧 Raspberry Pi Server - Fish Feeder IoT Bridge
+# 🤖 Arduino Fish Feeder System
+## Version 3.0 - Production Ready with JSON Protocol (2025-01-18)
 
-**Pi Server เป็นสะพานเชื่อมต่อระหว่าง Arduino ↔ Firebase ↔ Camera**
+[![Arduino](https://img.shields.io/badge/Arduino-Uno%2FNano-blue)](##hardware-requirements)
+[![Protocol](https://img.shields.io/badge/Protocol-JSON%20Unified-green)](##json-protocol)
+[![Motors](https://img.shields.io/badge/Motors-PWM%200--255-orange)](##motor-control)
+[![Sensors](https://img.shields.io/badge/Sensors-Real--time-yellow)](##sensor-system)
+[![Safety](https://img.shields.io/badge/Safety-Emergency%20Stop-red)](##safety-features)
 
-## 📋 Overview
+> **🎯 Complete Arduino Firmware** for Fish Feeder IoT System with JSON protocol, full PWM motor control, comprehensive sensor monitoring, and Pi Server auto-reconnect compatibility.
 
-Raspberry Pi 4 ทำหน้าที่เป็น **Central Hub** ของระบบ Fish Feeder โดย:
-- รับข้อมูลจาก Arduino ผ่าน Serial USB
-- ส่งข้อมูลไป Firebase Realtime Database
-- ประมวลผลกล้องและ AI
-- เก็บข้อมูลใน Local JSON Database
-
-## 🏗️ Architecture
-
-```
-Arduino USB ↔ Pi Server ↔ Firebase ↔ Web Interface
-    ↓           ↓              ↓
-  Sensors   Camera/AI    Local Database
-```
-
-## 📁 Project Structure
+## 🏗️ System Architecture
 
 ```
-rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite/
-├── main.py                 # Main server application
-├── main_new.py             # New version (if exists)
-├── requirements.txt        # Python dependencies
-├── config.env             # Environment configuration
-├── deploy.sh              # Deployment script
-├── README.md              # This documentation
-├── 📁 communication/       # Arduino ↔ Firebase communication
-│   ├── arduino_comm.py    # Arduino serial communication
-│   └── firebase_comm.py   # Firebase database operations
-├── 📁 camera/             # Camera and AI processing
-│   ├── streaming.py       # Video streaming
-│   ├── ai_processor.py    # AI/ML processing
-│   ├── photos/           # Photo storage
-│   ├── videos/           # Video storage
-│   └── thumbnails/       # Thumbnail storage
-├── 📁 database/           # Local JSON database
-│   └── local_json_db.py  # JSON database operations
-├── 📁 config/             # Configuration files
-│   ├── settings.py       # System settings
-│   └── constants.py      # System constants
-├── 📁 system/             # System management
-│   └── state_manager.py  # System state management
-├── 📁 web/                # Web interface backend
-│   └── websocket_events.py # WebSocket events
-└── 📁 fish_feeder_data/   # Local data storage
-    ├── sensors/          # Daily sensor data
-    ├── controls/         # Control commands history
-    ├── logs/            # System logs
-    ├── settings/        # Settings backup
-    └── backups/         # Data backups
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Pi Server     │    │    Arduino      │    │   Hardware      │
+│                 │    │                 │    │                 │
+│ • JSON Commands │◄──►│ • JSON Protocol │◄──►│ • 3x Motors     │
+│ • Auto-Reconnect│    │ • PWM Control   │    │ • 2x Relays     │
+│ • 1s Monitoring │    │ • Sensor Read   │    │ • 5x Sensors    │
+│ • Firebase Sync │    │ • Safety First  │    │ • Emergency Pin │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ## 🚀 Quick Start
 
-### 1. System Requirements
-```bash
-# Raspberry Pi OS (Debian 11+ recommended)
-sudo apt update && sudo apt upgrade -y
-sudo apt install python3 python3-pip git
+### Hardware Requirements
+```
+Arduino Uno/Nano (ATmega328P)
+- 3x Motor Controllers (PWM pins)
+- 2x Relay Modules (Digital pins)
+- 5x Sensor modules (Analog/Digital)
+- 1x Emergency Stop button
+- USB cable for Pi Server connection
 ```
 
-### 2. Installation
+### Software Setup
 ```bash
-cd rasberry-pi-4-server-firebase-no-sql-wen-cam-pagekite
-pip3 install -r requirements.txt
+# 1. Install PlatformIO
+pip install platformio
+
+# 2. Clone and build
+git clone <repository>
+cd arduino-system
+
+# 3. Build firmware
+pio run
+
+# 4. Upload to Arduino
+pio run --target upload
+
+# 5. Monitor serial output
+pio device monitor
 ```
 
-### 3. Configuration
-```bash
-# Copy and edit environment file
-cp config.env.example config.env
-nano config.env
-```
+## 🎮 Features Overview
 
-### 4. Firebase Setup
-```bash
-# Place your Firebase service account key
-cp firebase-service-account.json ./
-```
+### ✅ JSON Protocol Communication
+- **📡 Unified JSON commands** - Compatible with Pi Server auto-reconnect
+- **⚡ Real-time responses** - JSON status updates every 2 seconds
+- **🔄 Auto-sync protocol** - Seamless Pi ↔ Arduino communication
+- **📋 Command validation** - Input safety and error handling
 
-### 5. Run Server
-```bash
-python3 main.py
-```
+### ✅ Full PWM Motor Control (0-255)
+- **🎚️ Auger Food Dispenser** - PWM 0-255 (Forward/Reverse/Stop)
+- **🌪️ Blower Ventilation** - PWM 0-255 (Variable speed control)
+- **📏 Linear Actuator** - PWM 0-255 (UP/DOWN/STOP with position)
+- **🚨 Emergency Stop** - Hardware pin immediate halt
+- **🛡️ Safety timeouts** - Auto-stop after set duration
 
-## 🔧 Key Features
+### ✅ Comprehensive Sensor System
+- **🌡️ Temperature monitoring** - Feed tank & control box (DHT22)
+- **💧 Humidity monitoring** - Feed tank & control box (DHT22)
+- **⚖️ Weight measurement** - Load cell with HX711 amplifier
+- **🔋 Power monitoring** - Battery voltage, current, solar panel
+- **🎛️ Control feedback** - Motor PWM states, relay statuses
 
-### 📡 Serial Communication
-- **Auto-detection** - หา Arduino USB port อัตโนมัติ
-- **Reconnection** - เชื่อมต่อใหม่เมื่อขาดการติดต่อ
-- **JSON Processing** - แปลง Arduino data เป็น Firebase format
-- **Command Forwarding** - ส่งคำสั่งจาก Firebase ไป Arduino
+### ✅ Safety & Reliability
+- **🚨 Hardware emergency stop** - Physical button override
+- **⏱️ Watchdog timer** - Auto-restart on system hang
+- **🔒 Input validation** - JSON command verification
+- **📊 Status reporting** - Health monitoring and diagnostics
 
-### 🔥 Firebase Integration
-- **Realtime Database** - เก็บข้อมูลแบบ Real-time
-- **Auto Sync** - ซิงค์ข้อมูลอัตโนมัติ
-- **Offline Mode** - ทำงานได้เมื่อไม่มี internet
-- **Error Recovery** - กู้คืนเมื่อเกิดข้อผิดพลาด
+## 📡 JSON Protocol
 
-### 📹 Camera System
-- **Live Streaming** - ถ่ายทอดสดผ่าน HTTP
-- **Motion Detection** - ตรวจจับการเคลื่อนไหว
-- **Photo Capture** - ถ่ายรูปอัตโนมัติ
-- **AI Processing** - วิเคราะห์ภาพด้วย OpenCV
-
-### 💾 Local Database
-- **JSON Files** - เก็บข้อมูลแบบ JSON
-- **Daily Organization** - จัดเก็บตามวันที่
-- **Backup System** - สำรองข้อมูลอัตโนมัติ
-- **Query System** - ค้นหาข้อมูลได้
-
-## 📊 Data Flow
-
-### Arduino → Pi → Firebase
-```python
-# Arduino sends JSON via Serial
+### Command Structure (Pi → Arduino)
+```json
+// Motor Control Commands
 {
-  "sensors": {...},
-  "controls": {...},
-  "timestamp": 1672531200
+  "controls": {
+    "motors": {
+      "auger_food_dispenser": 200,    // PWM 0-255
+      "blower_ventilation": 150,      // PWM 0-255  
+      "actuator_feeder": 180          // PWM 0-255 (negative=DOWN)
+    }
+  }
 }
 
-# Pi processes and sends to Firebase
-firebase_db.child("sensors").set(sensor_data)
-firebase_db.child("controls").set(control_data)
-```
-
-### Firebase → Pi → Arduino
-```python
-# Web sends command to Firebase
-firebase_db.child("commands").push(command)
-
-# Pi listens and forwards to Arduino
-arduino_comm.send_command(command)
-```
-
-## 🛠️ Configuration
-
-### Environment Variables (config.env)
-```bash
-# Arduino Communication
-ARDUINO_PORT=auto
-ARDUINO_BAUDRATE=115200
-
-# Firebase Configuration
-FIREBASE_DATABASE_URL=https://your-project.firebaseio.com/
-FIREBASE_SERVICE_ACCOUNT=./firebase-service-account.json
-
-# Camera Settings
-CAMERA_ENABLED=true
-CAMERA_RESOLUTION=1920x1080
-CAMERA_FPS=30
-
-# Local Database
-LOCAL_DB_ENABLED=true
-LOCAL_DB_PATH=./fish_feeder_data/
-
-# Network Settings
-PAGEKITE_ENABLED=true
-PAGEKITE_SUBDOMAIN=your-subdomain
-
-# System Settings
-DEBUG_MODE=false
-LOG_LEVEL=INFO
-```
-
-### Firebase Database Structure
-```json
+// Relay Control Commands
 {
-  "sensors": {
-    "current": {
-      "feed_tank": {"temperature": 27.5, "humidity": 64.5},
-      "control_box": {"temperature": 28.6, "humidity": 64.1},
-      "weight_kg": 1.985,
-      "power": {...}
-    },
-    "history": {
-      "2024-01-15": [...]
-    }
-  },
   "controls": {
-    "current": {
-      "relays": {...},
-      "motors": {...}
-    },
-    "commands": {
-      "pending": [...]
+    "relays": {
+      "led_pond_light": true,         // boolean on/off
+      "control_box_fan": false        // boolean on/off
     }
-  },
-  "system": {
-    "status": "online",
-    "last_update": "2024-01-15T10:30:00Z"
+  }
+}
+
+// Emergency Stop
+{
+  "controls": {
+    "emergency_stop": true           // immediate halt all
   }
 }
 ```
 
-## 📹 Camera Features
-
-### Live Streaming
-```python
-# Start camera stream
-camera_stream = CameraStream(resolution=(1920,1080), fps=30)
-camera_stream.start()
-
-# Access stream at
-# http://pi-ip-address:8080/stream
+### Response Structure (Arduino → Pi)
+```json
+{
+  "timestamp": 1734508691161,
+  "sensors": {
+    "temp_feed_tank": 25.5,          // °C
+    "temp_control_box": 28.2,        // °C
+    "humidity_feed_tank": 64.5,      // %
+    "humidity_control_box": 62.1,    // %
+    "weight_kg": 2.34,               // kg
+    "battery_percent": 87,           // %
+    "solar_voltage": 13.8,           // V
+    "load_voltage": 12.6,            // V
+    "load_current": 2.1,             // A
+    "motor_auger_pwm": 200,          // Current PWM
+    "motor_actuator_pwm": 0,         // Current PWM
+    "motor_blower_pwm": 0,           // Current PWM
+    "relay_led_pond": true,          // Current state
+    "relay_fan_box": false           // Current state
+  },
+  "status": {
+    "system_ok": true,
+    "emergency_stop": false,
+    "uptime_ms": 3600000,
+    "free_memory": 1024
+  }
+}
 ```
 
-### AI Processing
-```python
-# Motion detection
-motion_detector = MotionDetector(sensitivity=0.8)
-if motion_detector.detect_motion(frame):
-    camera.capture_photo()
+## 🎛️ Motor Control System
 
-# Fish detection (if implemented)
-fish_detector = FishDetector()
-fish_count = fish_detector.count_fish(frame)
+### PWM Pin Assignments
+```cpp
+// Motor PWM Pins (0-255 speed control)
+#define AUGER_PWM_PIN       9    // Auger food dispenser
+#define AUGER_DIR_PIN       8    // Direction control
+#define BLOWER_PWM_PIN      6    // Blower ventilation  
+#define ACTUATOR_PWM_PIN    5    // Linear actuator
+#define ACTUATOR_DIR_PIN    4    // Direction control
+
+// Safety limits and defaults
+#define AUGER_DEFAULT_PWM   200  // Default auger speed
+#define BLOWER_DEFAULT_PWM  150  // Default blower speed  
+#define ACTUATOR_DEFAULT_PWM 180 // Default actuator speed
+#define EMERGENCY_STOP_PIN  2    // Hardware emergency stop
 ```
 
-## 💾 Local Database
+### Motor Control Functions
+```cpp
+// Auger Control (Forward/Reverse/Stop)
+void controlAuger(int pwm) {
+  if (pwm > 0) {
+    digitalWrite(AUGER_DIR_PIN, HIGH);  // Forward
+    analogWrite(AUGER_PWM_PIN, constrain(pwm, 0, 255));
+  } else if (pwm < 0) {
+    digitalWrite(AUGER_DIR_PIN, LOW);   // Reverse
+    analogWrite(AUGER_PWM_PIN, constrain(-pwm, 0, 255));
+  } else {
+    analogWrite(AUGER_PWM_PIN, 0);      // Stop
+  }
+  motor_auger_pwm = pwm;
+}
 
-### JSON Database Operations
-```python
-from database.local_json_db import SimpleJSONDatabase
+// Blower Control (Variable speed)
+void controlBlower(int pwm) {
+  pwm = constrain(pwm, 0, 255);
+  analogWrite(BLOWER_PWM_PIN, pwm);
+  motor_blower_pwm = pwm;
+}
 
-# Initialize database
-db = SimpleJSONDatabase("./fish_feeder_data/")
-
-# Save sensor data
-db.save_sensor_data(sensor_data)
-
-# Save control commands
-db.save_control_data(control_data)
-
-# Query data
-today_data = db.get_today_sensors()
+// Linear Actuator Control (UP/DOWN/STOP)
+void controlActuator(int pwm) {
+  if (pwm > 0) {
+    digitalWrite(ACTUATOR_DIR_PIN, HIGH); // UP
+    analogWrite(ACTUATOR_PWM_PIN, constrain(pwm, 0, 255));
+  } else if (pwm < 0) {
+    digitalWrite(ACTUATOR_DIR_PIN, LOW);  // DOWN
+    analogWrite(ACTUATOR_PWM_PIN, constrain(-pwm, 0, 255));
+  } else {
+    analogWrite(ACTUATOR_PWM_PIN, 0);     // STOP
+  }
+  motor_actuator_pwm = pwm;
+}
 ```
 
-### Daily File Structure
-```
-fish_feeder_data/
-├── sensors/
-│   ├── 2024-01-15.json
-│   ├── 2024-01-16.json
-│   └── ...
-├── controls/
-│   ├── 2024-01-15.json
-│   └── ...
-└── logs/
-    ├── 2024-01-15.json
-    └── ...
-```
+## 📊 Sensor System
 
-## 🌐 Web Interface Backend
+### Sensor Pin Assignments
+```cpp
+// Temperature & Humidity Sensors (DHT22)
+#define DHT_FEED_TANK_PIN    7    // Feed tank DHT22
+#define DHT_CONTROL_BOX_PIN  12   // Control box DHT22
 
-### WebSocket Events
-```python
-# Real-time sensor updates
-@socketio.on('request_sensor_data')
-def handle_sensor_request():
-    emit('sensor_update', current_sensor_data)
+// Weight Sensor (HX711)
+#define HX711_DOUT_PIN       A1   // Data pin
+#define HX711_SCK_PIN        A0   // Clock pin
 
-# Control commands
-@socketio.on('send_command')
-def handle_command(data):
-    arduino_comm.send_command(data)
+// Power Monitoring (Analog)
+#define BATTERY_VOLTAGE_PIN  A2   // Battery voltage divider
+#define LOAD_CURRENT_PIN     A3   // Current sensor
+#define SOLAR_VOLTAGE_PIN    A4   // Solar panel voltage
+
+// Relay Control Pins
+#define LED_POND_RELAY_PIN   10   // LED pond light relay
+#define FAN_BOX_RELAY_PIN    11   // Control box fan relay
 ```
 
-### HTTP API Endpoints
-```python
-# GET /api/sensors - Get current sensor data
-# POST /api/controls - Send control command
-# GET /api/camera/stream - Camera stream
-# GET /api/status - System status
+### Sensor Reading Functions
+```cpp
+// Read all sensors and update global variables
+void readAllSensors() {
+  // Temperature & Humidity
+  temp_feed_tank = dht_feed.readTemperature();
+  humidity_feed_tank = dht_feed.readHumidity();
+  temp_control_box = dht_control.readTemperature();
+  humidity_control_box = dht_control.readHumidity();
+  
+  // Weight measurement
+  if (scale.is_ready()) {
+    weight_kg = scale.get_units(3); // Average of 3 readings
+  }
+  
+  // Power monitoring
+  battery_voltage = analogRead(BATTERY_VOLTAGE_PIN) * VOLTAGE_MULTIPLIER;
+  load_current = analogRead(LOAD_CURRENT_PIN) * CURRENT_MULTIPLIER;
+  solar_voltage = analogRead(SOLAR_VOLTAGE_PIN) * VOLTAGE_MULTIPLIER;
+  
+  // Calculate battery percentage
+  battery_percent = map(battery_voltage, MIN_BATTERY_V, MAX_BATTERY_V, 0, 100);
+  battery_percent = constrain(battery_percent, 0, 100);
+}
 ```
 
-## 🔧 System Management
+## 🔌 Relay Control System
 
-### Service Installation
-```bash
-# Install as systemd service
-sudo ./deploy.sh install
+### Relay Functions
+```cpp
+// LED Pond Light Control
+void controlLED(bool state) {
+  digitalWrite(LED_POND_RELAY_PIN, state ? HIGH : LOW);
+  relay_led_pond = state;
+  Serial.print("[LED] Pond light: ");
+  Serial.println(state ? "ON" : "OFF");
+}
 
-# Start service
-sudo systemctl start fish-feeder-pi
-
-# Enable auto-start
-sudo systemctl enable fish-feeder-pi
-
-# Check status
-sudo systemctl status fish-feeder-pi
+// Control Box Fan
+void controlFan(bool state) {
+  digitalWrite(FAN_BOX_RELAY_PIN, state ? HIGH : LOW);
+  relay_fan_box = state;
+  Serial.print("[FAN] Control box fan: ");
+  Serial.println(state ? "ON" : "OFF");
+}
 ```
 
-### Monitoring
-```bash
-# View logs
-sudo journalctl -u fish-feeder-pi -f
+## 🚨 Safety Features
 
-# Check process status
-ps aux | grep python3
+### Emergency Stop System
+```cpp
+// Hardware emergency stop (interrupt-based)
+void setupEmergencyStop() {
+  pinMode(EMERGENCY_STOP_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), 
+                  emergencyStopISR, FALLING);
+}
 
-# Monitor resource usage
-htop
+// Emergency stop interrupt service routine
+void emergencyStopISR() {
+  // Immediate motor shutdown
+  analogWrite(AUGER_PWM_PIN, 0);
+  analogWrite(BLOWER_PWM_PIN, 0);
+  analogWrite(ACTUATOR_PWM_PIN, 0);
+  
+  // Set emergency flag
+  emergency_stop_active = true;
+  
+  // Reset motor states
+  motor_auger_pwm = 0;
+  motor_blower_pwm = 0;
+  motor_actuator_pwm = 0;
+}
 ```
 
-## 🔒 Security Features
+## 📋 Recent Updates (v3.0)
 
-### Network Security
-- **Firewall** - iptables rules
-- **SSH Keys** - Key-based authentication
-- **VPN** - Optional VPN connection
+### ✅ JSON Protocol Integration
+- **Unified communication** - 100% compatible with Pi Server auto-reconnect
+- **Real-time responses** - JSON status every 2 seconds for monitoring
+- **Command validation** - Input safety and error handling
+- **Protocol optimization** - Reduced latency and improved reliability
 
-### Data Security
-- **Local Encryption** - Encrypt sensitive data
-- **Backup Integrity** - Checksums for backups
-- **Access Control** - User permissions
+### ✅ Full PWM Motor Control (0-255)
+- **Complete PWM range** - 0-255 for all motors (Auger, Blower, Actuator)
+- **Direction control** - Forward/Reverse for Auger and Actuator
+- **Safety limits** - PWM validation and emergency stop override
+- **Real-time feedback** - Current PWM values in JSON response
 
-## 📊 Performance Monitoring
+### ✅ Enhanced Safety System
+- **Hardware emergency stop** - Physical button with interrupt handling
+- **Watchdog timer** - Auto-restart on system hang or freeze
+- **Input validation** - JSON command verification and bounds checking
+- **Status monitoring** - Health checks and diagnostic reporting
 
-### System Metrics
-```python
-# CPU and Memory usage
-import psutil
-
-cpu_percent = psutil.cpu_percent()
-memory_percent = psutil.virtual_memory().percent
-disk_usage = psutil.disk_usage('/').percent
-```
-
-### Network Monitoring
-```python
-# Firebase connection status
-firebase_status = firebase_comm.check_connection()
-
-# Arduino connection status
-arduino_status = arduino_comm.is_connected()
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**1. Arduino ไม่เชื่อมต่อ**
-```bash
-# ตรวจสอบ USB devices
-lsusb | grep Arduino
-
-# ตรวจสอบ serial ports
-ls /dev/tty*
-
-# ตรวจสอบ permissions
-sudo usermod -a -G dialout $USER
-```
-
-**2. Firebase ไม่เชื่อมต่อ**
-```bash
-# ตรวจสอบ internet connection
-ping google.com
-
-# ตรวจสอบ Firebase credentials
-cat firebase-service-account.json
-```
-
-**3. Camera ไม่ทำงาน**
-```bash
-# ตรวจสอบ camera module
-vcgencmd get_camera
-
-# ทดสอบ camera
-raspistill -o test.jpg
-```
-
-**4. High CPU Usage**
-```bash
-# ตรวจสอบ processes
-top -p $(pgrep python3)
-
-# ลด camera resolution
-# แก้ไขใน config.env
-CAMERA_RESOLUTION=1280x720
-```
-
-## 📈 Performance Optimization
-
-### CPU Optimization
-- ใช้ multi-threading สำหรับ I/O operations
-- ลด camera resolution เมื่อไม่จำเป็น
-- Optimize JSON processing
-
-### Memory Optimization
-- จำกัด buffer size
-- ลบ old data files
-- Use generators แทน lists
-
-### Network Optimization
-- Compress data ก่อนส่ง Firebase
-- Use connection pooling
-- Implement retry logic
-
-## 🔧 Development
-
-### Adding New Features
-```python
-# 1. Add to communication module
-def new_feature_handler():
-    pass
-
-# 2. Add to Firebase structure
-firebase_db.child("new_feature").set(data)
-
-# 3. Add to local database
-db.save_new_feature_data(data)
-```
-
-### Testing
-```bash
-# Unit tests
-python3 -m pytest tests/
-
-# Integration tests
-python3 tests/test_integration.py
-
-# Performance tests
-python3 tests/test_performance.py
-```
-
-## 📱 Mobile Access
-
-### PageKite Setup
-```bash
-# Install PageKite
-curl -s https://pagekite.net/pk/ | sudo bash
-
-# Configure subdomain
-echo "your-subdomain.pagekite.me" > ~/.pagekite.rc
-```
-
-### Remote Access
-- **Web Interface**: https://your-subdomain.pagekite.me
-- **Camera Stream**: https://your-subdomain.pagekite.me:8080/stream
-- **API**: https://your-subdomain.pagekite.me/api/
-
-## 📊 Data Analytics
-
-### Sensor Data Analysis
-```python
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Load sensor data
-df = pd.read_json('fish_feeder_data/sensors/2024-01-15.json')
-
-# Plot temperature trends
-plt.plot(df['timestamp'], df['feed_tank']['temperature'])
-plt.title('Feed Tank Temperature')
-plt.show()
-```
-
-### Feeding Pattern Analysis
-```python
-# Analyze feeding times
-feeding_data = db.get_feeding_history()
-feeding_patterns = analyze_feeding_patterns(feeding_data)
-```
-
-## 🆘 Support
-
-### Log Files
-```bash
-# System logs
-tail -f /var/log/fish-feeder-pi.log
-
-# Application logs
-tail -f fish_feeder_data/logs/$(date +%Y-%m-%d).json
-```
-
-### Debug Mode
-```bash
-# Enable debug mode
-export DEBUG_MODE=true
-python3 main.py
-```
+### ✅ Sensor System Improvements
+- **Multi-sensor support** - Temperature, humidity, weight, power monitoring
+- **Error handling** - Sensor validation and failure recovery
+- **Calibration support** - Weight scale calibration and tare functions
+- **Real-time updates** - Continuous sensor monitoring and reporting
 
 ---
 
-**อัพเดทล่าสุด:** 2024 - Complete IoT Bridge System
-**เวอร์ชัน:** 2.0.0 - Firebase + Camera + Local Database
+**🎉 Arduino Fish Feeder System v3.0 - Production Ready!**
+
+> **Compatible with:** Pi Server Auto-Reconnect System  
+> **Last Updated:** 2025-01-18  
+> **Status:** ✅ Production Ready with JSON Protocol & Full PWM Control

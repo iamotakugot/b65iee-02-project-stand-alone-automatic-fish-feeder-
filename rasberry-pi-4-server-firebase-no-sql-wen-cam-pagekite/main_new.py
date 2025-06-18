@@ -39,6 +39,7 @@ try:
         connect_arduino, init_firebase, 
         read_arduino_data, update_firebase_sensors
     )
+    from communication.arduino_comm import check_arduino_connection
     
     # Import database
     from database import local_db, backup_sensor_data
@@ -55,6 +56,36 @@ except ImportError as e:
     logger.error(f"Import error: {e}")
     logger.error("Please make sure all required modules are in their respective folders")
     sys.exit(1)
+
+# ===== ARDUINO AUTO-RECONNECT LOOP =====
+def arduino_auto_reconnect_loop():
+    """Arduino auto-reconnect loop - checks every 1 second"""
+    logger.info("🔄 Starting Arduino auto-reconnect monitor (1s interval)")
+    
+    while state.running:
+        try:
+            # Check and reconnect if needed
+            connection_ok = check_arduino_connection()
+            
+            # Log status periodically (every 30 seconds)
+            current_time = time.time()
+            if not hasattr(arduino_auto_reconnect_loop, 'last_status_log'):
+                arduino_auto_reconnect_loop.last_status_log = current_time
+            
+            if current_time - arduino_auto_reconnect_loop.last_status_log >= 30:
+                status = "✅ Connected" if connection_ok else "❌ Disconnected"
+                logger.info(f"🔄 Arduino status: {status} (auto-checking every 1s)")
+                arduino_auto_reconnect_loop.last_status_log = current_time
+            
+            # Sleep for 1 second before next check
+            time.sleep(1.0)
+            
+        except KeyboardInterrupt:
+            logger.info("🔄 Arduino reconnect monitor shutting down...")
+            break
+        except Exception as e:
+            logger.error(f"🔄 Arduino reconnect monitor error: {e}")
+            time.sleep(1.0)  # Continue checking even on error
 
 # ===== MAIN DATA PROCESSING LOOP =====
 def main_data_loop():
@@ -160,6 +191,9 @@ def start_fish_feeder_system():
     # Initialize Firebase
     if not init_firebase():
         logger.warning("Firebase not connected, running in offline mode")
+    else:
+        logger.info("[FIREBASE CONTROL] System ready to receive commands from Firebase")
+        logger.info("[FIREBASE CONTROL] Use --no-sensor-data to hide sensor logs only")
     
     # Start background threads
     logger.info("Starting background threads...")
@@ -167,6 +201,10 @@ def start_fish_feeder_system():
     # Heartbeat monitor thread
     heartbeat_thread = threading.Thread(target=heartbeat_monitor, daemon=True)
     heartbeat_thread.start()
+    
+    # Arduino auto-reconnect thread
+    arduino_reconnect_thread = threading.Thread(target=arduino_auto_reconnect_loop, daemon=True)
+    arduino_reconnect_thread.start()
     
     # Data processing thread
     data_thread = threading.Thread(target=main_data_loop, daemon=True)
